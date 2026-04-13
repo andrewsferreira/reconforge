@@ -429,6 +429,7 @@ class WebModule:
             self.output.audit_file(self.MODULE_NAME).write_text(
                 json.dumps(results.get("observability", {}), indent=2)
             )
+            self.output.write_evidence_manifest(self.MODULE_NAME, self.execution_id)
 
             # quick_report.md
             self._generate_quick_report(results)

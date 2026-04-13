@@ -480,6 +480,7 @@ class ADModule:
             self.output.audit_file(self.MODULE_NAME).write_text(
                 json.dumps(results.get("observability", {}), indent=2)
             )
+            self.output.write_evidence_manifest(self.MODULE_NAME, self.execution_id)
             self.logger.info(f"Reports saved to: {self.module_dir}")
         except Exception as e:
             self.logger.error(f"Error generating reports: {e}")

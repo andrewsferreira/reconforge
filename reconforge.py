@@ -17,6 +17,8 @@ from pathlib import Path
 # Ensure the project root is on the path
 sys.path.insert(0, str(Path(__file__).parent))
 
+from core.authorization_gate import ScopeAuthorization
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
@@ -72,6 +74,12 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Default command timeout in seconds")
     net_parser.add_argument("--encrypt-loot", action="store_true",
                             help="Encrypt loot files with Fernet (key in ~/.reconforge/loot.key)")
+    net_parser.add_argument("--enforce-scope", action="store_true",
+                            help="Require scope/approval validation before active execution")
+    net_parser.add_argument("--scope-file", default="",
+                            help="Path to scope authorization YAML/JSON file")
+    net_parser.add_argument("--approval-id", default="",
+                            help="Approval token/ID matching the scope file")
 
     # AD module
     ad_parser = subparsers.add_parser("ad", help="Active Directory reconnaissance")
@@ -99,6 +107,12 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Default command timeout in seconds")
     ad_parser.add_argument("--encrypt-loot", action="store_true",
                             help="Encrypt loot files with Fernet (key in ~/.reconforge/loot.key)")
+    ad_parser.add_argument("--enforce-scope", action="store_true",
+                           help="Require scope/approval validation before active execution")
+    ad_parser.add_argument("--scope-file", default="",
+                           help="Path to scope authorization YAML/JSON file")
+    ad_parser.add_argument("--approval-id", default="",
+                           help="Approval token/ID matching the scope file")
 
     # Web module
     web_parser = subparsers.add_parser(
@@ -132,6 +146,12 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Global timeout for tools")
     web_parser.add_argument("--encrypt-loot", action="store_true",
                             help="Encrypt loot files with Fernet (key in ~/.reconforge/loot.key)")
+    web_parser.add_argument("--enforce-scope", action="store_true",
+                            help="Require scope/approval validation before active execution")
+    web_parser.add_argument("--scope-file", default="",
+                            help="Path to scope authorization YAML/JSON file")
+    web_parser.add_argument("--approval-id", default="",
+                            help="Approval token/ID matching the scope file")
 
     # API module
     api_parser = subparsers.add_parser(
@@ -161,6 +181,12 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Global timeout for tools")
     api_parser.add_argument("--encrypt-loot", action="store_true",
                             help="Encrypt loot files with Fernet (key in ~/.reconforge/loot.key)")
+    api_parser.add_argument("--enforce-scope", action="store_true",
+                            help="Require scope/approval validation before active execution")
+    api_parser.add_argument("--scope-file", default="",
+                            help="Path to scope authorization YAML/JSON file")
+    api_parser.add_argument("--approval-id", default="",
+                            help="Approval token/ID matching the scope file")
 
     # Workflow orchestrator
     wf_parser = subparsers.add_parser(
@@ -196,6 +222,12 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Automatically enqueue safe follow-on module steps inferred from recon results")
     wf_parser.add_argument("--max-handoff-steps", type=int, default=5,
                            help="Maximum number of auto-handoff steps to enqueue")
+    wf_parser.add_argument("--enforce-scope", action="store_true",
+                           help="Require scope/approval validation before active execution")
+    wf_parser.add_argument("--scope-file", default="",
+                           help="Path to scope authorization YAML/JSON file")
+    wf_parser.add_argument("--approval-id", default="",
+                           help="Approval token/ID matching the scope file")
 
     # Surface module
     surface_parser = subparsers.add_parser(
@@ -219,8 +251,30 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="Global timeout for tools")
     surface_parser.add_argument("--encrypt-loot", action="store_true",
                                 help="Encrypt loot files with Fernet (key in ~/.reconforge/loot.key)")
+    surface_parser.add_argument("--enforce-scope", action="store_true",
+                                help="Require scope/approval validation before active execution")
+    surface_parser.add_argument("--scope-file", default="",
+                                help="Path to scope authorization YAML/JSON file")
+    surface_parser.add_argument("--approval-id", default="",
+                                help="Approval token/ID matching the scope file")
 
     return parser
+
+
+def enforce_scope_gate(args: argparse.Namespace) -> None:
+    """Enforce E1 scope/approval checks when explicitly enabled."""
+    if not getattr(args, "enforce_scope", False):
+        return
+    if getattr(args, "dry_run", False):
+        return
+
+    if not getattr(args, "scope_file", ""):
+        raise ValueError("--enforce-scope requires --scope-file")
+    if not getattr(args, "approval_id", ""):
+        raise ValueError("--enforce-scope requires --approval-id")
+
+    auth = ScopeAuthorization.from_file(args.scope_file)
+    auth.assert_authorized(target=args.target, provided_approval_id=args.approval_id)
 
 
 def main():
@@ -231,6 +285,10 @@ def main():
     if not args.module:
         parser.print_help()
         sys.exit(1)
+    try:
+        enforce_scope_gate(args)
+    except ValueError as e:
+        parser.error(str(e))
 
     if args.module == "network":
         from modules.network.network_module import NetworkModule
