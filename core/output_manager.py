@@ -166,6 +166,10 @@ class OutputManager:
             for ap in workflow.attack_paths:
                 lines.append(f"### {ap.name} [{ap.risk.upper()}]\n")
                 lines.append(f"{ap.description}\n")
+                if ap.tactic:
+                    lines.append(f"- **Tactic:** {ap.tactic}")
+                if ap.technique_id:
+                    lines.append(f"- **Technique:** {ap.technique_id}")
                 lines.append("**Steps:**")
                 for i, step in enumerate(ap.steps, 1):
                     lines.append(f"{i}. {step}")

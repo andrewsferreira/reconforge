@@ -26,6 +26,8 @@ class AttackPath:
     risk: str  # critical, high, medium, low
     prerequisites: List[str] = field(default_factory=list)
     references: List[str] = field(default_factory=list)
+    tactic: Optional[str] = None
+    technique_id: Optional[str] = None
 
 
 class AttackWorkflow:
@@ -56,20 +58,44 @@ class AttackWorkflow:
 
     def add_attack_path(self, name: str, description: str, steps: List[str],
                         risk: str, prerequisites: Optional[List[str]] = None,
-                        references: Optional[List[str]] = None) -> AttackPath:
+                        references: Optional[List[str]] = None,
+                        tactic: Optional[str] = None,
+                        technique_id: Optional[str] = None) -> AttackPath:
         """Record an identified attack path."""
         path = AttackPath(
             name=name, description=description, steps=steps,
             risk=risk, prerequisites=prerequisites or [],
-            references=references or []
+            references=references or [],
+            tactic=tactic,
+            technique_id=technique_id,
         )
         self.attack_paths.append(path)
         return path
 
     def suggest_next(self, command: str, justification: str, priority: str = "medium"):
-        """Suggest a next command to run."""
+        """Suggest a next command to run.
+
+        Duplicate commands are merged and keep the highest priority.
+        """
+        priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        normalized_priority = priority if priority in priority_order else "medium"
+        normalized_command = command.strip()
+
+        for existing in self._next_commands:
+            if existing["command"] != normalized_command:
+                continue
+            if priority_order[normalized_priority] < priority_order[existing["priority"]]:
+                existing["priority"] = normalized_priority
+            if justification and justification not in existing["justification"]:
+                existing["justification"] = (
+                    f"{existing['justification']} | {justification}"
+                )
+            return
+
         self._next_commands.append({
-            "command": command, "justification": justification, "priority": priority
+            "command": normalized_command,
+            "justification": justification,
+            "priority": normalized_priority,
         })
 
     def get_suggestions(self) -> List[Dict]:
@@ -104,6 +130,10 @@ class AttackWorkflow:
             for p in self.attack_paths:
                 lines.append(f"### {p.name} [{p.risk.upper()}]")
                 lines.append(f"{p.description}\n")
+                if p.tactic:
+                    lines.append(f"- **Tactic:** {p.tactic}")
+                if p.technique_id:
+                    lines.append(f"- **Technique:** {p.technique_id}")
                 lines.append("**Steps:**")
                 for j, step in enumerate(p.steps, 1):
                     lines.append(f"{j}. {step}")

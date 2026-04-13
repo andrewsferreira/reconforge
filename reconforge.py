@@ -213,6 +213,8 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="Dry run mode")
     surface_parser.add_argument("--timeout", type=int, default=600,
                                 help="Global timeout for tools")
+    surface_parser.add_argument("--encrypt-loot", action="store_true",
+                                help="Encrypt loot files with Fernet (key in ~/.reconforge/loot.key)")
 
     return parser
 
@@ -386,6 +388,7 @@ def main():
             verbose=args.verbose,
             dry_run=args.dry_run,
             timeout=args.timeout,
+            encrypt_loot=args.encrypt_loot,
         )
 
         results = module.run(phases=phases)

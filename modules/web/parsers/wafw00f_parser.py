@@ -39,7 +39,8 @@ class Wafw00fParser:
 
     # Pattern: "The site <url> is behind <WAF> (<Vendor>)"
     DETECTED_RE = re.compile(
-        r"is behind\s+(.+?)\s*(?:\((.+?)\))?$", re.IGNORECASE
+        r"is behind(?:\s+a)?\s+(.+?)(?:\s+WAF)?\s*(?:\((.+?)\))?$",
+        re.IGNORECASE,
     )
     # Pattern: "No WAF detected"
     NO_WAF_RE = re.compile(r"no waf detected", re.IGNORECASE)
@@ -54,22 +55,30 @@ class Wafw00fParser:
             Wafw00fResult with detection data.
         """
         result = Wafw00fResult(raw_output=text)
+        seen = set()
 
         for line in text.splitlines():
             line = line.strip()
 
             match = self.DETECTED_RE.search(line)
             if match:
+                product = match.group(1).strip().rstrip(".")
+                vendor = match.group(2).strip() if match.group(2) else ""
+                key = (product.lower(), vendor.lower())
+                if key in seen:
+                    continue
+                seen.add(key)
                 result.waf_detected = True
                 result.detections.append(WafDetection(
-                    product=match.group(1).strip(),
-                    vendor=match.group(2).strip() if match.group(2) else "",
+                    product=product,
+                    vendor=vendor,
                     detected=True,
                 ))
                 continue
 
             if self.NO_WAF_RE.search(line):
-                result.waf_detected = False
+                if not result.detections:
+                    result.waf_detected = False
 
         return result
 

@@ -410,6 +410,17 @@ class WebModule:
             f"**{total_findings}** findings:\n",
         ]
 
+        vuln_phase = results.get("phases", {}).get("vuln", {})
+        risk_score = vuln_phase.get("risk_score")
+        severity_summary = vuln_phase.get("severity_summary", {})
+        if isinstance(risk_score, int):
+            lines.append(f"- **Web Risk Score (phase vuln):** {risk_score}/100")
+        if severity_summary:
+            lines.append(
+                "- **Vuln Severity Mix:** "
+                + ", ".join(f"{k}={v}" for k, v in severity_summary.items() if v > 0)
+            )
+
         for sev in ["critical", "high", "medium", "low", "info"]:
             count = severity_counts.get(sev, 0)
             icon = {

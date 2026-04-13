@@ -137,7 +137,7 @@ class ImpacketParser:
     def parse_lookupsid(self, text: str) -> List[RIDEntry]:
         """Parse lookupsid.py output.
 
-        Format:  500: CORP\Administrator (SidTypeUser)
+        Format:  500: CORP\\Administrator (SidTypeUser)
         """
         entries: List[RIDEntry] = []
 

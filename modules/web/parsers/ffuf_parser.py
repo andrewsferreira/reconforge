@@ -65,15 +65,23 @@ class FfufParser:
             return result
 
         result.command_line = data.get("commandline", "")
+        if not result.command_line:
+            result.command_line = data.get("commandLine", "")
 
         for r in data.get("results", []):
+            input_data = r.get("input", {})
+            if isinstance(input_data, dict):
+                input_word = input_data.get("FUZZ", "")
+            else:
+                input_word = str(input_data)
+
             entry = FfufEntry(
                 url=r.get("url", ""),
-                status=r.get("status", 0),
-                length=r.get("length", 0),
-                words=r.get("words", 0),
-                lines=r.get("lines", 0),
-                input_word=r.get("input", {}).get("FUZZ", ""),
+                status=self._to_int(r.get("status", 0)),
+                length=self._to_int(r.get("length", 0)),
+                words=self._to_int(r.get("words", 0)),
+                lines=self._to_int(r.get("lines", 0)),
+                input_word=input_word,
             )
             result.entries.append(entry)
 
@@ -81,7 +89,7 @@ class FfufParser:
 
     @staticmethod
     def status_to_severity(status: int) -> str:
-        if status == 500:
+        if 500 <= status <= 599:
             return "medium"
         if status in (401, 403):
             return "low"
@@ -99,3 +107,10 @@ class FfufParser:
             500: "Internal server error – potential for exploitation.",
         }
         return recs.get(status, "Review endpoint manually.")
+
+    @staticmethod
+    def _to_int(value, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default

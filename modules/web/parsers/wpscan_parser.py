@@ -10,6 +10,7 @@ Extracts:
 """
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
@@ -44,6 +45,18 @@ class WpscanResult:
 
 class WpscanParser:
     """Parse WPScan JSON and text output into structured data."""
+    HIGH_KW = (
+        "rce", "sql", "xss", "csrf", "ssrf", "lfi", "rfi",
+        "auth bypass", "authentication bypass",
+    )
+    MEDIUM_KW = ("enumeration", "information disclosure", "exposed", "debug")
+    TEXT_NOISE_KW = (
+        "no wpscan api token given",
+        "the remote website is up",
+        "started:",
+        "finished:",
+    )
+
 
     def parse_json(self, json_path: Path) -> WpscanResult:
         """Parse WPScan JSON output file.
@@ -78,14 +91,13 @@ class WpscanParser:
             result.plugins[name] = ver
 
             for vuln in pdata.get("vulnerabilities", []):
-                refs_data = vuln.get("references", {})
-                ref_urls = refs_data.get("url", [])
+                references = self._extract_references(vuln.get("references", {}))
                 result.vulnerabilities.append(WpscanVuln(
                     title=vuln.get("title", "Unknown"),
                     component=name,
                     component_version=ver,
-                    severity="high",
-                    references=ref_urls[:5],
+                    severity=self._classify_severity(vuln.get("title", "")),
+                    references=references[:8],
                     fixed_in=vuln.get("fixed_in", ""),
                 ))
 
@@ -95,14 +107,13 @@ class WpscanParser:
             result.themes[name] = ver
 
             for vuln in tdata.get("vulnerabilities", []):
-                refs_data = vuln.get("references", {})
-                ref_urls = refs_data.get("url", [])
+                references = self._extract_references(vuln.get("references", {}))
                 result.vulnerabilities.append(WpscanVuln(
                     title=vuln.get("title", "Unknown"),
                     component=name,
                     component_version=ver,
-                    severity="high",
-                    references=ref_urls[:5],
+                    severity=self._classify_severity(vuln.get("title", "")),
+                    references=references[:8],
                     fixed_in=vuln.get("fixed_in", ""),
                 ))
 
@@ -115,7 +126,8 @@ class WpscanParser:
                 if isinstance(u, str):
                     result.users.append(u)
                 elif isinstance(u, dict):
-                    result.users.append(u.get("username", str(u)))
+                    result.users.append(u.get("username") or u.get("id") or str(u))
+        result.users = list(dict.fromkeys(result.users))
 
         return result
 
@@ -132,10 +144,43 @@ class WpscanParser:
 
         for line in text.splitlines():
             line = line.strip()
+            ver_match = re.search(r"WordPress version\s+([0-9][\w\.\-]+)", line, re.IGNORECASE)
+            if ver_match and not result.wp_version:
+                result.wp_version = ver_match.group(1)
             if "[!]" in line:
+                cleaned = line.replace("[!]", "").strip().lower()
+                if any(noise in cleaned for noise in self.TEXT_NOISE_KW):
+                    continue
                 result.vulnerabilities.append(WpscanVuln(
                     title=line,
-                    severity="medium",
+                    severity=self._classify_severity(line),
                 ))
 
         return result
+
+    def _classify_severity(self, title: str) -> str:
+        t = title.lower()
+        if any(kw in t for kw in self.HIGH_KW):
+            return "high"
+        if any(kw in t for kw in self.MEDIUM_KW):
+            return "medium"
+        return "low"
+
+    @staticmethod
+    def _extract_references(refs_data) -> List[str]:
+        refs: List[str] = []
+        if isinstance(refs_data, dict):
+            for key, value in refs_data.items():
+                if isinstance(value, str):
+                    refs.append(value)
+                elif isinstance(value, list):
+                    refs.extend(str(v) for v in value)
+                elif value:
+                    refs.append(str(value))
+                if key.lower() == "cve" and isinstance(value, list):
+                    refs.extend(f"CVE-{v}" if not str(v).startswith("CVE-") else str(v) for v in value)
+        elif isinstance(refs_data, list):
+            refs.extend(str(v) for v in refs_data)
+        elif isinstance(refs_data, str):
+            refs.append(refs_data)
+        return [r for r in dict.fromkeys(refs) if r]

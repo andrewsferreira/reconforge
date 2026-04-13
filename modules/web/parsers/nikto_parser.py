@@ -47,6 +47,12 @@ class NiktoParser:
     MEDIUM_KW = ("disclosure", "directory listing", "default", "backup",
                  "exposed", "sensitive", "configuration")
     LOW_KW = ("header", "cookie", "version", "uncommon", "deprecated")
+    NOISE_PREFIXES = (
+        "nikto v", "target ip:", "target hostname:", "target port:",
+        "start time:", "end time:", "retrieved x-powered-by header:",
+        "server:", "allowed http methods:", "root page / redirects to:",
+        "no cgi directories found", "1 host(s) tested",
+    )
 
     def parse_json(self, json_path: Path) -> NiktoResult:
         """Parse Nikto JSON output file.
@@ -98,12 +104,34 @@ class NiktoParser:
 
         for line in text.splitlines():
             line = line.strip()
-            if line.startswith("+ ") and ":" in line:
-                desc = line[2:].strip()
-                result.findings.append(NiktoFinding(
-                    description=desc,
-                    severity=self.classify_severity(desc),
-                ))
+            if line.lower().startswith("- target ip:"):
+                result.target_ip = line.split(":", 1)[1].strip()
+                continue
+            if line.lower().startswith("- target hostname:"):
+                result.target_hostname = line.split(":", 1)[1].strip()
+                continue
+            if line.lower().startswith("- target port:"):
+                result.target_port = line.split(":", 1)[1].strip()
+                continue
+
+            if not line.startswith("+ "):
+                continue
+
+            desc = line[2:].strip()
+            if self._is_noise_line(desc):
+                continue
+
+            osvdb_id = ""
+            osvdb_match = re.match(r"OSVDB-(\d+):\s*(.+)$", desc, flags=re.IGNORECASE)
+            if osvdb_match:
+                osvdb_id = osvdb_match.group(1)
+                desc = osvdb_match.group(2).strip()
+
+            result.findings.append(NiktoFinding(
+                description=desc,
+                osvdb_id=osvdb_id,
+                severity=self.classify_severity(desc),
+            ))
 
         return result
 
@@ -134,3 +162,7 @@ class NiktoParser:
         elif isinstance(data, list):
             vulns = data
         return vulns
+
+    def _is_noise_line(self, desc: str) -> bool:
+        desc_lower = desc.lower()
+        return any(desc_lower.startswith(prefix) for prefix in self.NOISE_PREFIXES)
