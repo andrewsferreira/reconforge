@@ -41,6 +41,7 @@ from core.exceptions import (
 )
 from core.post_exploitation import build_playbooks
 from core.external_integrations import dispatch_workflow_event
+from core.ai_orchestration import AIOrchestrationLayer
 
 
 # ── Workflow context (data bus between steps) ────────────────────────
@@ -567,6 +568,7 @@ class WorkflowOrchestrator:
         self.findings = FindingsManager()
         self.loot = LootManager(encrypt=encrypt_loot)
         self.workflow = AttackWorkflow()
+        self.ai_engine = AIOrchestrationLayer()
 
         # Pipeline
         self._steps: List[WorkflowStep] = []
@@ -706,6 +708,8 @@ class WorkflowOrchestrator:
                 _extract_context_from_result(step.module_name, result,
                                             self._context)
                 _derive_autonomous_next_steps(step.module_name, result, self._context)
+                self.ai_engine.ingest_module_result(step.module_name, result)
+                self._enqueue_ai_decisions()
                 self._enqueue_handoff_steps()
                 self._context.store_result(step.module_name, result)
 
@@ -830,10 +834,39 @@ class WorkflowOrchestrator:
             "auto_handoff": self.auto_handoff,
             "credentials_count": len(self.vault),
             "context": self._context.to_dict(),
+            "ai": {
+                "context": self.ai_engine.build_context_snapshot(),
+                "report": self.ai_engine.generate_ai_report(),
+            },
             "post_exploitation_playbooks": build_playbooks(self._context.to_dict()),
             "steps": [asdict(r) for r in self._results],
             "engagement_id": self.engagement.meta.id,
         }
+
+    def _enqueue_ai_decisions(self) -> None:
+        """Add adaptive steps suggested by AI decision engine."""
+        planned_modules = {step.module_name for step in self._steps}
+        decisions = self.ai_engine.decide_next_actions(already_planned=planned_modules)
+        for decision in decisions:
+            module_name = str(decision.get("module", "")).strip()
+            if module_name not in {"surface", "network", "ad", "web", "api"}:
+                continue
+            if module_name in planned_modules:
+                continue
+            confidence = float(decision.get("confidence", 0.0) or 0.0)
+            if confidence < 0.65:
+                continue
+            reason = str(decision.get("reason", "AI adaptive decision"))
+            self._steps.append(WorkflowStep(
+                module_name=module_name,
+                config={},
+                critical=False,
+                description=f"AI adaptive step ({module_name}) - {reason}",
+            ))
+            planned_modules.add(module_name)
+            self.logger.info(
+                f"AI adaptive step queued: {module_name} (confidence={confidence:.2f})"
+            )
 
     def _enqueue_handoff_steps(self) -> None:
         """Optionally convert autonomous suggestions into executable workflow steps."""
