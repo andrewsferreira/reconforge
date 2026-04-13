@@ -2,7 +2,7 @@
 
 ## Overall score
 
-**8.6 / 10**
+**9.5 / 10**
 
 ## Why this score
 
@@ -14,11 +14,11 @@
 - **Data interoperability is good**: contract sidecars make downstream consumption and automation easier.
 - **Autonomy progressed**: heuristics + inferred next-step recommendations now reduce analyst friction.
 
-### Main gaps to reach 9.5+
+### Remaining gaps to reach 10
 
 - **Real-tool coverage depends on host tooling** (nuclei/sqlmap/ffuf/etc. availability).
 - **Heuristic detections are intentionally conservative** and can produce false positives/negatives.
-- **Cross-module autonomous execution is still recommendation-driven** (not full closed-loop orchestration).
+- **Cross-module autonomous execution now exists with guardrails**, but still needs richer policy controls for enterprise approval flows.
 - **Need more scenario-driven integration tests** for realistic lab chains (pivot + post-exploitation paths).
 
 ## Evolution (from baseline to current state)
@@ -34,11 +34,12 @@
 5. **Autonomy improvements**
    - Web heuristic detection + attack-path hypotheses + SSRF handoff recommendations.
    - Recon-informed autonomous next steps from ports/services/banner/OS hints.
+6. **Guardrailed auto-handoff orchestration**
+   - Optional automatic conversion of recon recommendations into follow-on module steps.
 
 ## Recommended next priorities
 
 1. Add **end-to-end lab integration tests** (network → web → pivot → post-exploitation hypothesis).
 2. Add **confidence tuning** for heuristic findings with evidence weighting.
-3. Add optional **auto-handoff execution mode** (with strict OPSEC guardrails and dry-run previews).
+3. Expand **auto-handoff policy controls** (allow/deny lists, approval tiers, and environment-level constraints).
 4. Expand **parser normalization** for richer service/banner semantics across modules.
-

@@ -21,6 +21,7 @@ Usage::
 """
 
 import json
+import shlex
 import traceback
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
@@ -539,6 +540,8 @@ class WorkflowOrchestrator:
         dry_run: bool = False,
         timeout: int = 600,
         encrypt_loot: bool = False,
+        auto_handoff: bool = False,
+        max_handoff_steps: int = 5,
         credential_vault: Optional[CredentialVault] = None,
         engagement: Optional[EngagementManager] = None,
     ):
@@ -549,6 +552,8 @@ class WorkflowOrchestrator:
         self.dry_run = dry_run
         self.timeout = timeout
         self.encrypt_loot = encrypt_loot
+        self.auto_handoff = auto_handoff
+        self.max_handoff_steps = max_handoff_steps
 
         self.logger = ReconLogger(name="workflow", verbose=verbose)
         self.vault = credential_vault or CredentialVault(encrypt=encrypt_loot)
@@ -564,6 +569,7 @@ class WorkflowOrchestrator:
         # Pipeline
         self._steps: List[WorkflowStep] = []
         self._results: List[StepResult] = []
+        self._handoff_keys: Set[tuple[str, str]] = set()
         self._context = WorkflowContext()
         self._context.targets = list(self.targets)
 
@@ -698,6 +704,7 @@ class WorkflowOrchestrator:
                 _extract_context_from_result(step.module_name, result,
                                             self._context)
                 _derive_autonomous_next_steps(step.module_name, result, self._context)
+                self._enqueue_handoff_steps()
                 self._context.store_result(step.module_name, result)
 
                 step_result.status = "success"
@@ -818,11 +825,62 @@ class WorkflowOrchestrator:
             "steps_skipped": skipped,
             "steps_failed": failed,
             "duration_seconds": duration,
+            "auto_handoff": self.auto_handoff,
             "credentials_count": len(self.vault),
             "context": self._context.to_dict(),
             "steps": [asdict(r) for r in self._results],
             "engagement_id": self.engagement.meta.id,
         }
+
+    def _enqueue_handoff_steps(self) -> None:
+        """Optionally convert autonomous suggestions into executable workflow steps."""
+        if not self.auto_handoff:
+            return
+        suggestions = self._context.extra.get("autonomous_next_steps", [])
+        if not isinstance(suggestions, list):
+            return
+
+        queued = 0
+        for suggestion in suggestions:
+            if queued >= self.max_handoff_steps:
+                break
+            if not isinstance(suggestion, dict):
+                continue
+            command = str(suggestion.get("command", "")).strip()
+            if not command.startswith("python reconforge.py "):
+                continue
+
+            tokens = shlex.split(command)
+            if len(tokens) < 4:
+                continue
+            module_name = tokens[2]
+            if module_name not in {"surface", "network", "web", "api"}:
+                continue
+
+            target = None
+            if "--target" in tokens:
+                idx = tokens.index("--target")
+                if idx + 1 < len(tokens):
+                    target = tokens[idx + 1]
+            if not target:
+                continue
+
+            key = (module_name, target)
+            if key in self._handoff_keys:
+                continue
+            if any(s.module_name == module_name and s.config.get("target") == target for s in self._steps):
+                self._handoff_keys.add(key)
+                continue
+
+            self._steps.append(WorkflowStep(
+                module_name=module_name,
+                config={"target": target},
+                critical=False,
+                description=f"Auto-handoff from recon intelligence ({module_name})",
+            ))
+            self._handoff_keys.add(key)
+            queued += 1
+            self.logger.info(f"Auto-handoff queued: {module_name} -> {target}")
 
     def _save_workflow_report(self, summary: Dict[str, Any]):
         """Save a JSON workflow report."""

@@ -225,3 +225,38 @@ def test_derive_autonomous_next_steps_deduplicates():
     _derive_autonomous_next_steps("network", result, ctx)
     steps = ctx.extra.get("autonomous_next_steps", [])
     assert len(steps) == len({s["command"] for s in steps})
+
+
+def test_enqueue_handoff_steps_adds_web_step_when_enabled():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], auto_handoff=True)
+    wo.context.extra["autonomous_next_steps"] = [
+        {
+            "command": "python reconforge.py web --target http://10.10.10.10",
+            "reason": "http detected",
+            "priority": "high",
+        }
+    ]
+    wo._enqueue_handoff_steps()
+    assert any(
+        s.module_name == "web" and s.config.get("target") == "http://10.10.10.10"
+        for s in wo._steps
+    )
+
+
+def test_enqueue_handoff_steps_ignores_when_disabled():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], auto_handoff=False)
+    wo.context.extra["autonomous_next_steps"] = [
+        {"command": "python reconforge.py web --target http://10.10.10.10"}
+    ]
+    wo._enqueue_handoff_steps()
+    assert wo._steps == []
+
+
+def test_enqueue_handoff_steps_respects_max():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], auto_handoff=True, max_handoff_steps=1)
+    wo.context.extra["autonomous_next_steps"] = [
+        {"command": "python reconforge.py web --target http://10.10.10.10"},
+        {"command": "python reconforge.py surface --target 10.10.10.0/24"},
+    ]
+    wo._enqueue_handoff_steps()
+    assert len(wo._steps) == 1

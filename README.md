@@ -62,6 +62,9 @@ python reconforge.py workflow --target 10.10.10.1
 python reconforge.py workflow --target 10.10.10.1 --modules network,ad \
     --engagement "Q1 Pentest" --client "Acme Corp" --encrypt-loot
 
+# Workflow with guardrailed auto-handoff (follow-on module steps inferred from recon)
+python reconforge.py workflow --target 10.10.10.1 --auto-handoff --max-handoff-steps 5
+
 # Stealth mode
 python reconforge.py network --target 10.10.10.1 --opsec stealth
 
