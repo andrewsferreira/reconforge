@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.workflow_orchestrator import WorkflowOrchestrator, WorkflowContext
+from core.workflow_orchestrator import (
+    WorkflowOrchestrator,
+    WorkflowContext,
+    _derive_autonomous_next_steps,
+)
 from core.exceptions import WorkflowError
 
 
@@ -174,3 +178,85 @@ def test_repr():
     r = repr(wo)
     assert "WorkflowOrchestrator" in r
     assert "stealth" in r
+
+
+def test_derive_autonomous_next_steps_from_network_recon():
+    ctx = WorkflowContext()
+    result = {
+        "phases": {
+            "scanning": {
+                "hosts": {
+                    "10.10.10.10": {
+                        "open_ports": [
+                            {"port": 80, "service": "http", "version": "Apache httpd 2.4"},
+                            {"port": 22, "service": "ssh", "version": "OpenSSH 8.9"},
+                        ],
+                        "services": ["http", "ssh"],
+                    }
+                }
+            },
+            "service_enumeration": {"smb": {"os_info": "Linux 5.x"}},
+        }
+    }
+    _derive_autonomous_next_steps("network", result, ctx)
+
+    steps = ctx.extra.get("autonomous_next_steps", [])
+    commands = {s["command"] for s in steps}
+    assert "python reconforge.py web --target http://10.10.10.10" in commands
+    assert "nmap -sV -p22 --script ssh2-enum-algos,ssh-hostkey 10.10.10.10" in commands
+    assert "linpeas.sh (after obtaining shell access)" in commands
+
+
+def test_derive_autonomous_next_steps_deduplicates():
+    ctx = WorkflowContext()
+    result = {
+        "phases": {
+            "scanning": {
+                "hosts": {
+                    "10.10.10.20": {
+                        "open_ports": [{"port": 80, "service": "http", "version": "Apache"}],
+                        "services": ["http"],
+                    }
+                }
+            }
+        }
+    }
+    _derive_autonomous_next_steps("network", result, ctx)
+    _derive_autonomous_next_steps("network", result, ctx)
+    steps = ctx.extra.get("autonomous_next_steps", [])
+    assert len(steps) == len({s["command"] for s in steps})
+
+
+def test_enqueue_handoff_steps_adds_web_step_when_enabled():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], auto_handoff=True)
+    wo.context.extra["autonomous_next_steps"] = [
+        {
+            "command": "python reconforge.py web --target http://10.10.10.10",
+            "reason": "http detected",
+            "priority": "high",
+        }
+    ]
+    wo._enqueue_handoff_steps()
+    assert any(
+        s.module_name == "web" and s.config.get("target") == "http://10.10.10.10"
+        for s in wo._steps
+    )
+
+
+def test_enqueue_handoff_steps_ignores_when_disabled():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], auto_handoff=False)
+    wo.context.extra["autonomous_next_steps"] = [
+        {"command": "python reconforge.py web --target http://10.10.10.10"}
+    ]
+    wo._enqueue_handoff_steps()
+    assert wo._steps == []
+
+
+def test_enqueue_handoff_steps_respects_max():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], auto_handoff=True, max_handoff_steps=1)
+    wo.context.extra["autonomous_next_steps"] = [
+        {"command": "python reconforge.py web --target http://10.10.10.10"},
+        {"command": "python reconforge.py surface --target 10.10.10.0/24"},
+    ]
+    wo._enqueue_handoff_steps()
+    assert len(wo._steps) == 1

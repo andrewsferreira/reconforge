@@ -62,6 +62,9 @@ python reconforge.py workflow --target 10.10.10.1
 python reconforge.py workflow --target 10.10.10.1 --modules network,ad \
     --engagement "Q1 Pentest" --client "Acme Corp" --encrypt-loot
 
+# Workflow with guardrailed auto-handoff (follow-on module steps inferred from recon)
+python reconforge.py workflow --target 10.10.10.1 --auto-handoff --max-handoff-steps 5
+
 # Stealth mode
 python reconforge.py network --target 10.10.10.1 --opsec stealth
 
@@ -72,6 +75,26 @@ python reconforge.py network --target 10.10.10.1 --dry-run -v
 pipx install .
 reconforge network --target 10.10.10.1
 ```
+
+## Local Validation Lab (Safe Testing)
+
+For repeatable testing in isolated environments, run ReconForge against a local target you own (for example, an intentionally vulnerable HTTP service bound to `127.0.0.1`).
+
+Example smoke-test command:
+
+```bash
+python reconforge.py web --target http://127.0.0.1:8008 --phases surface,content -v
+```
+
+Expected artifacts:
+
+- `outputs/<target>/web/findings.json`
+- `outputs/<target>/web/session.md`
+- `outputs/<target>/web/commands.log`
+- `outputs/<target>/web/audit.json`
+- `outputs/<target>/web/results.contract.json`
+
+> Note: deep classes such as SQLi/XSS/SSRF depend on optional tools (for example `sqlmap`, `nuclei`, and `ffuf`) being installed and enabled in your OPSEC profile.
 
 ## OPSEC Modes
 

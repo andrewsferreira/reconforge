@@ -192,6 +192,10 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Operator name")
     wf_parser.add_argument("--resume", default="",
                            help="Path to saved engagement JSON to resume")
+    wf_parser.add_argument("--auto-handoff", action="store_true",
+                           help="Automatically enqueue safe follow-on module steps inferred from recon results")
+    wf_parser.add_argument("--max-handoff-steps", type=int, default=5,
+                           help="Maximum number of auto-handoff steps to enqueue")
 
     # Surface module
     surface_parser = subparsers.add_parser(
@@ -357,6 +361,8 @@ def main():
                 dry_run=args.dry_run,
                 timeout=args.timeout,
                 encrypt_loot=args.encrypt_loot,
+                auto_handoff=args.auto_handoff,
+                max_handoff_steps=args.max_handoff_steps,
                 credential_vault=vault,
                 engagement=engagement,
             )
@@ -369,6 +375,8 @@ def main():
                 dry_run=args.dry_run,
                 timeout=args.timeout,
                 encrypt_loot=args.encrypt_loot,
+                auto_handoff=args.auto_handoff,
+                max_handoff_steps=args.max_handoff_steps,
                 credential_vault=vault,
                 engagement=engagement,
             )

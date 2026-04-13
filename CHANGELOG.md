@@ -5,6 +5,7 @@ All notable changes to ReconForge are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
+
 ## [1.1.0] — 2026-04-13
 
 Baseline/professionalization release focused on release alignment, quality gates, packaging, and artifact governance.
