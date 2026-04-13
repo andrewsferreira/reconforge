@@ -1,6 +1,6 @@
 # ReconForge Development Guide
 
-> Version 1.0 — Last updated: 2026-03-21
+> Version 1.1.0 — Last updated: 2026-04-13
 
 ## Project Structure
 
@@ -17,7 +17,7 @@ reconforge/
 │   ├── api/                   # 4 tools, 4 parsers, 4 phases
 │   ├── surface/               # 2 tools, 1 parser, 6 intelligence components, 4 phases
 │   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 348 tests (pytest)
+└── tests/                     # 375 tests (pytest)
 ```
 
 ## Adding a New Tool
@@ -262,6 +262,12 @@ DETECTION_LEVELS = {
 
 ## Testing Guidelines
 
+### Dev Environment
+
+```bash
+pip install -r requirements-dev.txt
+```
+
 ### Running Tests
 
 ```bash
@@ -275,7 +281,26 @@ python -m pytest tests/core/test_runner.py -v
 python -m pytest tests/ --cov=core --cov=modules -v
 ```
 
-### Current Test Coverage (348 tests)
+### Quality Gates (Local/CI)
+
+```bash
+# Lint
+ruff check .
+
+# Type checks
+mypy --follow-imports=skip --ignore-missing-imports reconforge.py core/runner.py core/workflow_orchestrator.py
+
+# Static security analysis
+bandit -r core modules reconforge.py -c pyproject.toml
+
+# Dependency vulnerability audit
+pip-audit
+
+# Test + coverage gate
+pytest --cov=core --cov=modules --cov-report=term-missing --cov-fail-under=85
+```
+
+### Current Test Coverage (375 tests)
 
 | Area | Test Files |
 |------|------------|
@@ -399,4 +424,4 @@ These items are documented in the stabilization report as intentional deferments
 
 ---
 
-*Development guide validated: 2026-03-21 — 348/348 tests passing*
+*Development guide validated: 2026-03-21 — 375/375 tests passing*

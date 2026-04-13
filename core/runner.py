@@ -15,7 +15,7 @@ import time
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 from core.exceptions import (
     ExecutionError,
@@ -81,6 +81,12 @@ class Runner:
         self.timeout = timeout
         self.dry_run = dry_run
         self._command_log: List[str] = []
+        self._metrics: Dict[str, Any] = {
+            "total_commands": 0,
+            "failed_commands": 0,
+            "total_duration_seconds": 0.0,
+            "tools": {},  # tool -> stats
+        }
 
     def check_tool(self, tool_name: str) -> bool:
         """Check if an external tool is available on PATH."""
@@ -112,7 +118,7 @@ class Runner:
                 DeprecationWarning,
                 stacklevel=2,
             )
-            cmd_display = command
+            cmd_display = str(command)
 
         effective_timeout = timeout or self.timeout
         self.logger.command(cmd_display)
@@ -129,7 +135,8 @@ class Runner:
         if isinstance(command, (list, tuple)):
             cmd_list = [str(a) for a in command]
         else:
-            cmd_list = shlex.split(command)
+            cmd_list = shlex.split(str(command))
+        tool_name = cmd_list[0] if cmd_list else "unknown"
 
         start = time.time()
         try:
@@ -159,11 +166,13 @@ class Runner:
             if not result.success:
                 self.logger.debug(f"Command exited with code {proc.returncode}: {proc.stderr[:200]}")
 
+            self._record_metrics(tool_name, duration, result.success)
             return result
 
         except subprocess.TimeoutExpired:
             duration = time.time() - start
             self.logger.error(f"Command timed out after {effective_timeout}s: {cmd_display}")
+            self._record_metrics(tool_name, duration, success=False)
             return RunResult(
                 command=cmd_display, returncode=-1, stdout="",
                 stderr=f"Timeout after {effective_timeout}s",
@@ -172,6 +181,7 @@ class Runner:
         except FileNotFoundError:
             tool_name = cmd_list[0] if cmd_list else "unknown"
             self.logger.error(f"Tool not found: {tool_name}")
+            self._record_metrics(tool_name, 0.0, success=False)
             return RunResult(
                 command=cmd_display, returncode=-2, stdout="",
                 stderr=f"Tool not found: {tool_name}",
@@ -180,6 +190,7 @@ class Runner:
         except ValueError as e:
             # shlex.split can raise on malformed input
             self.logger.error(f"Invalid command: {e}")
+            self._record_metrics(tool_name, 0.0, success=False)
             return RunResult(
                 command=cmd_display, returncode=-4, stdout="",
                 stderr=str(e), duration=0.0, success=False
@@ -187,6 +198,7 @@ class Runner:
         except Exception as e:
             duration = time.time() - start
             self.logger.error(f"Command failed: {e}")
+            self._record_metrics(tool_name, duration, success=False)
             return RunResult(
                 command=cmd_display, returncode=-3, stdout="",
                 stderr=str(e), duration=duration, success=False
@@ -243,3 +255,26 @@ class Runner:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("\n".join(self._command_log) + "\n")
+
+    def _record_metrics(self, tool_name: str, duration: float, success: bool) -> None:
+        self._metrics["total_commands"] += 1
+        self._metrics["total_duration_seconds"] += max(duration, 0.0)
+        if not success:
+            self._metrics["failed_commands"] += 1
+        tool = self._metrics["tools"].setdefault(
+            tool_name,
+            {"commands": 0, "failed": 0, "duration_seconds": 0.0},
+        )
+        tool["commands"] += 1
+        tool["duration_seconds"] += max(duration, 0.0)
+        if not success:
+            tool["failed"] += 1
+
+    def get_metrics(self) -> dict:
+        """Return execution metrics for audit/observability."""
+        total = self._metrics["total_commands"]
+        failed = self._metrics["failed_commands"]
+        return {
+            **self._metrics,
+            "error_rate": (failed / total) if total else 0.0,
+        }

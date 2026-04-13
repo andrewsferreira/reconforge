@@ -1,16 +1,60 @@
 """ReconForge Config Loader - YAML configuration management."""
 
+import os
 import yaml
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+from core.secrets_manager import SecretManager
+
+if TYPE_CHECKING:
+    from core.tool_config import ToolConfig
 
 
 class ConfigLoader:
     """Load and manage YAML configuration files."""
 
-    def __init__(self, config_dir: Optional[Path] = None):
+    def __init__(self, config_dir: Optional[Path] = None, environment: Optional[str] = None):
         self.config_dir = Path(config_dir) if config_dir else Path(__file__).parent.parent / "config"
         self._cache: Dict[str, dict] = {}
+        self.environment = (environment or os.getenv("RECONFORGE_ENV", "dev")).strip().lower()
+        self._env_dir = self.config_dir / "environments"
+        self._secrets = self._build_secret_manager()
+
+    def _build_secret_manager(self) -> SecretManager:
+        provider = os.getenv("RECONFORGE_SECRET_PROVIDER", "env").strip().lower() or "env"
+        file_path = os.getenv("RECONFORGE_SECRETS_FILE", "").strip()
+        return SecretManager(provider=provider, file_path=file_path)
+
+    @staticmethod
+    def _merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        merged = dict(base)
+        for k, v in override.items():
+            if isinstance(v, dict) and isinstance(merged.get(k), dict):
+                merged[k] = ConfigLoader._merge_dicts(merged[k], v)
+            else:
+                merged[k] = v
+        return merged
+
+    def _load_env_overrides(self) -> dict:
+        if not self.environment:
+            return {}
+        for ext in (".yaml", ".yml"):
+            p = self._env_dir / f"{self.environment}{ext}"
+            if p.exists():
+                with open(p) as f:
+                    return yaml.safe_load(f) or {}
+        return {}
+
+    def _resolve_secrets(self, obj: Any) -> Any:
+        if isinstance(obj, dict):
+            return {k: self._resolve_secrets(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [self._resolve_secrets(v) for v in obj]
+        if isinstance(obj, str) and obj.startswith("${secret:") and obj.endswith("}"):
+            key = obj[len("${secret:"):-1].strip()
+            return self._secrets.get(key, "")
+        return obj
 
     def load(self, name: str) -> dict:
         """Load a config file by name (without extension)."""
@@ -22,10 +66,15 @@ class ConfigLoader:
             if path.exists():
                 with open(path) as f:
                     data = yaml.safe_load(f) or {}
-                self._cache[name] = data
-                return data
+                env_data = self._load_env_overrides()
+                override = env_data.get(name, {}) if isinstance(env_data, dict) else {}
+                merged = self._merge_dicts(data, override if isinstance(override, dict) else {})
+                resolved = self._resolve_secrets(merged)
+                self._cache[name] = resolved
+                return resolved
 
-        return {}
+        self._cache[name] = {}
+        return self._cache[name]
 
     def get_tool_config(self, tool_name: str) -> dict:
         """Get configuration for a specific tool.

@@ -17,6 +17,7 @@ Usage:
 """
 
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,6 +32,8 @@ from core.findings_manager import FindingsManager
 from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
 from core.profile_loader import ProfileLoader
+from core.telemetry import ModuleTelemetry
+from core.data_contracts import SCHEMA_VERSION, build_contract
 
 # Tool imports
 from modules.api.tools.ffuf_api import FfufApiTool
@@ -97,17 +100,24 @@ class APIModule:
         self.headers = headers or []
         self.auth_token = auth_token
 
+        self.output = OutputManager(base_dir=output_base, target=target)
+        self.execution_id = f"run_{uuid.uuid4().hex[:12]}"
         # Core services
-        self.logger = ReconLogger(name="api", verbose=verbose)
+        self.logger = ReconLogger(
+            name="api",
+            verbose=verbose,
+            log_dir=self.output.module_dir(self.MODULE_NAME),
+            execution_id=self.execution_id,
+        )
         self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run)
         self.config = ConfigLoader(config_dir=config_dir)
-        self.output = OutputManager(base_dir=output_base, target=target)
         self.workflow = AttackWorkflow()
         self.loot = LootManager(encrypt=encrypt_loot)
         self.findings_mgr = FindingsManager()
         self.notes = NotesManager(target=target)
         self.opsec = OpsecChecker(mode=opsec_mode, logger=self.logger)
         self.credential_vault = None  # Set by WorkflowOrchestrator
+        self.telemetry = ModuleTelemetry(self.MODULE_NAME, target, execution_id=self.execution_id)
 
         # Profile loader — resolves OPSEC profile for timing, technique
         # toggles, and tool-specific configuration (CF-2 activation).
@@ -232,6 +242,8 @@ class APIModule:
         results: Dict[str, Any] = {
             "target": self.target_url,
             "opsec_mode": self.opsec_mode,
+            "schema_version": SCHEMA_VERSION,
+            "execution_id": self.execution_id,
             "start_time": datetime.now().isoformat(),
             "phases": {},
         }
@@ -239,10 +251,13 @@ class APIModule:
         try:
             # Phase 1: Discovery
             if "discovery" in phases_to_run:
-                discovery_results = self.phase_discovery.execute(
-                    target_url=self.target_url,
-                    headers=self.headers,
-                    auth_token=self.auth_token,
+                discovery_results = self.telemetry.run_phase(
+                    "discovery",
+                    lambda: self.phase_discovery.execute(
+                        target_url=self.target_url,
+                        headers=self.headers,
+                        auth_token=self.auth_token,
+                    ),
                 )
                 results["phases"]["discovery"] = discovery_results
             else:
@@ -252,23 +267,29 @@ class APIModule:
             if "authentication" in phases_to_run:
                 endpoints = discovery_results.get("endpoints", [])
                 spec_data = discovery_results.get("spec_data")  # Enhanced OpenApiSpec
-                auth_results = self.phase_authentication.execute(
-                    target_url=self.target_url,
-                    endpoints=endpoints,
-                    spec_data=spec_data,
-                    headers=self.headers,
-                    auth_token=self.auth_token,
+                auth_results = self.telemetry.run_phase(
+                    "authentication",
+                    lambda: self.phase_authentication.execute(
+                        target_url=self.target_url,
+                        endpoints=endpoints,
+                        spec_data=spec_data,
+                        headers=self.headers,
+                        auth_token=self.auth_token,
+                    ),
                 )
                 results["phases"]["authentication"] = auth_results
 
             # Phase 3: Fuzzing
             if "fuzzing" in phases_to_run:
                 endpoints = discovery_results.get("endpoints", [])
-                fuzz_results = self.phase_fuzzing.execute(
-                    target_url=self.target_url,
-                    endpoints=endpoints,
-                    headers=self.headers,
-                    auth_token=self.auth_token,
+                fuzz_results = self.telemetry.run_phase(
+                    "fuzzing",
+                    lambda: self.phase_fuzzing.execute(
+                        target_url=self.target_url,
+                        endpoints=endpoints,
+                        headers=self.headers,
+                        auth_token=self.auth_token,
+                    ),
                 )
                 results["phases"]["fuzzing"] = fuzz_results
 
@@ -281,14 +302,17 @@ class APIModule:
                         "discovered_params", []
                     )
                 spec_data = discovery_results.get("spec_data")
-                authz_results = self.phase_authorization.execute(
-                    target_url=self.target_url,
-                    endpoints=endpoints,
-                    discovered_params=discovered_params,
-                    spec_data=spec_data,
-                    opt_in=opt_in,
-                    headers=self.headers,
-                    auth_token=self.auth_token,
+                authz_results = self.telemetry.run_phase(
+                    "authorization",
+                    lambda: self.phase_authorization.execute(
+                        target_url=self.target_url,
+                        endpoints=endpoints,
+                        discovered_params=discovered_params,
+                        spec_data=spec_data,
+                        opt_in=opt_in,
+                        headers=self.headers,
+                        auth_token=self.auth_token,
+                    ),
                 )
                 results["phases"]["authorization"] = authz_results
 
@@ -301,6 +325,7 @@ class APIModule:
             raise
         finally:
             results["end_time"] = datetime.now().isoformat()
+            results["observability"] = self.telemetry.to_dict(self.runner.get_metrics())
             self._generate_reports(results)
 
         results["success"] = "error" not in results
@@ -358,6 +383,11 @@ class APIModule:
             self.findings_mgr.save_json(
                 self.output.findings_file(self.MODULE_NAME, "json")
             )
+            self.findings_mgr.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "findings"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
 
             # findings.md
             self.findings_mgr.save_markdown(
@@ -380,6 +410,24 @@ class APIModule:
 
             # loot.json
             self.loot.save(self.output.loot_file(self.MODULE_NAME))
+            self.loot.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "loot"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+
+            results_contract = build_contract(
+                "results",
+                results,
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+            self.output.contract_file(self.MODULE_NAME, "results").write_text(
+                json.dumps(results_contract, indent=2)
+            )
+            self.output.audit_file(self.MODULE_NAME).write_text(
+                json.dumps(results.get("observability", {}), indent=2)
+            )
 
             # quick_report.md
             self._generate_quick_report(results)

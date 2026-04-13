@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reconforge"
+version = "1.1.0"
+description = "Modular pentest reconnaissance framework"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Andrews Ferreira" }
+]
+dependencies = [
+  "pyyaml>=6.0",
+  "cryptography>=41.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.13.0",
+  "mypy>=1.11.0",
+  "bandit>=1.8.0",
+  "pip-audit>=2.8.0",
+  "types-PyYAML>=6.0.12",
+]
+
+[project.scripts]
+reconforge = "reconforge:main"
+
+[tool.setuptools]
+py-modules = ["reconforge"]
+
+[tool.setuptools.packages.find]
+include = ["core*", "modules*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.md"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = false
+exclude = [
+  "^outputs/",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "outputs"]
+severity = "medium"
+confidence = "medium"

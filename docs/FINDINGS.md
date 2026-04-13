@@ -1,6 +1,6 @@
 # ReconForge Findings & Confidence Model
 
-> Version 1.0 — Last updated: 2026-03-21
+> Version 1.1.0 — Last updated: 2026-04-13
 
 ## Overview
 
@@ -264,4 +264,4 @@ Example:
 
 ---
 
-*Findings model validated: 2026-03-21 — 348/348 tests passing*
+*Findings model validated: 2026-03-21 — 375/375 tests passing*

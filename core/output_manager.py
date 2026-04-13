@@ -67,6 +67,14 @@ class OutputManager:
         """Get path for loot file."""
         return self.module_dir(module) / "loot.json"
 
+    def contract_file(self, module: str, kind: str) -> Path:
+        """Get path for versioned contract sidecar file."""
+        return self.module_dir(module) / f"{kind}.contract.json"
+
+    def audit_file(self, module: str) -> Path:
+        """Get path for module execution audit metadata."""
+        return self.module_dir(module) / "audit.json"
+
     # ── Unified engagement report (IF-2) ────────────────────────────
 
     def generate_engagement_report(

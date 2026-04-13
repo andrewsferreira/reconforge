@@ -1,6 +1,6 @@
 # ReconForge Usage Guide
 
-> Version 1.0 — Last updated: 2026-03-21
+> Version 1.1.0 — Last updated: 2026-04-13
 
 ## CLI Entry Point
 
@@ -322,4 +322,4 @@ python reconforge.py api -t https://api.target.com/v2 \
 
 ---
 
-*Usage guide validated: 2026-03-21 — 348/348 tests passing*
+*Usage guide validated: 2026-03-21 — 375/375 tests passing*

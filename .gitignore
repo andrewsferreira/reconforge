@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
+# OS noise
+.DS_Store
+
+# ReconForge runtime artifacts
+outputs/

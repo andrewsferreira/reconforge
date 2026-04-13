@@ -126,6 +126,20 @@ class WorkflowContext:
         }
 
 
+def _add_autonomous_step(ctx: WorkflowContext, command: str, reason: str, priority: str = "medium") -> None:
+    """Store deduplicated autonomous next steps inferred from recon evidence."""
+    steps = ctx.extra.setdefault("autonomous_next_steps", [])
+    key = command.strip()
+    for item in steps:
+        if item.get("command") == key:
+            return
+    steps.append({
+        "command": key,
+        "reason": reason,
+        "priority": priority,
+    })
+
+
 # ── Workflow step definition ─────────────────────────────────────────
 
 @dataclass
@@ -229,6 +243,99 @@ def _extract_context_from_result(module_name: str, result: Dict[str, Any],
                     svc = _PORT_SERVICE_MAP.get(p)
                     if svc:
                         ctx.add_services(host, [svc])
+
+
+def _derive_autonomous_next_steps(module_name: str, result: Dict[str, Any], ctx: WorkflowContext) -> None:
+    """Infer post-recon commands from ports/services/banners/OS hints."""
+    if module_name not in {"network", "surface"}:
+        return
+
+    phases = result.get("phases", {})
+    host_views: Dict[str, Dict[str, Any]] = {}
+    if module_name == "network":
+        host_views = phases.get("scanning", {}).get("hosts", {})
+    elif module_name == "surface":
+        host_views = phases.get("port_discovery", {}).get("hosts", {})
+
+    if not isinstance(host_views, dict):
+        return
+
+    for host, host_info in host_views.items():
+        if not isinstance(host_info, dict):
+            continue
+        ports = host_info.get("open_ports", []) or []
+        services = {str(s).lower() for s in host_info.get("services", []) if s}
+        banner_blob = " ".join(str(p.get("service", "")) + " " + str(p.get("version", ""))
+                               for p in ports if isinstance(p, dict)).lower()
+
+        port_numbers = set()
+        for p in ports:
+            if isinstance(p, dict):
+                if isinstance(p.get("port"), int):
+                    port_numbers.add(p["port"])
+                svc = p.get("service")
+                if svc:
+                    services.add(str(svc).lower())
+
+        if 80 in port_numbers or 443 in port_numbers or {"http", "https"} & services:
+            _add_autonomous_step(
+                ctx,
+                command=f"python reconforge.py web --target http://{host}",
+                reason=f"HTTP surface detected on {host}; continue web attack-surface and vuln probing.",
+                priority="high",
+            )
+        if 22 in port_numbers or "ssh" in services:
+            _add_autonomous_step(
+                ctx,
+                command=f"nmap -sV -p22 --script ssh2-enum-algos,ssh-hostkey {host}",
+                reason=f"SSH exposed on {host}; enumerate algorithms, host keys and hardening posture.",
+                priority="medium",
+            )
+        if 445 in port_numbers or 139 in port_numbers or "smb" in banner_blob:
+            _add_autonomous_step(
+                ctx,
+                command=f"python reconforge.py network --target {host} --phases service,auth --brute-force",
+                reason=f"SMB/NetBIOS evidence on {host}; escalate to authenticated service checks.",
+                priority="high",
+            )
+        if 3306 in port_numbers or "mysql" in services:
+            _add_autonomous_step(
+                ctx,
+                command=f"nmap -sV -p3306 --script mysql-info,mysql-empty-password {host}",
+                reason=f"MySQL detected on {host}; validate weak/default database exposure.",
+                priority="medium",
+            )
+        if 5432 in port_numbers or "postgres" in banner_blob:
+            _add_autonomous_step(
+                ctx,
+                command=f"nmap -sV -p5432 --script pgsql-brute {host}",
+                reason=f"PostgreSQL detected on {host}; test authentication and service exposure.",
+                priority="medium",
+            )
+
+        if "apache" in banner_blob:
+            _add_autonomous_step(
+                ctx,
+                command=f"nmap -sV -p80,443 --script http-enum,http-server-header,http-vuln* {host}",
+                reason=f"Apache banner fingerprint on {host}; expand HTTP vulnerability checks.",
+                priority="high",
+            )
+
+    os_blob = json.dumps(phases, default=str).lower()
+    if "linux" in os_blob:
+        _add_autonomous_step(
+            ctx,
+            command="linpeas.sh (after obtaining shell access)",
+            reason="Linux indicators detected; prepare post-exploitation privilege-escalation checks.",
+            priority="medium",
+        )
+    if "windows" in os_blob:
+        _add_autonomous_step(
+            ctx,
+            command="winPEAS.exe (after obtaining shell access)",
+            reason="Windows indicators detected; prepare local privilege-escalation checks.",
+            priority="medium",
+        )
 
 
 # ── Default conditions ───────────────────────────────────────────────
@@ -590,6 +697,7 @@ class WorkflowOrchestrator:
                 # Extract context for downstream steps
                 _extract_context_from_result(step.module_name, result,
                                             self._context)
+                _derive_autonomous_next_steps(step.module_name, result, self._context)
                 self._context.store_result(step.module_name, result)
 
                 step_result.status = "success"
