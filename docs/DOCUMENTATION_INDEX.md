@@ -104,7 +104,7 @@ Detailed evidence requirements for each severity × confidence combination. Defi
 📍 **Location:** [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) · [PDF](DEVELOPMENT.pdf)
 **Status:** ✅ Complete (402 lines)
 
-Project structure overview, step-by-step guides for adding tools/parsers/phases, testing guidelines (pytest, 348 tests), code standards (type hints, docstrings, `list[str]` commands), and the 11-parameter base class constructor contract.
+Project structure overview, step-by-step guides for adding tools/parsers/phases, testing guidelines (pytest, 375 tests), code standards (type hints, docstrings, `list[str]` commands), and the 11-parameter base class constructor contract.
 
 ---
 
@@ -154,7 +154,7 @@ Documents the Priority-1 refactoring of all 27 tool wrappers from `f"tool ..."` 
 📍 **Location:** [`docs/FINAL_STABILIZATION_REPORT.md`](FINAL_STABILIZATION_REPORT.md) · [PDF](FINAL_STABILIZATION_REPORT.pdf)
 **Status:** ✅ Complete (256 lines)
 
-10-point checklist validation confirming framework stability: 348/348 tests passing, no critical blockers, two non-critical issues documented (Surface CLI missing `--encrypt-loot`, minor), and deferred technical debt inventory.
+10-point checklist validation confirming framework stability: 375/375 tests passing, no critical blockers, two non-critical issues documented (Surface CLI missing `--encrypt-loot`, minor), and deferred technical debt inventory.
 
 ---
 

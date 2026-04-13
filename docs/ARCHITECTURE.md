@@ -1,6 +1,6 @@
 # ReconForge Architecture
 
-> Version 1.0 — Last updated: 2026-03-21
+> Version 1.1.0 — Last updated: 2026-04-13
 
 ## System Overview
 
@@ -186,7 +186,7 @@ reconforge/
 │       ├── attack_paths/          # acl, asrep, delegation, gpo, kerberoast, privilege_escalation
 │       ├── phases/                # passive_recon, identity_enumeration, configuration_enumeration, delegation_discovery, bloodhound_collection
 │       └── reporting/             # ad_summary, attack_path, attack_surface, high_value_targets, remediation, report_builders
-└── tests/                         # 348 tests (pytest)
+└── tests/                         # 375 tests (pytest)
 ```
 
 ## Core Services
@@ -400,9 +400,9 @@ Each phase base defines class attributes: `PHASE_NUMBER`, `PHASE_NAME`, `PHASE_D
 
 ## Testing
 
-- **348 tests, all passing** (pytest, ~3.1s)
+- **375 tests, all passing** (pytest, ~3.1s)
 - Coverage spans: config_loader, credential_vault, engagement, logger, loot_manager, profile_loader, runner, target_parser, validators, workflow_orchestrator, tool_config, API module, parsers (nmap, arjun, ffuf, nuclei_api), JWT analysis, OpenAPI parser, authorization/fuzzing, surface intelligence, profile activation
 
 ---
 
-*Architecture validated: 2026-03-21 — ReconForge v1.0 Stabilization Audit (348/348 tests passing)*
+*Architecture validated: 2026-03-21 — ReconForge v1.1.0 Stabilization Audit (375/375 tests passing)*

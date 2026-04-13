@@ -2,7 +2,7 @@
 """ReconForge - Modular Pentest Reconnaissance Framework.
 
 Author: Andrews Ferreira
-Version: 1.0
+Version: 1.1.0
 
 Usage:
     python reconforge.py network --target <target> [options]

@@ -1,6 +1,6 @@
 # ReconForge Module Documentation
 
-> Version 1.0 — Last updated: 2026-03-21
+> Version 1.1.0 — Last updated: 2026-04-13
 
 ## Module Architecture Pattern
 
@@ -406,4 +406,4 @@ python reconforge.py workflow --target 10.10.10.1 --resume /path/to/engagement.j
 
 ---
 
-*Module documentation validated: 2026-03-21 — 348/348 tests passing*
+*Module documentation validated: 2026-03-21 — 375/375 tests passing*

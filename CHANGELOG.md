@@ -5,6 +5,17 @@ All notable changes to ReconForge are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
+## [1.1.0] — 2026-04-13
+
+Baseline/professionalization release focused on release alignment, quality gates, packaging, and artifact governance.
+
+### Changed
+
+- Aligned README/docs baseline to current test suite status (`368` passing tests) and bumped documented version to `1.1.0`.
+- Added modern Python packaging via `pyproject.toml` and installable CLI entry point (`reconforge`).
+- Added formal CI quality gates for linting, type checks, SAST, dependency audit, and coverage-enforced tests.
+- Added runtime artifact policy and stopped tracking operational `outputs/` artifacts in version control.
+
 ## [1.0.0] — 2026-03-21
 
 Initial stable release. All 348 tests passing.

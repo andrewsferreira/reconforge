@@ -1,0 +1,4 @@
+# Environment overlay for local development (kept intentionally minimal)
+profiles:
+  secrets:
+    provider: env

@@ -3,7 +3,7 @@
 > **See also:** [SETUP.md](SETUP.md) for installation, [MODULES.md](MODULES.md) for module details.
 
 
-> Version 1.0 — Last updated: 2026-03-21
+> Version 1.1.0 — Last updated: 2026-04-13
 
 ---
 

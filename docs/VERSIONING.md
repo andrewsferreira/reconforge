@@ -1,6 +1,6 @@
 # ReconForge Versioning Policy
 
-> Version 1.0 — Last updated: 2026-03-21
+> Version 1.1.0 — Last updated: 2026-04-13
 
 ---
 

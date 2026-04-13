@@ -31,6 +31,7 @@ from typing import List, Optional, Dict
 from pathlib import Path
 from datetime import datetime
 
+from core.data_contracts import build_contract
 
 @dataclass
 class Finding:
@@ -243,6 +244,13 @@ class FindingsManager:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(self.to_json())
+
+    def save_contract(self, path: Path, execution_id: str = "", module: str = ""):
+        payload = [asdict(f) for f in self.get_all()]
+        contract = build_contract("findings", payload, execution_id=execution_id, module=module)
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(contract, indent=2))
 
     def save_markdown(self, path: Path):
         path = Path(path)

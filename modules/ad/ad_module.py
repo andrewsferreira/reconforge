@@ -21,6 +21,7 @@ Usage:
 """
 
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -36,6 +37,8 @@ from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
 from core.target_parser import parse_target
 from core.profile_loader import ProfileLoader
+from core.telemetry import ModuleTelemetry
+from core.data_contracts import SCHEMA_VERSION, build_contract
 
 from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
 from modules.ad.tools.ldapsearch import ADLdapsearchTool
@@ -96,16 +99,23 @@ class ADModule:
         self.dc_ip = dc_ip or target
         self.credential_vault = None  # Set by WorkflowOrchestrator
 
+        self.output = OutputManager(base_dir=output_base, target=target)
+        self.execution_id = f"run_{uuid.uuid4().hex[:12]}"
         # Core services
-        self.logger = ReconLogger(name="ad", verbose=verbose)
+        self.logger = ReconLogger(
+            name="ad",
+            verbose=verbose,
+            log_dir=self.output.module_dir(self.MODULE_NAME),
+            execution_id=self.execution_id,
+        )
         self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run)
         self.config = ConfigLoader(config_dir=config_dir)
-        self.output = OutputManager(base_dir=output_base, target=target)
         self.workflow = AttackWorkflow()
         self.loot = LootManager(encrypt=encrypt_loot)
         self.findings_mgr = FindingsManager()
         self.notes = NotesManager(target=target)
         self.opsec = OpsecChecker(mode=opsec_mode, logger=self.logger)
+        self.telemetry = ModuleTelemetry(self.MODULE_NAME, target, execution_id=self.execution_id)
 
         # Output directories
         self.raw_dir = self.output.raw_dir(self.MODULE_NAME)
@@ -255,6 +265,8 @@ class ADModule:
             "target": self.target_str, "domain": self.domain,
             "dc_ip": self.dc_ip, "opsec_mode": self.opsec_mode,
             "authenticated": has_creds,
+            "schema_version": SCHEMA_VERSION,
+            "execution_id": self.execution_id,
             "start_time": datetime.now().isoformat(),
             "phases": {},
         }
@@ -270,6 +282,7 @@ class ADModule:
             raise
         finally:
             results["end_time"] = datetime.now().isoformat()
+            results["observability"] = self.telemetry.to_dict(self.runner.get_metrics())
             self._generate_reports(results)
 
         # Credential vault: contribute discovered credentials
@@ -285,9 +298,12 @@ class ADModule:
         """Execute requested phases sequentially."""
         if "passive" in phases_to_run:
             self.logger.info(f"\n{'─'*60}\nPhase 1: Passive Reconnaissance\n{'─'*60}")
-            passive = self.phase_passive.run(
-                target=self.target_str, domain=self.domain,
-                opsec_mode=self.opsec_mode,
+            passive = self.telemetry.run_phase(
+                "passive",
+                lambda: self.phase_passive.run(
+                    target=self.target_str, domain=self.domain,
+                    opsec_mode=self.opsec_mode,
+                ),
             )
             results["phases"]["passive"] = passive
             if not self.domain and passive.get("domain"):
@@ -297,35 +313,44 @@ class ADModule:
         if "identity" in phases_to_run:
             self.logger.info(f"\n{'─'*60}\nPhase 2: Identity Enumeration\n{'─'*60}")
             pd = results.get("phases", {}).get("passive", {})
-            results["phases"]["identity"] = self.phase_identity.run(
-                target=self.target_str, domain=self.domain,
-                base_dn=pd.get("base_dn", ""),
-                anonymous_ldap=pd.get("anonymous_ldap", False),
-                null_session=pd.get("null_session", False),
-                username=self.username, password=self.password,
-                opsec_mode=self.opsec_mode,
+            results["phases"]["identity"] = self.telemetry.run_phase(
+                "identity",
+                lambda: self.phase_identity.run(
+                    target=self.target_str, domain=self.domain,
+                    base_dn=pd.get("base_dn", ""),
+                    anonymous_ldap=pd.get("anonymous_ldap", False),
+                    null_session=pd.get("null_session", False),
+                    username=self.username, password=self.password,
+                    opsec_mode=self.opsec_mode,
+                ),
             )
 
         if "configuration" in phases_to_run:
             self.logger.info(f"\n{'─'*60}\nPhase 3: Configuration Enumeration\n{'─'*60}")
             pd = results.get("phases", {}).get("passive", {})
-            results["phases"]["configuration"] = self.phase_configuration.run(
-                target=self.target_str, domain=self.domain,
-                base_dn=pd.get("base_dn", ""),
-                anonymous_ldap=pd.get("anonymous_ldap", False),
-                null_session=pd.get("null_session", False),
-                username=self.username, password=self.password,
-                opsec_mode=self.opsec_mode,
+            results["phases"]["configuration"] = self.telemetry.run_phase(
+                "configuration",
+                lambda: self.phase_configuration.run(
+                    target=self.target_str, domain=self.domain,
+                    base_dn=pd.get("base_dn", ""),
+                    anonymous_ldap=pd.get("anonymous_ldap", False),
+                    null_session=pd.get("null_session", False),
+                    username=self.username, password=self.password,
+                    opsec_mode=self.opsec_mode,
+                ),
             )
 
         if "delegation" in phases_to_run:
             self.logger.info(f"\n{'─'*60}\nPhase 4: Delegation Discovery\n{'─'*60}")
             pd = results.get("phases", {}).get("passive", {})
-            results["phases"]["delegation"] = self.phase_delegation.run(
-                target=self.target_str, domain=self.domain,
-                base_dn=pd.get("base_dn", ""),
-                username=self.username, password=self.password,
-                opsec_mode=self.opsec_mode,
+            results["phases"]["delegation"] = self.telemetry.run_phase(
+                "delegation",
+                lambda: self.phase_delegation.run(
+                    target=self.target_str, domain=self.domain,
+                    base_dn=pd.get("base_dn", ""),
+                    username=self.username, password=self.password,
+                    opsec_mode=self.opsec_mode,
+                ),
             )
 
         if "bloodhound" in phases_to_run:
@@ -333,10 +358,13 @@ class ADModule:
             if not (self.username and self.password):
                 self.logger.warning("Bloodhound requires credentials. Skipping.")
             else:
-                results["phases"]["bloodhound"] = self.phase_bloodhound.run(
-                    target=self.target_str, domain=self.domain,
-                    username=self.username, password=self.password,
-                    dc_ip=self.dc_ip, opsec_mode=self.opsec_mode,
+                results["phases"]["bloodhound"] = self.telemetry.run_phase(
+                    "bloodhound",
+                    lambda: self.phase_bloodhound.run(
+                        target=self.target_str, domain=self.domain,
+                        username=self.username, password=self.password,
+                        dc_ip=self.dc_ip, opsec_mode=self.opsec_mode,
+                    ),
                 )
 
     # ------------------------------------------------------------------
@@ -378,6 +406,11 @@ class ADModule:
         try:
             # Core reports
             self.findings_mgr.save_json(self.output.findings_file(self.MODULE_NAME, "json"))
+            self.findings_mgr.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "findings"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
             self.findings_mgr.save_markdown(self.output.findings_file(self.MODULE_NAME, "md"))
             self.notes.save(self.output.session_file(self.MODULE_NAME))
             self.output.attack_paths_file(self.MODULE_NAME).write_text(
@@ -385,6 +418,11 @@ class ADModule:
             )
             self.runner.save_command_log(self.output.commands_log(self.MODULE_NAME))
             self.loot.save(self.output.loot_file(self.MODULE_NAME))
+            self.loot.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "loot"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
 
             # Attack surface / quick report
             report_data = build_attack_surface_data(
@@ -429,6 +467,18 @@ class ADModule:
             # Full results JSON
             (self.module_dir / "results.json").write_text(
                 json.dumps(results, indent=2, default=str)
+            )
+            results_contract = build_contract(
+                "results",
+                results,
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+            self.output.contract_file(self.MODULE_NAME, "results").write_text(
+                json.dumps(results_contract, indent=2)
+            )
+            self.output.audit_file(self.MODULE_NAME).write_text(
+                json.dumps(results.get("observability", {}), indent=2)
             )
             self.logger.info(f"Reports saved to: {self.module_dir}")
         except Exception as e:

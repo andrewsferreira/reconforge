@@ -1,0 +1,11 @@
+# Environment overlay for staging
+profiles:
+  profiles:
+    normal:
+      delays:
+        between_tools: 0.5
+  integrations:
+    notifications:
+      webhook_url: "${secret:STAGE_WEBHOOK_URL}"
+  secrets:
+    provider: env

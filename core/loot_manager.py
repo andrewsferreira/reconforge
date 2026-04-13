@@ -12,6 +12,7 @@ from dataclasses import dataclass, field, asdict
 from typing import List, Optional, Dict
 from pathlib import Path
 from datetime import datetime
+from core.data_contracts import build_contract
 
 try:
     from cryptography.fernet import Fernet
@@ -132,6 +133,11 @@ class LootManager:
         """Export loot as JSON."""
         return json.dumps([asdict(item) for item in self._loot], indent=2)
 
+    def to_contract_json(self, execution_id: str = "", module: str = "") -> str:
+        payload = [asdict(item) for item in self._loot]
+        contract = build_contract("loot", payload, execution_id=execution_id, module=module)
+        return json.dumps(contract, indent=2)
+
     def save(self, path: Path):
         """Save loot to file.
 
@@ -151,6 +157,11 @@ class LootManager:
             enc_path.write_bytes(encrypted)
         else:
             path.write_text(plaintext)
+
+    def save_contract(self, path: Path, execution_id: str = "", module: str = "") -> None:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.to_contract_json(execution_id=execution_id, module=module))
 
     @staticmethod
     def load_encrypted(path: Path) -> str:

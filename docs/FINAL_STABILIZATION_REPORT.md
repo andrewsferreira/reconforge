@@ -14,7 +14,7 @@
 
 ## 1. OVERALL STATUS: ✅ PASS
 
-The ReconForge framework is **stable, architecturally consistent, and ready for documentation** (Priority 4). All 348 tests pass. No critical blockers were found. Two non-critical issues and a small set of deferred technical debt items are documented below.
+The ReconForge framework is **stable, architecturally consistent, and ready for documentation** (Priority 4). All 375 tests pass. No critical blockers were found. Two non-critical issues and a small set of deferred technical debt items are documented below.
 
 ---
 
@@ -226,7 +226,7 @@ A `grep` for `TODO`, `FIXME`, `HACK`, `WORKAROUND`, `XXX`, `TEMP`, `DEPRECATED` 
 
 ### ✅ Checkpoint 8: Testing & Code Quality
 
-- **348 tests, all passing** in 3.10s.
+- **375 tests, all passing** in 3.10s.
 - Coverage spans: config_loader, credential_vault, engagement, logger, loot_manager, profile_loader, runner, target_parser, validators, workflow_orchestrator, tool_config, API module, 4 parsers, JWT analysis, OpenAPI parser, authorization/fuzzing, surface intelligence, profile activation.
 - Gaps: web/network/surface/AD parsers, individual phase tests, findings_manager unit tests, E2E CLI tests.
 - No linting tools installed but code appears consistent on manual review.
@@ -258,4 +258,4 @@ The ReconForge framework passes all 10 validation checkpoints. The codebase is a
 
 ---
 
-*Report generated: 2026-03-21 — ReconForge v1.0 Stabilization Audit*
+*Report generated: 2026-03-21 — ReconForge v1.1.0 Stabilization Audit*
