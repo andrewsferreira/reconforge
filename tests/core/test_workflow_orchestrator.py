@@ -260,3 +260,14 @@ def test_enqueue_handoff_steps_respects_max():
     ]
     wo._enqueue_handoff_steps()
     assert len(wo._steps) == 1
+
+
+def test_enqueue_ai_decisions_adds_web_when_http_detected():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    wo.ai_engine.ingest_nmap_scan({
+        "10.10.10.40": {
+            "open_ports": [{"port": 80, "service": "http", "version": "Apache"}]
+        }
+    })
+    wo._enqueue_ai_decisions()
+    assert any(step.module_name == "web" for step in wo._steps)
