@@ -47,7 +47,6 @@ class WhatwebParser:
         "Title", "UncommonHeaders", "X-Powered-By",
         "HTTPServer", "IP", "Country", "RedirectLocation",
     }
-
     def parse_json(self, json_path: Path) -> WhatwebResult:
         """Parse WhatWeb JSON log file.
 
@@ -79,13 +78,13 @@ class WhatwebParser:
             for plugin_name, plugin_data in plugins.items():
                 version = self._extract_version(plugin_data)
 
-                if plugin_name in self.HEADER_PLUGINS:
+                if plugin_name == "HTTPServer":
+                    category = "server"
+                elif plugin_name in self.HEADER_PLUGINS:
                     category = "header"
                 elif plugin_name.lower() in ("wordpress", "joomla", "drupal",
                                               "magento", "shopify", "woocommerce"):
                     category = "cms"
-                elif plugin_name == "HTTPServer":
-                    category = "server"
                 else:
                     category = "technology"
 
@@ -119,17 +118,32 @@ class WhatwebParser:
             line = line.strip()
             if not line or line.startswith("ERROR"):
                 continue
-            # Extract technology names from bracketed entries
-            parts = line.split(",")
-            for part in parts:
+            for part in line.split(","):
                 part = part.strip()
-                if "[" in part and "]" in part:
-                    name = part.split("[")[0].strip()
-                    version = part.split("[")[1].rstrip("]").strip()
-                    if name:
-                        result.technologies.append(
-                            DetectedTechnology(name=name, version=version)
-                        )
+                if "[" not in part or "]" not in part:
+                    continue
+
+                name, _, tail = part.partition("[")
+                name = name.strip()
+                value = tail.rsplit("]", 1)[0].strip()
+                lower_name = name.lower()
+                if not name or "://" in name or lower_name.startswith("http://") or lower_name.startswith("https://"):
+                    continue
+                if name.lower() in {"status", "redirected"}:
+                    continue
+
+                category = "technology"
+                if name == "HTTPServer":
+                    category = "server"
+                elif name in self.HEADER_PLUGINS:
+                    category = "header"
+                elif name.lower() in ("wordpress", "joomla", "drupal",
+                                       "magento", "shopify", "woocommerce"):
+                    category = "cms"
+
+                result.technologies.append(
+                    DetectedTechnology(name=name, version=value, category=category)
+                )
         return result
 
     @staticmethod
@@ -140,7 +154,11 @@ class WhatwebParser:
             line = line.strip()
             if line:
                 try:
-                    entries.append(json.loads(line))
+                    parsed = json.loads(line)
+                    if isinstance(parsed, list):
+                        entries.extend(parsed)
+                    else:
+                        entries.append(parsed)
                 except json.JSONDecodeError:
                     continue
 

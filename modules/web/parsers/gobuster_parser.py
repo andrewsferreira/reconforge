@@ -32,10 +32,9 @@ class GobusterResult:
 class GobusterParser:
     """Parse gobuster text output into structured data."""
 
-    # Gobuster dir output: /path (Status: 200) [Size: 1234]
-    DIR_PATTERN = re.compile(
-        r"(/\S+)\s+\(Status:\s*(\d+)\)\s*\[Size:\s*(\d+)\]"
-    )
+    PATH_RE = re.compile(r"^(/\S+)")
+    STATUS_RE = re.compile(r"(?:\(\s*Status:\s*(\d+)\s*\)|\[\s*Status:\s*(\d+)\s*\])")
+    SIZE_RE = re.compile(r"\[\s*(?:Size|Length):\s*(\d+)\s*\]")
 
     def parse_dir(self, output_path: Path, base_url: str = "") -> GobusterResult:
         """Parse gobuster dir mode output.
@@ -55,15 +54,7 @@ class GobusterParser:
         raw = output_path.read_text(encoding="utf-8", errors="replace")
         result.raw_output = raw
 
-        for match in self.DIR_PATTERN.finditer(raw):
-            path = match.group(1)
-            entry = GobusterEntry(
-                path=path,
-                full_url=f"{base_url.rstrip('/')}{path}" if base_url else path,
-                status=int(match.group(2)),
-                size=int(match.group(3)),
-            )
-            result.entries.append(entry)
+        result.entries = self._parse_entries(raw, base_url)
 
         return result
 
@@ -79,13 +70,32 @@ class GobusterParser:
         """
         result = GobusterResult(raw_output=text)
 
-        for match in self.DIR_PATTERN.finditer(text):
-            path = match.group(1)
-            result.entries.append(GobusterEntry(
-                path=path,
-                full_url=f"{base_url.rstrip('/')}{path}" if base_url else path,
-                status=int(match.group(2)),
-                size=int(match.group(3)),
-            ))
+        result.entries = self._parse_entries(text, base_url)
 
         return result
+
+    def _parse_entries(self, text: str, base_url: str = "") -> List[GobusterEntry]:
+        entries: List[GobusterEntry] = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            path_match = self.PATH_RE.search(line)
+            status_match = self.STATUS_RE.search(line)
+            if not path_match or not status_match:
+                continue
+
+            size_match = self.SIZE_RE.search(line)
+            status = status_match.group(1) or status_match.group(2) or "0"
+            size = int(size_match.group(1)) if size_match else 0
+            path = path_match.group(1)
+
+            entries.append(GobusterEntry(
+                path=path,
+                full_url=f"{base_url.rstrip('/')}{path}" if base_url else path,
+                status=int(status),
+                size=size,
+            ))
+
+        return entries
