@@ -5,17 +5,6 @@ All notable changes to ReconForge are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
-## [1.1.1] — 2026-04-13
-
-### Added
-
-- Workflow auto-handoff mode (`--auto-handoff`) to transform autonomous recon recommendations into safe follow-on module steps with configurable cap (`--max-handoff-steps`).
-- Additional orchestration tests covering handoff queueing behavior and guardrails.
-
-### Changed
-
-- Improved workflow autonomy model by keeping recommendation generation and execution policy explicit and configurable.
-- Updated project scorecard to reflect the new autonomy maturity baseline.
 
 ## [1.1.0] — 2026-04-13
 
