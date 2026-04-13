@@ -39,6 +39,8 @@ from core.exceptions import (
     WorkflowAbortedError,
     ModuleError,
 )
+from core.post_exploitation import build_playbooks
+from core.external_integrations import dispatch_workflow_event
 
 
 # ── Workflow context (data bus between steps) ────────────────────────
@@ -828,6 +830,7 @@ class WorkflowOrchestrator:
             "auto_handoff": self.auto_handoff,
             "credentials_count": len(self.vault),
             "context": self._context.to_dict(),
+            "post_exploitation_playbooks": build_playbooks(self._context.to_dict()),
             "steps": [asdict(r) for r in self._results],
             "engagement_id": self.engagement.meta.id,
         }
@@ -898,6 +901,11 @@ class WorkflowOrchestrator:
         # Save credential vault
         vault_path = out_dir / f"vault_{ts}.json"
         self.vault.save(vault_path)
+
+        # Optional external integrations (SIEM/ticketing/approval webhooks)
+        sent = dispatch_workflow_event(summary)
+        if sent:
+            self.logger.info(f"External workflow events sent to: {', '.join(sent)}")
 
         self.logger.info(f"Workflow report saved to: {report_path}")
 

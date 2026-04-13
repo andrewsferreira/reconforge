@@ -32,6 +32,7 @@ from pathlib import Path
 from datetime import datetime
 
 from core.data_contracts import build_contract
+from core.cve_enricher import enrich_references
 
 @dataclass
 class Finding:
@@ -154,7 +155,7 @@ class FindingsManager:
             finding_type=finding_type, severity=severity, confidence=confidence,
             target=target, module=module, phase=phase, description=description,
             evidence=evidence, recommendation=recommendation,
-            references=references or []
+            references=enrich_references(description, evidence, references or [])
         )
         self._findings.append(f)
         return f
