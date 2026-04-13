@@ -1,0 +1,9 @@
+# ReconForge Python dependencies
+pyyaml>=6.0
+
+# Optional — loot encryption (--encrypt-loot)
+cryptography>=41.0
+
+# Optional — testing
+# pytest>=8.0
+# pytest-cov>=5.0

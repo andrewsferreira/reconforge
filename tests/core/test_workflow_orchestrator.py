@@ -1,0 +1,176 @@
+"""Tests for core.workflow_orchestrator – WorkflowOrchestrator & WorkflowContext."""
+
+import json
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from core.workflow_orchestrator import WorkflowOrchestrator, WorkflowContext
+from core.exceptions import WorkflowError
+
+
+# ── WorkflowContext ─────────────────────────────────────────────
+
+def test_context_set_and_get():
+    ctx = WorkflowContext()
+    ctx.extra["key"] = "value"
+    assert ctx.extra["key"] == "value"
+
+
+def test_context_add_hosts():
+    ctx = WorkflowContext()
+    ctx.add_hosts(["10.0.0.1", "10.0.0.2"])
+    assert len(ctx.live_hosts) == 2
+
+
+def test_context_add_hosts_dedup():
+    ctx = WorkflowContext()
+    ctx.add_hosts(["10.0.0.1"])
+    ctx.add_hosts(["10.0.0.1", "10.0.0.2"])
+    assert len(ctx.live_hosts) == 2
+
+
+def test_context_add_ports():
+    ctx = WorkflowContext()
+    ctx.add_ports("10.0.0.1", [80, 443])
+    assert ctx.has_port(80)
+    assert ctx.has_port(443)
+
+
+def test_context_add_services():
+    ctx = WorkflowContext()
+    ctx.add_services("10.0.0.1", ["http", "ldap"])
+    assert ctx.has_service("http")
+    assert ctx.has_service("LDAP")  # case-insensitive
+
+
+def test_context_add_domain():
+    ctx = WorkflowContext()
+    ctx.add_domain("corp.local")
+    assert ctx.has_domain()
+    assert "corp.local" in ctx.domains
+
+
+def test_context_add_url():
+    ctx = WorkflowContext()
+    ctx.add_url("https://app.corp.local")
+    assert ctx.has_url()
+
+
+def test_context_store_result():
+    ctx = WorkflowContext()
+    ctx.store_result("network", {"phases": {}})
+    assert "network" in ctx.module_results
+
+
+def test_context_to_dict():
+    ctx = WorkflowContext()
+    ctx.targets = ["10.0.0.1"]
+    ctx.add_hosts(["10.0.0.1"])
+    d = ctx.to_dict()
+    assert d["targets"] == ["10.0.0.1"]
+    assert d["live_hosts"] == ["10.0.0.1"]
+
+
+def test_context_host_count():
+    ctx = WorkflowContext()
+    ctx.targets = ["10.0.0.1"]
+    assert ctx.host_count() == 1
+    ctx.add_hosts(["10.0.0.1", "10.0.0.2"])
+    assert ctx.host_count() == 2
+
+
+# ── WorkflowOrchestrator ────────────────────────────────────────
+
+def test_init():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], opsec_mode="normal")
+    assert wo.context.targets == ["10.0.0.1"]
+
+
+def test_add_step():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    wo.add_step("network", description="Network recon")
+    assert len(wo._steps) == 1
+    assert wo._steps[0].module_name == "network"
+
+
+def test_add_step_returns_self():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    result = wo.add_step("network")
+    assert result is wo  # chainable
+
+
+def test_add_step_with_condition():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    cond = lambda ctx: True
+    wo.add_step("ad", condition=cond)
+    assert wo._steps[0].condition is cond
+
+
+def test_add_multiple_steps():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    wo.add_step("network")
+    wo.add_step("web")
+    wo.add_step("ad")
+    assert len(wo._steps) == 3
+
+
+def test_add_full_recon():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    wo.add_full_recon()
+    # Should have steps for: surface, network, ad, web, api
+    assert len(wo._steps) >= 4
+
+
+def test_clear_steps():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    wo.add_step("network")
+    wo.add_step("web")
+    wo.clear_steps()
+    assert len(wo._steps) == 0
+
+
+def test_full_recon_class_method():
+    wo = WorkflowOrchestrator.full_recon(["10.0.0.1"], opsec_mode="stealth")
+    assert wo.context.targets == ["10.0.0.1"]
+    assert len(wo._steps) >= 2
+
+
+def test_targeted_class_method():
+    wo = WorkflowOrchestrator.targeted(["10.0.0.1"], modules=["network", "web"])
+    assert len(wo._steps) == 2
+    module_names = [s.module_name for s in wo._steps]
+    assert "network" in module_names
+    assert "web" in module_names
+
+
+def test_context_property():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    wo.context.extra["found_dc"] = True
+    assert wo.context.extra["found_dc"] is True
+
+
+def test_credential_vault_exists():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    assert wo.vault is not None
+    assert wo.vault.count() == 0
+
+
+def test_engagement_exists_by_default():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"])
+    # Engagement is always created by default
+    assert wo.engagement is not None
+
+
+def test_custom_engagement():
+    from core.engagement import EngagementManager
+    eng = EngagementManager(client="Acme", operator="alice")
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], engagement=eng)
+    assert wo.engagement.meta.client == "Acme"
+
+
+def test_repr():
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], opsec_mode="stealth")
+    r = repr(wo)
+    assert "WorkflowOrchestrator" in r
+    assert "stealth" in r

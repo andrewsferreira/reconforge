@@ -1,0 +1,122 @@
+"""ReconForge API Nuclei Parser - Parse Nuclei JSONL output for API vulns.
+
+Author: Andrews Ferreira
+
+Extracts:
+- Template-matched API vulnerabilities
+- Severity levels from template metadata
+- Matched URLs and extracted data
+- CVE references and remediation advice
+"""
+
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List
+
+
+@dataclass
+class NucleiApiFinding:
+    """A single Nuclei API finding."""
+    template_id: str = ""
+    name: str = ""
+    severity: str = "info"
+    matched_at: str = ""
+    extracted: List[str] = field(default_factory=list)
+    references: List[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
+    remediation: str = ""
+    raw_data: str = ""
+    matcher_name: str = ""
+    curl_command: str = ""
+
+
+@dataclass
+class NucleiApiResult:
+    """Complete Nuclei API scan result."""
+    findings: List[NucleiApiFinding] = field(default_factory=list)
+    raw_output: str = ""
+
+    @property
+    def by_severity(self) -> Dict[str, List[NucleiApiFinding]]:
+        groups: Dict[str, List[NucleiApiFinding]] = {}
+        for f in self.findings:
+            groups.setdefault(f.severity, []).append(f)
+        return groups
+
+    @property
+    def api_specific(self) -> List[NucleiApiFinding]:
+        """Return only API-specific findings."""
+        api_tags = {"api", "graphql", "swagger", "openapi", "jwt",
+                    "oauth", "idor", "bola", "token", "rest"}
+        return [
+            f for f in self.findings
+            if any(t in api_tags for t in f.tags)
+        ]
+
+
+SEVERITY_MAP = {
+    "critical": "critical", "high": "high",
+    "medium": "medium", "low": "low", "info": "info",
+}
+
+
+class NucleiApiParser:
+    """Parse Nuclei JSONL output for API vulnerability findings."""
+
+    def parse_jsonl(self, jsonl_path: Path) -> NucleiApiResult:
+        """Parse Nuclei JSONL output file.
+
+        Args:
+            jsonl_path: Path to Nuclei JSONL output.
+
+        Returns:
+            NucleiApiResult with parsed findings.
+        """
+        result = NucleiApiResult()
+
+        if not jsonl_path.is_file():
+            return result
+
+        raw = jsonl_path.read_text(encoding="utf-8", errors="replace")
+        result.raw_output = raw
+
+        for line in raw.strip().splitlines():
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            info = entry.get("info", {})
+            template_id = entry.get("template-id",
+                                    entry.get("templateID", "unknown"))
+
+            refs = info.get("reference", [])
+            if isinstance(refs, str):
+                refs = [refs]
+
+            tags = info.get("tags", [])
+            if isinstance(tags, str):
+                tags = [t.strip() for t in tags.split(",")]
+
+            nuclei_sev = info.get("severity", "info").lower()
+
+            finding = NucleiApiFinding(
+                template_id=template_id,
+                name=info.get("name", template_id),
+                severity=SEVERITY_MAP.get(nuclei_sev, "info"),
+                matched_at=entry.get("matched-at",
+                                     entry.get("matched", "")),
+                extracted=entry.get("extracted-results", [])[:10],
+                references=refs[:5] if refs else [],
+                tags=tags,
+                remediation=info.get("remediation", ""),
+                matcher_name=entry.get("matcher-name", ""),
+                curl_command=entry.get("curl-command", ""),
+                raw_data=json.dumps(entry, default=str)[:800],
+            )
+            result.findings.append(finding)
+
+        return result

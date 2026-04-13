@@ -1,0 +1,12 @@
+{
+  "tests/parsers/test_arjun_parser.py::test_parse_flat_format": true,
+  "tests/core/test_validators.py::test_validate_cidr_rejects_plain_ip": true,
+  "tests/core/test_engagement.py::test_generate_report": true,
+  "tests/core/test_workflow_orchestrator.py::test_context_get_default": true,
+  "tests/core/test_workflow_orchestrator.py::test_context_target": true,
+  "tests/core/test_workflow_orchestrator.py::test_context_module_results": true,
+  "tests/core/test_workflow_orchestrator.py::test_condition_skip": true,
+  "tests/core/test_workflow_orchestrator.py::test_context_shared_across_steps": true,
+  "tests/core/test_workflow_orchestrator.py::test_engagement_optional": true,
+  "tests/core/test_workflow_orchestrator.py::test_no_engagement_by_default": true
+}

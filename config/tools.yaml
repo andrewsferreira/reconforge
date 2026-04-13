@@ -1,0 +1,488 @@
+# ReconForge Tool Configuration
+# Defines tool paths, default arguments, and timeouts for all integrated tools.
+
+tools:
+  nmap:
+    binary: nmap
+    description: "Network mapper - host discovery, port scanning, service enumeration"
+    required: true
+    default_timeout: 600
+    install_cmd: "sudo apt install -y nmap"
+    scan_profiles:
+      ping_sweep:
+        args: "-sn"
+        timeout: 120
+        detection: low
+      syn_scan:
+        args: "-sS --open"
+        timeout: 600
+        detection: medium
+        requires_root: true
+      connect_scan:
+        args: "-sT --open"
+        timeout: 600
+        detection: high
+      version_scan:
+        args: "-sV --version-intensity 5"
+        timeout: 600
+        detection: medium
+      script_scan:
+        args: "-sC -sV --script=default,vuln"
+        timeout: 900
+        detection: high
+      aggressive_scan:
+        args: "-A"
+        timeout: 1200
+        detection: very_high
+      udp_scan:
+        args: "-sU"
+        timeout: 600
+        detection: medium
+        requires_root: true
+      quick_scan:
+        args: "-sV -sC"
+        timeout: 300
+        detection: medium
+      smb_scripts:
+        args: "-p 139,445 --script=smb-enum-shares,smb-enum-users,smb-os-discovery,smb-security-mode,smb-vuln*"
+        timeout: 300
+        detection: high
+
+  enum4linux:
+    binary: enum4linux
+    description: "SMB/NetBIOS enumeration tool"
+    required: false
+    default_timeout: 300
+    install_cmd: "sudo apt install -y enum4linux"
+    modes:
+      full:
+        args: "-a"
+        timeout: 300
+      users:
+        args: "-U"
+        timeout: 120
+      shares:
+        args: "-S"
+        timeout: 120
+      groups:
+        args: "-G"
+        timeout: 120
+      password_policy:
+        args: "-P"
+        timeout: 120
+      os_info:
+        args: "-o"
+        timeout: 60
+
+  smbclient:
+    binary: smbclient
+    description: "SMB share access and enumeration"
+    required: false
+    default_timeout: 60
+    install_cmd: "sudo apt install -y smbclient"
+
+  ldapsearch:
+    binary: ldapsearch
+    description: "LDAP directory enumeration"
+    required: false
+    default_timeout: 120
+    install_cmd: "sudo apt install -y ldap-utils"
+
+  hydra:
+    binary: hydra
+    description: "Authentication testing (opt-in only)"
+    required: false
+    default_timeout: 300
+    install_cmd: "sudo apt install -y hydra"
+    opt_in_only: true
+    warning: "Brute-force testing can trigger lockouts and IDS alerts"
+    safety:
+      max_tasks: 4
+      wait_time: 3
+      max_attempts_per_account: 10
+
+  # ─── AD Module Tools ───────────────────────────────────────
+
+  enum4linux_ng:
+    binary: enum4linux-ng
+    description: "Next-generation SMB/NetBIOS/MSRPC enumeration (AD-focused)"
+    required: false
+    default_timeout: 300
+    install_cmd: "pip install enum4linux-ng"
+    modes:
+      full:
+        args: "-A"
+        timeout: 600
+        detection: medium
+      users:
+        args: "-U"
+        timeout: 120
+        detection: medium
+      groups:
+        args: "-G"
+        timeout: 120
+        detection: medium
+      shares:
+        args: "-S"
+        timeout: 120
+        detection: low
+      password_policy:
+        args: "-P"
+        timeout: 60
+        detection: low
+      rid_cycling:
+        args: "-R"
+        timeout: 300
+        detection: high
+
+  impacket_getadusers:
+    binary: GetADUsers.py
+    alt_binary: impacket-GetADUsers
+    description: "Impacket - Enumerate AD users via LDAP"
+    required: false
+    default_timeout: 120
+    install_cmd: "pip install impacket"
+    detection: medium
+
+  impacket_getnpusers:
+    binary: GetNPUsers.py
+    alt_binary: impacket-GetNPUsers
+    description: "Impacket - Find AS-REP roastable accounts (no preauth)"
+    required: false
+    default_timeout: 120
+    install_cmd: "pip install impacket"
+    detection: medium
+
+  impacket_lookupsid:
+    binary: lookupsid.py
+    alt_binary: impacket-lookupsid
+    description: "Impacket - SID brute-force / RID cycling"
+    required: false
+    default_timeout: 180
+    install_cmd: "pip install impacket"
+    detection: high
+
+  impacket_rpcdump:
+    binary: rpcdump.py
+    alt_binary: impacket-rpcdump
+    description: "Impacket - Dump RPC endpoints"
+    required: false
+    default_timeout: 60
+    install_cmd: "pip install impacket"
+    detection: low
+
+  nmap_ad:
+    binary: nmap
+    description: "Nmap AD-specific scan profiles"
+    required: true
+    default_timeout: 600
+    scan_profiles:
+      ad_service_scan:
+        args: "-sV -p 53,88,135,139,389,445,464,593,636,3268,3269,5985,5986,9389"
+        timeout: 300
+        detection: medium
+      ldap_scripts:
+        args: "-p 389,636,3268,3269 --script=ldap-rootdse,ldap-search"
+        timeout: 300
+        detection: medium
+      smb_scripts:
+        args: "-p 139,445 --script=smb-enum-shares,smb-enum-users,smb-os-discovery,smb-security-mode"
+        timeout: 300
+        detection: high
+      kerberos_scan:
+        args: "-p 88 --script=krb5-enum-users"
+        timeout: 300
+        detection: high
+      full_ad_scripts:
+        args: "-p 53,88,135,139,389,445,464,636,3268,3269 --script=ldap-rootdse,smb-os-discovery,smb-security-mode,smb-enum-shares"
+        timeout: 600
+        detection: high
+      dns_srv:
+        args: "-sU -sS -p U:53,T:53 --script=dns-srv-enum"
+        timeout: 300
+        detection: low
+
+  bloodhound_python:
+    binary: bloodhound-python
+    alt_binary: bloodhound.py
+    description: "Bloodhound data collector for AD graph analysis"
+    required: false
+    default_timeout: 600
+    install_cmd: "pip install bloodhound"
+    detection: high
+    collection_methods:
+      all:
+        args: "-c All"
+        timeout: 900
+      default:
+        args: "-c DCOnly"
+        timeout: 300
+      stealth:
+        args: "-c DCOnly --dns-tcp"
+        timeout: 300
+
+  netexec:
+    binary: netexec
+    alt_binary: nxc
+    alt_binary2: crackmapexec
+    description: "Network execution tool (formerly CrackMapExec)"
+    required: false
+    default_timeout: 300
+    install_cmd: "pipx install netexec"
+    detection: high
+    modes:
+      smb_enum:
+        args: "smb --shares --users --groups"
+        detection: high
+      ldap_enum:
+        args: "ldap --users --groups"
+        detection: medium
+      bloodhound:
+        args: "ldap --bloodhound"
+        detection: high
+
+  impacket_finddelegation:
+    binary: findDelegation.py
+    alt_binary: impacket-findDelegation
+    description: "Impacket - Find delegation configurations"
+    required: false
+    default_timeout: 180
+    install_cmd: "pip install impacket"
+    detection: medium
+
+  impacket_getuserspns:
+    binary: GetUserSPNs.py
+    alt_binary: impacket-GetUserSPNs
+    description: "Impacket - Find Kerberoastable accounts"
+    required: false
+    default_timeout: 120
+    install_cmd: "pip install impacket"
+    detection: medium
+
+
+
+  # ─── Surface Module Tools ─────────────────────────────────
+
+  nmap_surface:
+    binary: nmap
+    description: "Nmap stealth scan profiles for attack-surface mapping"
+    required: true
+    default_timeout: 600
+    scan_profiles:
+      stealth_syn:
+        args: "-sS -T1 --top-ports 1000 -Pn --open"
+        timeout: 900
+        detection: low
+      normal_syn:
+        args: "-sS -T3 --top-ports 1000 -Pn --open"
+        timeout: 600
+        detection: medium
+      aggressive_syn:
+        args: "-sS -T4 -p- -Pn --open"
+        timeout: 1200
+        detection: high
+      service_version:
+        args: "-sV -T3 -Pn --open"
+        timeout: 600
+        detection: medium
+
+  httpx_surface:
+    binary: httpx
+    description: "HTTP service probing for attack-surface mapping"
+    required: false
+    default_timeout: 300
+    install_cmd: "go install github.com/projectdiscovery/httpx/cmd/httpx@latest"
+    detection: low
+    modes:
+      normal:
+        args: "-title -tech-detect -status-code -follow-redirects"
+        detection: low
+      verbose:
+        args: "-title -tech-detect -status-code -follow-redirects -content-length -web-server"
+        detection: low
+
+  # ─── API Module Tools ──────────────────────────────────────
+
+  httpx:
+    binary: httpx
+    description: "Fast HTTP probing and technology detection"
+    required: false
+    default_timeout: 120
+    install_cmd: "go install github.com/projectdiscovery/httpx/cmd/httpx@latest"
+    detection: low
+
+  arjun:
+    binary: arjun
+    description: "HTTP parameter discovery"
+    required: false
+    default_timeout: 300
+    install_cmd: "pip install arjun"
+    detection: medium
+    modes:
+      normal:
+        args: "-t 10"
+        detection: medium
+      aggressive:
+        args: "-t 25 --stable"
+        detection: medium
+
+  ffuf_api:
+    binary: ffuf
+    description: "Fast web fuzzer (API-focused profiles)"
+    required: false
+    default_timeout: 300
+    install_cmd: "go install github.com/ffuf/ffuf@latest"
+    detection: medium
+    modes:
+      stealth:
+        args: "-t 10 -rate 50"
+        detection: low
+      normal:
+        args: "-t 30 -rate 300"
+        detection: medium
+      aggressive:
+        args: "-t 80 -rate 1500"
+        detection: high
+
+  nuclei_api:
+    binary: nuclei
+    description: "Template-based vulnerability scanner (API templates)"
+    required: false
+    default_timeout: 600
+    install_cmd: "go install github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
+    detection: medium
+    modes:
+      api:
+        args: "-tags api,graphql,swagger"
+        detection: medium
+      auth:
+        args: "-tags token,jwt,auth,default-login"
+        detection: medium
+
+  # ─── Web Module Tools ─────────────────────────────────────
+
+  whatweb:
+    binary: whatweb
+    description: "Web technology fingerprinting"
+    required: false
+    default_timeout: 60
+    install_cmd: "gem install whatweb"
+    detection: low
+    modes:
+      normal:
+        args: "-a 3"
+        detection: low
+      aggressive:
+        args: "-a 4 --plugins all"
+        detection: medium
+
+  wafw00f:
+    binary: wafw00f
+    alt_binary: wafw00f.py
+    description: "Web Application Firewall detection"
+    required: false
+    default_timeout: 30
+    install_cmd: "pip install wafw00f"
+    detection: low
+
+  nikto:
+    binary: nikto
+    description: "Web vulnerability scanner"
+    required: false
+    default_timeout: 600
+    install_cmd: "apt install nikto"
+    detection: high
+    modes:
+      normal:
+        args: "-Tuning 1,2,3,4,5"
+        detection: high
+      aggressive:
+        args: "-Tuning 1,2,3,4,5,6,7,8,9,a,b,c"
+        detection: very_high
+
+  gobuster:
+    binary: gobuster
+    description: "Directory/file brute forcing"
+    required: false
+    default_timeout: 300
+    install_cmd: "apt install gobuster"
+    detection: medium
+    modes:
+      dir:
+        args: "dir -t 50"
+        detection: medium
+      vhost:
+        args: "vhost -t 50"
+        detection: medium
+
+  ffuf:
+    binary: ffuf
+    description: "Fast web fuzzer"
+    required: false
+    default_timeout: 300
+    install_cmd: "go install github.com/ffuf/ffuf@latest"
+    detection: medium
+    modes:
+      stealth:
+        args: "-t 10 -rate 100"
+        detection: low
+      normal:
+        args: "-t 40 -rate 500"
+        detection: medium
+      aggressive:
+        args: "-t 100 -rate 2000"
+        detection: high
+
+  wpscan:
+    binary: wpscan
+    description: "WordPress security scanner"
+    required: false
+    default_timeout: 600
+    install_cmd: "gem install wpscan"
+    detection: high
+    modes:
+      enumerate:
+        args: "--enumerate vp,vt,u"
+        detection: high
+      aggressive:
+        args: "--enumerate ap,at,cb,dbe --plugins-detection aggressive"
+        detection: very_high
+
+  nuclei:
+    binary: nuclei
+    description: "Template-based vulnerability scanner"
+    required: false
+    default_timeout: 600
+    install_cmd: "go install github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
+    detection: medium
+    modes:
+      cves:
+        args: "-t cves/"
+        detection: medium
+      all:
+        args: "-t ."
+        detection: high
+
+  sqlmap:
+    binary: sqlmap
+    description: "SQL injection detection and exploitation"
+    required: false
+    default_timeout: 900
+    install_cmd: "apt install sqlmap"
+    detection: very_high
+    modes:
+      detect:
+        args: "--batch --level=1 --risk=1"
+        detection: high
+      exploit:
+        args: "--batch --level=5 --risk=3"
+        detection: very_high
+
+  testssl:
+    binary: testssl.sh
+    alt_binary: testssl
+    description: "SSL/TLS security testing"
+    required: false
+    default_timeout: 300
+    install_cmd: "git clone https://github.com/drwetter/testssl.sh.git"
+    detection: low

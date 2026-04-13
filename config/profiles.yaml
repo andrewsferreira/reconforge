@@ -1,0 +1,386 @@
+# ReconForge Scan Profiles
+# Defines OPSEC-aware scan profiles for different engagement types.
+
+profiles:
+  stealth:
+    description: "Minimal noise - avoid detection"
+    opsec_mode: stealth
+    timing:
+      nmap_timing: T2
+      scan_delay: "500ms"
+      max_retries: 1
+    scanning:
+      port_range: "21,22,23,25,53,80,88,110,111,135,139,143,389,443,445,636,993,995,1433,1521,3306,3389,5432,5900,5985,8080,8443"
+      scan_type: syn
+      version_detection: false
+      script_scan: false
+      udp_scan: false
+    enumeration:
+      enum4linux: false
+      smb_scripts: false
+      ldap_full_dump: false
+    authentication:
+      brute_force: false
+      anonymous_checks: true
+    allowed_noise_levels:
+      - low
+
+  normal:
+    description: "Balanced scan - standard engagement"
+    opsec_mode: normal
+    timing:
+      nmap_timing: T3
+      scan_delay: "0"
+      max_retries: 2
+    scanning:
+      port_range: "-"  # All ports
+      scan_type: syn
+      version_detection: true
+      script_scan: false
+      udp_scan: false
+    enumeration:
+      enum4linux: true
+      smb_scripts: false
+      ldap_full_dump: false
+    authentication:
+      brute_force: false
+      anonymous_checks: true
+    allowed_noise_levels:
+      - low
+      - medium
+
+  aggressive:
+    description: "Maximum coverage - CTF/Lab environment"
+    opsec_mode: aggressive
+    timing:
+      nmap_timing: T4
+      scan_delay: "0"
+      max_retries: 3
+    scanning:
+      port_range: "-"  # All ports
+      scan_type: syn
+      version_detection: true
+      script_scan: true
+      script_categories: "default,vuln,safe"
+      udp_scan: true
+      udp_ports: "53,67,68,69,111,123,135,137,138,139,161,162,445,500,514,520,631,1434,1900,4500,5353"
+    enumeration:
+      enum4linux: true
+      smb_scripts: true
+      ldap_full_dump: true
+    authentication:
+      brute_force: false  # Still opt-in only
+      anonymous_checks: true
+    allowed_noise_levels:
+      - low
+      - medium
+      - high
+      - very_high
+
+  # ─── AD Module Profiles ────────────────────────────────────
+
+  stealth_ad:
+    description: "AD recon - minimal noise, anonymous/passive only"
+    opsec_mode: stealth
+    timing:
+      nmap_timing: T2
+      scan_delay: "500ms"
+    ad:
+      phases:
+        - passive
+      anonymous_only: true
+      ldap_queries: true
+      smb_null_session: true
+      rid_cycling: false
+      enum4linux_ng: false
+      impacket: false
+      kerberos_enum: false
+      nmap_scripts: false
+    allowed_noise_levels:
+      - low
+
+  normal_ad:
+    description: "AD recon - balanced, standard engagement"
+    opsec_mode: normal
+    timing:
+      nmap_timing: T3
+      scan_delay: "0"
+    ad:
+      phases:
+        - passive
+        - identity
+        - configuration
+        - delegation
+      anonymous_only: false
+      ldap_queries: true
+      smb_null_session: true
+      rid_cycling: false
+      enum4linux_ng: true
+      impacket: true
+      kerberos_enum: true
+      nmap_scripts: true
+    allowed_noise_levels:
+      - low
+      - medium
+
+  aggressive_ad:
+    description: "AD recon - full coverage, lab/CTF environment"
+    opsec_mode: aggressive
+    timing:
+      nmap_timing: T4
+      scan_delay: "0"
+    ad:
+      phases:
+        - passive
+        - identity
+        - configuration
+        - delegation
+        - bloodhound
+      anonymous_only: false
+      ldap_queries: true
+      smb_null_session: true
+      rid_cycling: true
+      enum4linux_ng: true
+      impacket: true
+      kerberos_enum: true
+      nmap_scripts: true
+      full_ad_scripts: true
+    allowed_noise_levels:
+      - low
+      - medium
+      - high
+      - very_high
+
+  # ─── Surface Module Profiles ──────────────────────────────
+
+  stealth_surface:
+    description: "Surface recon - stealth port discovery only"
+    opsec_mode: stealth
+    timing:
+      nmap_timing: T1
+      scan_delay: "1000ms"
+    surface:
+      phases:
+        - port_discovery
+      tools:
+        nmap: true
+        httpx: false
+      options:
+        port_range: "--top-ports 100"
+        version_detection: false
+        http_probing: false
+    allowed_noise_levels:
+      - low
+
+  normal_surface:
+    description: "Surface recon - balanced port + service mapping"
+    opsec_mode: normal
+    timing:
+      nmap_timing: T3
+      scan_delay: "0"
+    surface:
+      phases:
+        - port_discovery
+        - service_fingerprint
+        - vector_correlation
+        - prioritization
+      tools:
+        nmap: true
+        httpx: true
+      options:
+        port_range: "--top-ports 1000"
+        version_detection: true
+        http_probing: true
+    allowed_noise_levels:
+      - low
+      - medium
+
+  aggressive_surface:
+    description: "Surface recon - full port scan + aggressive fingerprinting"
+    opsec_mode: aggressive
+    timing:
+      nmap_timing: T4
+      scan_delay: "0"
+    surface:
+      phases:
+        - port_discovery
+        - service_fingerprint
+        - vector_correlation
+        - prioritization
+      tools:
+        nmap: true
+        httpx: true
+      options:
+        port_range: "-p-"
+        version_detection: true
+        http_probing: true
+    allowed_noise_levels:
+      - low
+      - medium
+      - high
+      - very_high
+
+  ctf:
+    description: "CTF optimized - fast and comprehensive"
+    opsec_mode: aggressive
+    timing:
+      nmap_timing: T4
+      scan_delay: "0"
+      max_retries: 2
+    scanning:
+      port_range: "-"
+      scan_type: syn
+      version_detection: true
+      script_scan: true
+      script_categories: "default,vuln"
+      udp_scan: true
+      udp_ports: "53,69,111,123,161,500,514,1434"
+    enumeration:
+      enum4linux: true
+      smb_scripts: true
+      ldap_full_dump: true
+    authentication:
+      brute_force: false
+      anonymous_checks: true
+    allowed_noise_levels:
+      - low
+      - medium
+      - high
+      - very_high
+
+
+  # ─── API Module Profiles ──────────────────────────────────
+
+  stealth_api:
+    description: "API recon - passive probing only"
+    opsec_mode: stealth
+    api:
+      phases:
+        - discovery
+      tools:
+        httpx: true
+        ffuf: false
+        arjun: false
+        nuclei: false
+      options:
+        spec_detection: true
+        endpoint_enum: false
+        param_fuzzing: false
+        auth_testing: false
+        authz_testing: false
+    allowed_noise_levels:
+      - low
+
+  normal_api:
+    description: "API recon - balanced approach"
+    opsec_mode: normal
+    api:
+      phases:
+        - discovery
+        - authentication
+        - fuzzing
+      tools:
+        httpx: true
+        ffuf: true
+        arjun: true
+        nuclei: true
+      options:
+        spec_detection: true
+        endpoint_enum: true
+        param_fuzzing: true
+        auth_testing: true
+        authz_testing: false
+    allowed_noise_levels:
+      - low
+      - medium
+
+  aggressive_api:
+    description: "API recon - full coverage including authorization testing"
+    opsec_mode: aggressive
+    api:
+      phases:
+        - discovery
+        - authentication
+        - fuzzing
+        - authorization
+      tools:
+        httpx: true
+        ffuf: true
+        arjun: true
+        nuclei: true
+      options:
+        spec_detection: true
+        endpoint_enum: true
+        param_fuzzing: true
+        auth_testing: true
+        authz_testing: true
+        rate_limit_check: true
+    allowed_noise_levels:
+      - low
+      - medium
+      - high
+      - very_high
+
+  # Web Module Profiles
+  stealth_web:
+    description: "Stealth web reconnaissance - passive only"
+    opsec_mode: stealth
+    web:
+      phases:
+        - surface
+      tools:
+        whatweb: true
+        wafw00f: true
+        testssl: true
+      options:
+        aggressive_scan: false
+        follow_redirects: true
+        verify_ssl: false
+
+  normal_web:
+    description: "Normal web reconnaissance - balanced approach"
+    opsec_mode: normal
+    web:
+      phases:
+        - surface
+        - content
+        - vuln
+      tools:
+        whatweb: true
+        wafw00f: true
+        nikto: true
+        gobuster: true
+        ffuf: true
+        nuclei: true
+        testssl: true
+      options:
+        aggressive_scan: false
+        follow_redirects: true
+        verify_ssl: false
+        wordlist_size: medium
+
+  aggressive_web:
+    description: "Aggressive web reconnaissance - full coverage"
+    opsec_mode: aggressive
+    web:
+      phases:
+        - surface
+        - content
+        - vuln
+        - exploit
+      tools:
+        whatweb: true
+        wafw00f: true
+        nikto: true
+        gobuster: true
+        ffuf: true
+        wpscan: true
+        nuclei: true
+        sqlmap: true
+        testssl: true
+      options:
+        aggressive_scan: true
+        follow_redirects: true
+        verify_ssl: false
+        wordlist_size: large
+        enable_exploit_phase: true
