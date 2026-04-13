@@ -1,0 +1,12 @@
+# Environment overlay for production engagements
+profiles:
+  profiles:
+    stealth:
+      delays:
+        between_tools: 1.0
+  integrations:
+    siem:
+      endpoint: "${secret:PROD_SIEM_ENDPOINT}"
+      token: "${secret:PROD_SIEM_TOKEN}"
+  secrets:
+    provider: env

@@ -2,7 +2,7 @@
 
 **Modular Pentest Reconnaissance Framework**
 
-> Author: Andrews Ferreira • Version 1.0 • 348/348 tests passing
+> Author: Andrews Ferreira • Version 1.1.0 • 375/375 tests passing
 
 ReconForge automates the reconnaissance phase of penetration tests through five specialized modules and a cross-module workflow orchestrator. All commands are executed securely as `list[str]` via `subprocess.run` — **no `shell=True` anywhere in the codebase**.
 
@@ -67,6 +67,10 @@ python reconforge.py network --target 10.10.10.1 --opsec stealth
 
 # Dry run (show commands without executing)
 python reconforge.py network --target 10.10.10.1 --dry-run -v
+
+# Install as a CLI tool (recommended for operators)
+pipx install .
+reconforge network --target 10.10.10.1
 ```
 
 ## OPSEC Modes
@@ -104,14 +108,27 @@ outputs/<target>/<module>/
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Adding tools/parsers/phases, testing guidelines, code standards |
 | [API_REFERENCE.md](docs/API_REFERENCE.md) | Core classes, module classes, data structures |
 | [FINAL_STABILIZATION_REPORT.md](docs/FINAL_STABILIZATION_REPORT.md) | Validation results, technical debt, 10-point checklist |
+| [ARTIFACT_POLICY.md](docs/ARTIFACT_POLICY.md) | Artifact retention, storage separation, and sensitive-data handling |
+| [OBSERVABILITY_AND_CONTRACTS.md](docs/OBSERVABILITY_AND_CONTRACTS.md) | Execution IDs, structured audit logs, env overlays, and versioned data contracts |
 
 ## Testing
 
 ```bash
-pip install pytest
-python -m pytest tests/ -v
-# 348 tests, all passing (~3.1s)
+pip install -r requirements-dev.txt
+python -m pytest
+# 375 tests, all passing (~3.1s)
 ```
+
+## Quality Gates
+
+Quality gates are codified in CI (`.github/workflows/quality-gates.yml`) and run:
+
+- Ruff (lint)
+- MyPy (type checks)
+- Bandit (SAST)
+- pip-audit (dependency vulnerability audit)
+- Pytest + coverage threshold (`--cov-fail-under=85`)
+- Packaging smoke test (`pip install -e .` + `reconforge --help`)
 
 ## Project Structure
 
@@ -121,7 +138,7 @@ reconforge/
 ├── config/
 │   ├── tools.yaml             # Tool configuration
 │   └── profiles.yaml          # OPSEC profiles
-├── core/                      # 17 shared services
+├── core/                      # 18 shared services
 │   ├── runner.py              # Secure subprocess execution
 │   ├── config_loader.py       # YAML config with caching
 │   ├── tool_config.py         # Typed config accessor
@@ -139,14 +156,15 @@ reconforge/
 │   ├── detection_map.py       # Noise-level mapping
 │   ├── exceptions.py          # Exception hierarchy
 │   ├── logger.py              # Logging + credential sanitization
-│   └── target_parser.py       # Target parsing
+│   ├── target_parser.py       # Target parsing
+│   └── utils.py               # Utility helpers
 ├── modules/
 │   ├── network/               # 5 tools, 4 parsers, 4 phases
 │   ├── web/                   # 9 tools, 7 parsers, 4 phases
 │   ├── api/                   # 4 tools, 4 parsers, 4 phases
 │   ├── surface/               # 2 tools, 1 parser, 6 intelligence, 4 phases
 │   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 348 tests (pytest)
+└── tests/                     # 375 tests (pytest)
 ```
 
 ## License

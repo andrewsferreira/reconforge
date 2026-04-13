@@ -15,6 +15,7 @@ Usage:
 """
 
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -30,6 +31,8 @@ from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
 from core.target_parser import parse_target
 from core.profile_loader import ProfileLoader
+from core.telemetry import ModuleTelemetry
+from core.data_contracts import SCHEMA_VERSION, build_contract
 
 from modules.network.tools.nmap import NmapTool
 from modules.network.tools.enum4linux import Enum4linuxTool
@@ -86,16 +89,23 @@ class NetworkModule:
         self.opsec_mode = opsec_mode
         self.credential_vault = None  # Set by WorkflowOrchestrator
 
+        self.output = OutputManager(base_dir=output_base, target=target)
+        self.execution_id = f"run_{uuid.uuid4().hex[:12]}"
         # Core services
-        self.logger = ReconLogger(name="network", verbose=verbose)
+        self.logger = ReconLogger(
+            name="network",
+            verbose=verbose,
+            log_dir=self.output.module_dir(self.MODULE_NAME),
+            execution_id=self.execution_id,
+        )
         self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run)
         self.config = ConfigLoader(config_dir=config_dir)
-        self.output = OutputManager(base_dir=output_base, target=target)
         self.workflow = AttackWorkflow()
         self.loot = LootManager(encrypt=self._encrypt_loot)
         self.findings_mgr = FindingsManager()
         self.notes = NotesManager(target=target)
         self.opsec = OpsecChecker(mode=opsec_mode, logger=self.logger)
+        self.telemetry = ModuleTelemetry(self.MODULE_NAME, target, execution_id=self.execution_id)
 
         # Output directories
         self.raw_dir = self.output.raw_dir(self.MODULE_NAME)
@@ -214,6 +224,8 @@ class NetworkModule:
         results: Dict[str, Any] = {
             "target": self.target_str,
             "opsec_mode": self.opsec_mode,
+            "schema_version": SCHEMA_VERSION,
+            "execution_id": self.execution_id,
             "start_time": datetime.now().isoformat(),
             "phases": {},
         }
@@ -221,9 +233,12 @@ class NetworkModule:
         try:
             # Phase 1: Host Discovery
             if "discovery" in phases_to_run:
-                discovery_results = self.phase_discovery.run(
-                    target=self.target_str,
-                    is_network=self.target.is_network,
+                discovery_results = self.telemetry.run_phase(
+                    "discovery",
+                    lambda: self.phase_discovery.run(
+                        target=self.target_str,
+                        is_network=self.target.is_network,
+                    ),
                 )
                 results["phases"]["discovery"] = discovery_results
                 live_hosts = discovery_results.get("live_hosts", [])
@@ -238,9 +253,12 @@ class NetworkModule:
 
             # Phase 2: Port Scanning
             if "scanning" in phases_to_run:
-                scan_results = self.phase_scanning.run(
-                    targets=live_hosts,
-                    opsec_mode=self.opsec_mode,
+                scan_results = self.telemetry.run_phase(
+                    "scanning",
+                    lambda: self.phase_scanning.run(
+                        targets=live_hosts,
+                        opsec_mode=self.opsec_mode,
+                    ),
                 )
                 results["phases"]["scanning"] = scan_results
             else:
@@ -249,21 +267,27 @@ class NetworkModule:
             # Phase 3: Service Enumeration
             if "enumeration" in phases_to_run:
                 for host in live_hosts:
-                    enum_results = self.phase_enumeration.run(
-                        target=host,
-                        scan_results=scan_results,
-                        opsec_mode=self.opsec_mode,
+                    enum_results = self.telemetry.run_phase(
+                        f"enumeration:{host}",
+                        lambda host=host: self.phase_enumeration.run(
+                            target=host,
+                            scan_results=scan_results,
+                            opsec_mode=self.opsec_mode,
+                        ),
                     )
                     results["phases"].setdefault("enumeration", {})[host] = enum_results
 
             # Phase 4: Authentication Checks
             if "authentication" in phases_to_run:
                 for host in live_hosts:
-                    auth_results = self.phase_auth.run(
-                        target=host,
-                        scan_results=scan_results,
-                        brute_force=brute_force,
-                        opsec_mode=self.opsec_mode,
+                    auth_results = self.telemetry.run_phase(
+                        f"authentication:{host}",
+                        lambda host=host: self.phase_auth.run(
+                            target=host,
+                            scan_results=scan_results,
+                            brute_force=brute_force,
+                            opsec_mode=self.opsec_mode,
+                        ),
                     )
                     results["phases"].setdefault("authentication", {})[host] = auth_results
 
@@ -276,6 +300,7 @@ class NetworkModule:
             raise
         finally:
             results["end_time"] = datetime.now().isoformat()
+            results["observability"] = self.telemetry.to_dict(self.runner.get_metrics())
             self._generate_reports(results)
 
         # Credential vault: contribute discovered credentials at end
@@ -316,6 +341,11 @@ class NetworkModule:
         try:
             # findings.json
             self.findings_mgr.save_json(self.output.findings_file(self.MODULE_NAME, "json"))
+            self.findings_mgr.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "findings"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
 
             # findings.md
             self.findings_mgr.save_markdown(self.output.findings_file(self.MODULE_NAME, "md"))
@@ -332,6 +362,25 @@ class NetworkModule:
 
             # loot.json (CF-3: always use LootManager API via OutputManager)
             self.loot.save(self.output.loot_file(self.MODULE_NAME))
+            self.loot.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "loot"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+
+            # results contract + audit
+            results_contract = build_contract(
+                "results",
+                results,
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+            self.output.contract_file(self.MODULE_NAME, "results").write_text(
+                json.dumps(results_contract, indent=2)
+            )
+            self.output.audit_file(self.MODULE_NAME).write_text(
+                json.dumps(results.get("observability", {}), indent=2)
+            )
 
             # quick_report.md
             self._generate_quick_report(results)

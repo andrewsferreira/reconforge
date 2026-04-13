@@ -77,7 +77,7 @@ Each documentation claim was cross-referenced against the codebase:
 | Workflow orchestrator supports conditional pipelines | `core/workflow_orchestrator.py` — `run()` w/ conditions | ✅ Match |
 | `tools.yaml` single-schema consumption | `core/tool_config.py` + `MIGRATION_CONFIG_SCHEMA.md` | ✅ Match |
 | Credential vault with sanitized logging | `core/credential_vault.py` (430 lines) | ✅ Match |
-| 348 tests all passing | `pytest` final run: **348 passed in 3.25s** | ✅ Match |
+| 375 tests all passing | `pytest` final run: **348 passed in 3.25s** | ✅ Match |
 | `validate_arg()` used for input sanitization | `core/validators.py` | ✅ Match |
 
 ---
@@ -214,8 +214,8 @@ $ python -m pytest --tb=short -q
 348 passed in 3.25s
 ```
 
-All 348 tests pass with zero failures, zero warnings, and zero skips. Documentation changes introduced **no regressions** to the codebase.
+All 375 tests pass with zero failures, zero warnings, and zero skips. Documentation changes introduced **no regressions** to the codebase.
 
 ---
 
-**Conclusion:** Priority 4 (Documentation) is **complete**. The ReconForge framework has 29 Markdown documents totalling 5,273+ lines in `docs/` alone, covering architecture, usage, API reference, security model, configuration, extension guide, and full audit trail. Every documented claim has been verified against the implementation. The test suite remains green at 348/348.
+**Conclusion:** Priority 4 (Documentation) is **complete**. The ReconForge framework has 29 Markdown documents totalling 5,273+ lines in `docs/` alone, covering architecture, usage, API reference, security model, configuration, extension guide, and full audit trail. Every documented claim has been verified against the implementation. The test suite remains green at 375/375.

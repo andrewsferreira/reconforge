@@ -1,8 +1,10 @@
 """ReconForge Logger - Structured logging with color-coded output."""
 
 import logging
+import json
 import re
 import sys
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -63,9 +65,12 @@ class ReconLogger:
         "CRITICAL": "[X]",
     }
 
-    def __init__(self, name: str = "reconforge", log_dir: Optional[Path] = None, verbose: bool = False):
+    def __init__(self, name: str = "reconforge", log_dir: Optional[Path] = None, verbose: bool = False,
+                 execution_id: Optional[str] = None):
         self.name = name
         self.verbose = verbose
+        self.execution_id = execution_id or f"run_{uuid.uuid4().hex[:12]}"
+        self._json_log_path: Optional[Path] = None
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG if verbose else logging.INFO)
         self.logger.handlers.clear()
@@ -77,13 +82,29 @@ class ReconLogger:
         self.logger.addHandler(console)
 
         # File handler
-        if log_dir:
+        if log_dir and isinstance(log_dir, (str, Path)):
             log_dir = Path(log_dir)
             log_dir.mkdir(parents=True, exist_ok=True)
             fh = logging.FileHandler(log_dir / f"reconforge_{datetime.now():%Y%m%d_%H%M%S}.log")
             fh.setLevel(logging.DEBUG)
             fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
             self.logger.addHandler(fh)
+            self._json_log_path = log_dir / f"reconforge_{datetime.now():%Y%m%d_%H%M%S}.jsonl"
+
+    def _json_event(self, level: str, message: str, **fields) -> None:
+        if not self._json_log_path:
+            return
+        payload = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": level,
+            "logger": self.name,
+            "execution_id": self.execution_id,
+            "message": sanitize_log(message),
+            **fields,
+        }
+        self._json_log_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._json_log_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
     class _ColorFormatter(logging.Formatter):
         def __init__(self, colors, icons):
@@ -100,18 +121,23 @@ class ReconLogger:
 
     def debug(self, msg: str, *args, **kwargs):
         self.logger.debug(msg, *args, **kwargs)
+        self._json_event("DEBUG", msg)
 
     def info(self, msg: str, *args, **kwargs):
         self.logger.info(msg, *args, **kwargs)
+        self._json_event("INFO", msg)
 
     def warning(self, msg: str, *args, **kwargs):
         self.logger.warning(msg, *args, **kwargs)
+        self._json_event("WARNING", msg)
 
     def error(self, msg: str, *args, **kwargs):
         self.logger.error(msg, *args, **kwargs)
+        self._json_event("ERROR", msg)
 
     def critical(self, msg: str, *args, **kwargs):
         self.logger.critical(msg, *args, **kwargs)
+        self._json_event("CRITICAL", msg)
 
     def command(self, cmd: str):
         """Log a command being executed (credentials are redacted)."""

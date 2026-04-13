@@ -16,6 +16,7 @@ Usage:
 """
 
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,6 +32,8 @@ from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
 from core.profile_loader import ProfileLoader
 from core.target_parser import parse_target
+from core.telemetry import ModuleTelemetry
+from core.data_contracts import SCHEMA_VERSION, build_contract
 
 # Tool imports
 from modules.surface.tools.nmap_stealth import NmapStealthTool
@@ -87,17 +90,24 @@ class SurfaceModule:
         self.target = parse_target(target)
         self.opsec_mode = opsec_mode
 
+        self.output = OutputManager(base_dir=output_base, target=target)
+        self.execution_id = f"run_{uuid.uuid4().hex[:12]}"
         # Core services
-        self.logger = ReconLogger(name="surface", verbose=verbose)
+        self.logger = ReconLogger(
+            name="surface",
+            verbose=verbose,
+            log_dir=self.output.module_dir(self.MODULE_NAME),
+            execution_id=self.execution_id,
+        )
         self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run)
         self.config = ConfigLoader(config_dir=config_dir)
-        self.output = OutputManager(base_dir=output_base, target=target)
         self.workflow = AttackWorkflow()
         self.loot = LootManager(encrypt=encrypt_loot)
         self.findings_mgr = FindingsManager()
         self.notes = NotesManager(target=target)
         self.opsec = OpsecChecker(mode=opsec_mode, logger=self.logger)
         self.credential_vault = None  # Set by WorkflowOrchestrator
+        self.telemetry = ModuleTelemetry(self.MODULE_NAME, target, execution_id=self.execution_id)
         self.profile = ProfileLoader(
             config=self.config, opsec_mode=opsec_mode, module=self.MODULE_NAME
         )
@@ -202,6 +212,8 @@ class SurfaceModule:
         results: Dict[str, Any] = {
             "target": str(self.target),
             "opsec_mode": self.opsec_mode,
+            "schema_version": SCHEMA_VERSION,
+            "execution_id": self.execution_id,
             "start_time": datetime.now().isoformat(),
             "phases": {},
         }
@@ -209,8 +221,11 @@ class SurfaceModule:
         try:
             # Phase 1: Port Discovery
             if "port_discovery" in phases_to_run:
-                discovery_results = self.phase_port_discovery.execute(
-                    target=str(self.target),
+                discovery_results = self.telemetry.run_phase(
+                    "port_discovery",
+                    lambda: self.phase_port_discovery.execute(
+                        target=str(self.target),
+                    ),
                 )
                 results["phases"]["port_discovery"] = discovery_results
             else:
@@ -220,9 +235,12 @@ class SurfaceModule:
 
             # Phase 2: Service Fingerprint
             if "service_fingerprint" in phases_to_run:
-                fp_results = self.phase_service_fingerprint.execute(
-                    target=str(self.target),
-                    ports=ports,
+                fp_results = self.telemetry.run_phase(
+                    "service_fingerprint",
+                    lambda: self.phase_service_fingerprint.execute(
+                        target=str(self.target),
+                        ports=ports,
+                    ),
                 )
                 results["phases"]["service_fingerprint"] = fp_results
             else:
@@ -233,11 +251,14 @@ class SurfaceModule:
 
             # Phase 3: Vector Correlation
             if "vector_correlation" in phases_to_run:
-                corr_results = self.phase_vector_correlation.execute(
-                    target=str(self.target),
-                    ports=ports,
-                    services=services,
-                    http_services=http_services,
+                corr_results = self.telemetry.run_phase(
+                    "vector_correlation",
+                    lambda: self.phase_vector_correlation.execute(
+                        target=str(self.target),
+                        ports=ports,
+                        services=services,
+                        http_services=http_services,
+                    ),
                 )
                 results["phases"]["vector_correlation"] = corr_results
             else:
@@ -249,13 +270,16 @@ class SurfaceModule:
 
             # Phase 4: Prioritisation
             if "prioritization" in phases_to_run:
-                prio_results = self.phase_prioritization.execute(
-                    target=str(self.target),
-                    vectors=vectors,
-                    ports=ports,
-                    http_services=http_services,
-                    surface_map=surface_map,
-                    confidence_scores=confidence_scores,
+                prio_results = self.telemetry.run_phase(
+                    "prioritization",
+                    lambda: self.phase_prioritization.execute(
+                        target=str(self.target),
+                        vectors=vectors,
+                        ports=ports,
+                        http_services=http_services,
+                        surface_map=surface_map,
+                        confidence_scores=confidence_scores,
+                    ),
                 )
                 results["phases"]["prioritization"] = prio_results
 
@@ -268,6 +292,7 @@ class SurfaceModule:
             raise
         finally:
             results["end_time"] = datetime.now().isoformat()
+            results["observability"] = self.telemetry.to_dict(self.runner.get_metrics())
             self._generate_reports(results)
 
         results["success"] = "error" not in results
@@ -317,6 +342,11 @@ class SurfaceModule:
             self.findings_mgr.save_json(
                 self.output.findings_file(self.MODULE_NAME, "json")
             )
+            self.findings_mgr.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "findings"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
 
             # findings.md
             self.findings_mgr.save_markdown(
@@ -339,6 +369,24 @@ class SurfaceModule:
 
             # loot.json
             self.loot.save(self.output.loot_file(self.MODULE_NAME))
+            self.loot.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "loot"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+
+            results_contract = build_contract(
+                "results",
+                results,
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+            self.output.contract_file(self.MODULE_NAME, "results").write_text(
+                json.dumps(results_contract, indent=2)
+            )
+            self.output.audit_file(self.MODULE_NAME).write_text(
+                json.dumps(results.get("observability", {}), indent=2)
+            )
 
             # quick_report.md
             self._generate_quick_report(results)

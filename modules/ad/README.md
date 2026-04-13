@@ -350,4 +350,4 @@ pipx install netexec
 
 ---
 
-*ReconForge AD Module v1.0 — Author: Andrews Ferreira*
+*ReconForge AD Module v1.1.0 — Author: Andrews Ferreira*

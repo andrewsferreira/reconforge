@@ -1,6 +1,6 @@
 # Extending ReconForge
 
-> Version 1.0 — Last updated: 2026-03-21
+> Version 1.1.0 — Last updated: 2026-04-13
 
 This guide walks through every extension point in ReconForge:
 tool wrappers, parsers, phases, modules, configuration, and tests.
@@ -1356,4 +1356,4 @@ See [FINDINGS.md](FINDINGS.md) for the full confidence model.
 
 ---
 
-*Extension guide validated: 2026-03-21 — All patterns verified against codebase (348/348 tests passing)*
+*Extension guide validated: 2026-03-21 — All patterns verified against codebase (375/375 tests passing)*

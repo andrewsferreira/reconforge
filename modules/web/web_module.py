@@ -17,6 +17,7 @@ Usage:
 """
 
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,6 +32,8 @@ from core.findings_manager import FindingsManager
 from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
 from core.profile_loader import ProfileLoader
+from core.telemetry import ModuleTelemetry
+from core.data_contracts import SCHEMA_VERSION, build_contract
 
 # Tool imports
 from modules.web.tools.whatweb import WhatwebTool
@@ -98,17 +101,24 @@ class WebModule:
         self.target_url = self._normalise_url(target)
         self.opsec_mode = opsec_mode
 
+        self.output = OutputManager(base_dir=output_base, target=target)
+        self.execution_id = f"run_{uuid.uuid4().hex[:12]}"
         # Core services
-        self.logger = ReconLogger(name="web", verbose=verbose)
+        self.logger = ReconLogger(
+            name="web",
+            verbose=verbose,
+            log_dir=self.output.module_dir(self.MODULE_NAME),
+            execution_id=self.execution_id,
+        )
         self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run)
         self.config = ConfigLoader(config_dir=config_dir)
-        self.output = OutputManager(base_dir=output_base, target=target)
         self.workflow = AttackWorkflow()
         self.loot = LootManager(encrypt=encrypt_loot)
         self.findings_mgr = FindingsManager()
         self.notes = NotesManager(target=target)
         self.opsec = OpsecChecker(mode=opsec_mode, logger=self.logger)
         self.credential_vault = None  # Set by WorkflowOrchestrator
+        self.telemetry = ModuleTelemetry(self.MODULE_NAME, target, execution_id=self.execution_id)
 
         # Output directories
         self.raw_dir = self.output.raw_dir(self.MODULE_NAME)
@@ -247,6 +257,8 @@ class WebModule:
         results: Dict[str, Any] = {
             "target": self.target_url,
             "opsec_mode": self.opsec_mode,
+            "schema_version": SCHEMA_VERSION,
+            "execution_id": self.execution_id,
             "start_time": datetime.now().isoformat(),
             "phases": {},
         }
@@ -254,8 +266,11 @@ class WebModule:
         try:
             # Phase 1: Surface Discovery
             if "surface" in phases_to_run:
-                surface_results = self.phase_surface.execute(
-                    target_url=self.target_url,
+                surface_results = self.telemetry.run_phase(
+                    "surface",
+                    lambda: self.phase_surface.execute(
+                        target_url=self.target_url,
+                    ),
                 )
                 results["phases"]["surface"] = surface_results
             else:
@@ -265,26 +280,35 @@ class WebModule:
             if "content" in phases_to_run:
                 waf_info = surface_results.get("waf") or {}
                 waf_detected = bool(waf_info.get("detected", False))
-                content_results = self.phase_content.execute(
-                    target_url=self.target_url,
-                    waf_detected=waf_detected,
+                content_results = self.telemetry.run_phase(
+                    "content",
+                    lambda: self.phase_content.execute(
+                        target_url=self.target_url,
+                        waf_detected=waf_detected,
+                    ),
                 )
                 results["phases"]["content"] = content_results
 
             # Phase 3: Vulnerability Scanning
             if "vuln" in phases_to_run:
-                vuln_results = self.phase_vuln.execute(
-                    target_url=self.target_url,
+                vuln_results = self.telemetry.run_phase(
+                    "vuln",
+                    lambda: self.phase_vuln.execute(
+                        target_url=self.target_url,
+                    ),
                 )
                 results["phases"]["vuln"] = vuln_results
 
             # Phase 4: Exploit Candidates (opt-in)
             if "exploit" in phases_to_run:
                 technologies = surface_results.get("technologies", [])
-                exploit_results = self.phase_exploit.execute(
-                    target_url=self.target_url,
-                    opt_in=opt_in,
-                    technologies=technologies,
+                exploit_results = self.telemetry.run_phase(
+                    "exploit",
+                    lambda: self.phase_exploit.execute(
+                        target_url=self.target_url,
+                        opt_in=opt_in,
+                        technologies=technologies,
+                    ),
                 )
                 results["phases"]["exploit"] = exploit_results
 
@@ -297,6 +321,7 @@ class WebModule:
             raise
         finally:
             results["end_time"] = datetime.now().isoformat()
+            results["observability"] = self.telemetry.to_dict(self.runner.get_metrics())
             self._generate_reports(results)
 
         results["success"] = "error" not in results
@@ -359,6 +384,11 @@ class WebModule:
             self.findings_mgr.save_json(
                 self.output.findings_file(self.MODULE_NAME, "json")
             )
+            self.findings_mgr.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "findings"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
 
             # findings.md
             self.findings_mgr.save_markdown(
@@ -381,6 +411,24 @@ class WebModule:
 
             # loot.json (CF-3: always use LootManager API via OutputManager)
             self.loot.save(self.output.loot_file(self.MODULE_NAME))
+            self.loot.save_contract(
+                self.output.contract_file(self.MODULE_NAME, "loot"),
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+
+            results_contract = build_contract(
+                "results",
+                results,
+                execution_id=self.execution_id,
+                module=self.MODULE_NAME,
+            )
+            self.output.contract_file(self.MODULE_NAME, "results").write_text(
+                json.dumps(results_contract, indent=2)
+            )
+            self.output.audit_file(self.MODULE_NAME).write_text(
+                json.dumps(results.get("observability", {}), indent=2)
+            )
 
             # quick_report.md
             self._generate_quick_report(results)
