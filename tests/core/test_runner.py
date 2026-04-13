@@ -103,3 +103,20 @@ def test_command_log(runner):
     runner.run("echo b")
     log = runner.get_command_log()
     assert len(log) == 2
+
+
+def test_kill_switch_blocks_execution(runner, monkeypatch):
+    monkeypatch.setenv("RECONFORGE_KILL_SWITCH", "1")
+    result = runner.run(["echo", "hello"])
+    assert result.success is False
+    assert result.returncode == -5
+    assert "kill-switch" in result.stderr.lower()
+
+
+def test_policy_engine_blocks_high_risk_without_approval(runner, monkeypatch):
+    monkeypatch.setenv("RECONFORGE_POLICY_ENFORCE", "1")
+    monkeypatch.setenv("RECONFORGE_APPROVAL_TIER", "low")
+    result = runner.run(["sqlmap", "-u", "https://example.com", "--os-shell"])
+    assert result.success is False
+    assert result.returncode == -6
+    assert "policy blocked" in result.stderr.lower()

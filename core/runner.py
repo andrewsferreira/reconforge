@@ -11,6 +11,7 @@ import re
 import subprocess
 import shlex
 import shutil
+import os
 import time
 import warnings
 from dataclasses import dataclass, field
@@ -22,6 +23,7 @@ from core.exceptions import (
     ToolNotFoundError,
     TimeoutError as ReconTimeoutError,
 )
+from core.risk_policy import RiskPolicyEngine
 
 
 # Characters / patterns that should never appear in a single argument
@@ -130,6 +132,16 @@ class Runner:
                 command=cmd_display, returncode=0, stdout="", stderr="",
                 duration=0.0, success=True
             )
+        if self._kill_switch_active():
+            self.logger.error("Execution blocked by kill-switch control")
+            return RunResult(
+                command=cmd_display,
+                returncode=-5,
+                stdout="",
+                stderr="Execution blocked: kill-switch is active",
+                duration=0.0,
+                success=False,
+            )
 
         # Build argument list safely — never uses shell=True
         if isinstance(command, (list, tuple)):
@@ -137,6 +149,18 @@ class Runner:
         else:
             cmd_list = shlex.split(str(command))
         tool_name = cmd_list[0] if cmd_list else "unknown"
+        policy_decision = RiskPolicyEngine.check(cmd_list)
+        if not policy_decision.allowed:
+            self.logger.error(policy_decision.reason)
+            self._record_metrics(tool_name, 0.0, success=False)
+            return RunResult(
+                command=cmd_display,
+                returncode=-6,
+                stdout="",
+                stderr=policy_decision.reason,
+                duration=0.0,
+                success=False,
+            )
 
         start = time.time()
         try:
@@ -203,6 +227,21 @@ class Runner:
                 command=cmd_display, returncode=-3, stdout="",
                 stderr=str(e), duration=duration, success=False
             )
+
+    @staticmethod
+    def _kill_switch_active() -> bool:
+        """Return True when global kill switch is enabled via env/file."""
+        if os.getenv("RECONFORGE_KILL_SWITCH", "").strip() == "1":
+            return True
+
+        file_path = os.getenv("RECONFORGE_KILL_SWITCH_FILE", "").strip()
+        if not file_path:
+            return False
+        p = Path(file_path)
+        if not p.exists():
+            return False
+        content = p.read_text(encoding="utf-8").strip().lower()
+        return content in {"1", "true", "on", "stop", "blocked"}
 
     def run_or_raise(self, command: Union[str, Sequence[str]],
                      timeout: Optional[int] = None,
