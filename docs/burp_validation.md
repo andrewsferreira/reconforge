@@ -109,28 +109,3 @@ The validation probe intentionally uses read-oriented safe operations only:
 - Fallback: `get_proxy_http_history_regex`
 
 The probe must not alter Burp configuration, intercept mode, editor state, or task execution state.
-
-### Empty proxy history interpretation
-
-An empty proxy history **is valid** and does not fail readiness if:
-
-- the tool call succeeds,
-- response normalization is valid,
-- output is interpretable.
-
-## Allowed vs blocked tools (policy view)
-
-Current initial safe allowlist is capability-gated by provider policy:
-
-- `send_http1_request`
-- `send_http2_request`
-- `get_proxy_http_history`
-- `get_proxy_http_history_regex`
-
-All other tools are considered blocked for this validation context unless policy changes are made through core adapter policy controls.
-
-## Next steps after READY
-
-1. Keep the allowlist constrained to approved recon actions.
-2. Wire this validator as a preflight gate for Burp-dependent workflows.
-3. Add environment-specific integration checks (mock MCP + controlled Burp lab profile).

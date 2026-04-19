@@ -33,3 +33,15 @@ class BurpUnsupportedCapabilityError(BurpMcpError):
 
 class BurpNoCapabilitiesError(BurpMcpError):
     """Burp reachable but returned no capabilities."""
+
+
+class BurpScopeValidationError(BurpMcpError):
+    """Base scope validation error for Burp request-capable operations."""
+
+
+class BurpMalformedTargetError(BurpScopeValidationError):
+    """Target is malformed or missing for scoped request execution."""
+
+
+class BurpOutOfScopeError(BurpScopeValidationError):
+    """Target blocked by explicit scope policy decision."""
