@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-"""Run official Burp MCP provider validation and save report.json."""
+
 
 from __future__ import annotations
 
 import argparse
+
 import logging
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from reconforge.entrypoints.burp_validation import (
-    render_validation_console_summary,
-    save_validation_json,
-    validate_burp_provider,
-)
+
 
 
 def configure_logging(verbose: bool) -> None:
@@ -30,11 +27,7 @@ def main() -> int:
     args = parser.parse_args()
 
     configure_logging(args.verbose)
-    result = validate_burp_provider(base_url=args.url)
-    output_path = save_validation_json(result, Path(args.output))
-    print(render_validation_console_summary(result))
-    print(f"JSON report written to: {output_path.as_posix()}")
-    return 0 if result.readiness_status == "READY" else 2
+ main
 
 
 if __name__ == "__main__":

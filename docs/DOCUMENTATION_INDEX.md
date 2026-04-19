@@ -19,7 +19,7 @@
 | Understand findings/severity | [FINDINGS.md](#findingsmd) + [SEVERITY_CRITERIA.md](#severity_criteriamd) |
 | Run multi-module workflows | [WORKFLOW_GUIDE.md](#workflow_guidemd) |
 | Integrate Burp MCP provider | [BURP_MCP_INTEGRATION.md](#burp_mcp_integrationmd) |
-| Validate Burp MCP provider | [burp_validation.md](#burp_validationmd) |
+
 | Review audit & stabilization | [AUDIT_REPORT.md](#audit_reportmd) + [FINAL_STABILIZATION_REPORT.md](#final_stabilization_reportmd) |
 
 ---
