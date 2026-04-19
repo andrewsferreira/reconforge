@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-04-19T04:04:32.841957+00:00",
+  "target_url": "http://127.0.0.1:9876",
+  "success": false,
+  "recommendation": "NOT READY",
+  "connection": {
+    "base_url": "http://127.0.0.1:9876",
+    "sse_connected": false,
+    "session_id": "",
+    "message_endpoint": "",
+    "retries_used": 0,
+    "transport_stable": false
+  },
+  "tool_count": 0,
+  "tools": [],
+  "missing_features": [
+    "tools/list",
+    "tools/call",
+    "session stability"
+  ],
+  "restricted_features": [],
+  "safe_execution": {
+    "tool_name": "",
+    "attempted": false,
+    "success": false,
+    "latency_ms": 0.0,
+    "response_shape_valid": false,
+    "error": ""
+  },
+  "errors": [
+    {
+      "stage": "connection",
+      "error_type": "BurpNotReachableError",
+      "message": "SSE connection failed: <urlopen error [Errno 111] Connection refused>",
+      "recoverable": false
+    }
+  ],
+  "notes": [
+    "Burp MCP endpoint unreachable or refused connection."
+  ]
+}
