@@ -69,6 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Burp MCP base URL (defaults to BURP_MCP_URL or http://127.0.0.1:9876)",
     )
+    burp_validate_parser.add_argument("--rpc-timeout", type=float, default=None, help="RPC timeout seconds")
+    burp_validate_parser.add_argument("--connect-timeout", type=float, default=None, help="SSE/connect timeout seconds")
+    burp_validate_parser.add_argument("--debug", action="store_true", help="Enable provider debug mode")
     burp_validate_parser.add_argument("--json", action="store_true", help="Print structured JSON report")
     burp_validate_parser.add_argument("--output", default="", help="Optional output path for JSON report")
     burp_validate_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
@@ -487,6 +490,12 @@ def main():
         cli_args = []
         if args.url:
             cli_args.extend(["--url", args.url])
+        if args.rpc_timeout is not None:
+            cli_args.extend(["--rpc-timeout", str(args.rpc_timeout)])
+        if args.connect_timeout is not None:
+            cli_args.extend(["--connect-timeout", str(args.connect_timeout)])
+        if args.debug:
+            cli_args.append("--debug")
         if args.json:
             cli_args.append("--json")
         if args.output:

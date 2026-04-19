@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -16,3 +16,6 @@ class BurpMcpConfig:
     max_retries: int = 2
     debug_logging: bool = False
     lab_mode: bool = True
+    scope_allowed_domains: tuple[str, ...] = field(default_factory=tuple)
+    scope_denied_domains: tuple[str, ...] = field(default_factory=tuple)
+    scope_allow_subdomains: bool = False

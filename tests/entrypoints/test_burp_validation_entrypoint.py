@@ -51,6 +51,26 @@ class _ProviderSuccess:
         raise AssertionError("should not call regex tool when history tool exists")
 
 
+class _ProviderEmptyButValid:
+    def __init__(self, config):
+        self._state = BurpProviderState(
+            session=BurpSessionState(base_url=config.base_url, sse_connected=True, session_id="sess-999"),
+            discovered_tools=[BurpCapability(name="get_proxy_http_history", enabled=True)],
+            enabled_tools=["get_proxy_http_history"],
+            disabled_tools=[],
+        )
+
+    def start(self):
+        return self._state
+
+    def stop(self):
+        return None
+
+    def get_proxy_http_history(self, arguments):
+        assert arguments == {}
+        return []
+
+
 class _ProviderNoSafeTool:
     def __init__(self, config):
         self._state = BurpProviderState(
@@ -85,16 +105,32 @@ def test_validate_burp_provider_ready(monkeypatch):
 
     result = validate_burp_provider("http://127.0.0.1:9876")
 
+    assert result.provider_name == "burp_mcp"
+    assert result.provider_type == "mcp_adapter"
     assert result.connection_status == "CONNECTED"
+    assert result.session_status == "ESTABLISHED"
+    assert result.capability_discovery_status == "SUCCESS"
+    assert result.safe_test_name == "get_proxy_http_history"
+    assert result.safe_test_status == "SUCCESS"
     assert result.session_id == "sess-123"
     assert result.total_tools == 1
     assert result.allowed_tools == ["get_proxy_http_history"]
     assert result.blocked_tools == ["burp.scanner.start"]
-    assert result.test_execution_success is True
     assert result.readiness_status == READY
 
     summary = render_validation_console_summary(result)
     assert "Readiness status: READY" in summary
+
+
+def test_validate_burp_provider_empty_but_valid_result(monkeypatch):
+    monkeypatch.setattr(burp_validation, "BurpMcpProvider", _ProviderEmptyButValid)
+
+    result = validate_burp_provider("http://127.0.0.1:9876")
+
+    assert result.safe_test_status == "SUCCESS"
+    assert result.normalized_record_count == 0
+    assert "empty" in result.safe_test_summary.lower()
+    assert result.readiness_status == READY
 
 
 def test_validate_burp_provider_partial_without_safe_tool(monkeypatch):
@@ -103,7 +139,7 @@ def test_validate_burp_provider_partial_without_safe_tool(monkeypatch):
     result = validate_burp_provider("http://127.0.0.1:9876")
 
     assert result.connection_status == "CONNECTED"
-    assert result.test_execution_success is False
+    assert result.safe_test_status == "DENIED_BY_POLICY"
     assert result.readiness_status == PARTIAL
     assert result.warnings
 
@@ -113,6 +149,8 @@ def test_validate_burp_provider_failed_when_unreachable(monkeypatch):
 
     result = validate_burp_provider("http://127.0.0.1:1")
 
+    assert result.connection_status == "UNREACHABLE"
+    assert result.session_status == "FAILED"
     assert result.readiness_status == FAILED
     assert result.errors
 
