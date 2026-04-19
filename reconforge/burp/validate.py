@@ -24,13 +24,21 @@ def _configure_logging(verbose: bool) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate Burp MCP provider integration for ReconForge")
     parser.add_argument("--url", default=None, help="Burp MCP base URL (or use BURP_MCP_URL)")
+    parser.add_argument("--rpc-timeout", type=float, default=None, help="RPC timeout seconds")
+    parser.add_argument("--connect-timeout", type=float, default=None, help="SSE/connect timeout seconds")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode in provider config")
     parser.add_argument("--json", action="store_true", help="Print structured JSON report")
     parser.add_argument("--output", default="", help="Optional output file for JSON report")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
     args = parser.parse_args(argv)
 
     _configure_logging(args.verbose)
-    result = validate_burp_provider(base_url=args.url)
+    result = validate_burp_provider(
+        base_url=args.url,
+        rpc_timeout_seconds=args.rpc_timeout,
+        connect_timeout_seconds=args.connect_timeout,
+        debug_logging=args.debug,
+    )
 
     print(render_validation_console_summary(result))
 
