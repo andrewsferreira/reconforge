@@ -1,39 +1,48 @@
 # Burp MCP Validation Entrypoint
 
-The Burp MCP validation entrypoint is the official internal method for verifying Burp connectivity and safe provider operation inside ReconForge.
+The Burp MCP validation entrypoint is the official readiness check for the ReconForge Burp provider adapter.
 
-## Why this exists
+It validates provider behavior through the provider abstraction (not the raw SSE client) and is safe for manual operator checks, CI smoke checks, and orchestration preflight gates.
 
-ReconForge must preserve adapter-only integration and keep orchestration/policy inside the core platform. This validator checks that the Burp provider can:
+## What the validation checks
 
-1. Establish SSE connectivity
-2. Acquire session metadata
-3. Discover capabilities
-4. Apply capability policy filtering
-5. Execute a single safe probe (`get_proxy_http_history` or fallback `get_proxy_http_history_regex`)
-6. Return normalized data structures
+Validation flow:
 
-## Usage
+1. Initialize `BurpMcpProvider`
+2. Connect to Burp MCP and establish session transport
+3. Confirm session metadata (`session_id`) handling
+4. Discover capabilities (`tools/list`)
+5. Apply provider policy classification (allowed vs blocked tools)
+6. Execute one safe operation (`get_proxy_http_history`, fallback `get_proxy_http_history_regex`)
+7. Validate response normalization shape and classify readiness
 
-### CLI (official)
+## Official invocation methods
+
+### Project CLI (recommended)
 
 ```bash
 reconforge burp validate
 ```
 
-Optional flags:
+With explicit options:
 
 ```bash
-reconforge burp validate --url http://127.0.0.1:9876 --json --output mcp_validation/report.json
+reconforge burp validate \
+  --url http://127.0.0.1:9876 \
+  --rpc-timeout 8 \
+  --connect-timeout 3 \
+  --debug \
+  --json \
+  --output mcp_validation/report.json
 ```
 
-### Module CLI
+### Module execution
 
 ```bash
 python -m reconforge.burp.validate --json
 ```
 
-### Programmatic
+### Programmatic usage
 
 ```python
 from reconforge.entrypoints.burp_validation import validate_burp_provider
@@ -42,59 +51,86 @@ result = validate_burp_provider()
 print(result.to_dict())
 ```
 
-See `examples/validate_burp_provider.py` for a complete runnable example.
+## Configuration inputs
 
-## Configuration
+Supported configuration precedence:
 
-Validation URL precedence:
+1. CLI args (`--url`, `--rpc-timeout`, `--connect-timeout`, `--debug`)
+2. Environment variables:
+   - `BURP_MCP_URL`
+   - `BURP_MCP_RPC_TIMEOUT_SECONDS`
+   - `BURP_MCP_CONNECT_TIMEOUT_SECONDS`
+   - `BURP_MCP_READ_TIMEOUT_SECONDS`
+   - `BURP_MCP_MAX_RETRIES`
+   - `BURP_MCP_DEBUG`
+3. Provider defaults from `BurpMcpConfig`
 
-1. `--url` CLI argument
-2. `BURP_MCP_URL` environment variable
-3. default `http://127.0.0.1:9876`
+## Output model
 
-## Structured output fields
+The validator always returns a structured result model (`BurpValidationResult`) and supports optional JSON emission.
 
-The validator emits human-readable output and structured JSON with fields including:
+Key JSON fields:
 
+- `provider_name`
+- `provider_type`
 - `connection_status`
+- `session_status`
 - `session_id`
+- `capability_discovery_status`
 - `total_tools`
+- `discovered_tools`
 - `allowed_tools`
 - `blocked_tools`
-- `test_execution_success`
-- `test_execution_latency`
-- `errors`
+- `safe_test_name`
+- `safe_test_status`
+- `safe_test_latency_ms`
+- `safe_test_summary`
 - `warnings`
+- `errors`
 - `readiness_status`
 
-## Readiness status semantics
+## Readiness states
 
-- `READY`: Connected, tools discovered, and safe execution probe succeeded with normalized response shape.
-- `PARTIAL`: Connected but one or more validation checks failed (e.g., no safe allowed tool, capability issue, timeout).
-- `FAILED`: Could not establish stable provider/session connectivity or fatal validation failure occurred.
+- `READY`
+  - Connection established
+  - Session established
+  - Capabilities discovered
+  - Safe test succeeded with valid normalized response
+- `PARTIAL`
+  - Provider reachable/session usable but one or more checks degraded (for example safe tool denied, timeout during probe, or capability issues)
+- `FAILED`
+  - Connection/session establishment failed, or validation could not safely proceed
 
-## Error handling coverage
+## Safe test behavior
 
-The entrypoint handles and reports:
+The validation probe intentionally uses read-oriented safe operations only:
 
-- Burp not reachable
-- SSE/session protocol failures
-- Missing `sessionId`
-- Capability discovery failures
-- Empty tool set
-- Safe tool execution failures
-- Timeout waiting for JSON-RPC/SSE response
+- Primary: `get_proxy_http_history`
+- Fallback: `get_proxy_http_history_regex`
 
-## Burp Community limitations
+The probe must not alter Burp configuration, intercept mode, editor state, or task execution state.
 
-Burp Community feature access may vary by extension/plugin behavior. In restricted environments:
+### Empty proxy history interpretation
 
-- Tool count may be lower than expected
-- Some tool calls can be blocked by policy or server-side capability restrictions
-- Validation can return `PARTIAL` even with successful connectivity
+An empty proxy history **is valid** and does not fail readiness if:
 
-## Next steps after validation
+- the tool call succeeds,
+- response normalization is valid,
+- output is interpretable.
 
-1. Keep policy-allowed tool set constrained to approved recon actions.
-2. Add environment-specific smoke tests in CI using a controlled mock MCP endpoint.
-3. Integrate this validation as a preflight gate in orchestration workflows where Burp-dependent actions are required.
+## Allowed vs blocked tools (policy view)
+
+Current initial safe allowlist is capability-gated by provider policy:
+
+- `send_http1_request`
+- `send_http2_request`
+- `get_proxy_http_history`
+- `get_proxy_http_history_regex`
+
+All other tools are considered blocked for this validation context unless policy changes are made through core adapter policy controls.
+
+## Next steps after READY
+
+1. Keep the allowlist constrained to approved recon actions.
+2. Wire this validator as a preflight gate for Burp-dependent workflows.
+3. Add environment-specific integration checks (mock MCP + controlled Burp lab profile).
