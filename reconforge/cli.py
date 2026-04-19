@@ -101,6 +101,20 @@ def build_parser() -> argparse.ArgumentParser:
     burp_intel_parser.add_argument("--output", default="", help="Optional output path for JSON report")
     burp_intel_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
+    burp_attack_path_parser = burp_subparsers.add_parser(
+        "attack-paths",
+        help="Generate and validate multi-step attack paths from correlated findings",
+    )
+    burp_attack_path_parser.add_argument("--mcp-url", default="http://127.0.0.1:9876", help="Burp MCP base URL")
+    burp_attack_path_parser.add_argument("--endpoint", action="append", default=[], help="Endpoint URL to test")
+    burp_attack_path_parser.add_argument("--allow-domain", action="append", default=[], help="Allowed scope domain")
+    burp_attack_path_parser.add_argument("--deny-domain", action="append", default=[], help="Denied scope domain")
+    burp_attack_path_parser.add_argument("--no-subdomains", action="store_true", help="Disable subdomain allowance")
+    burp_attack_path_parser.add_argument("--refinement-rounds", type=int, default=1, help="Refinement loop count")
+    burp_attack_path_parser.add_argument("--json", action="store_true", help="Print structured JSON report")
+    burp_attack_path_parser.add_argument("--output", default="", help="Optional output path for JSON report")
+    burp_attack_path_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
+
     # Network module
     net_parser = subparsers.add_parser("network", help="Network reconnaissance")
     net_parser.add_argument("-t", "--target", required=True, help="Target IP, hostname, or CIDR")
@@ -565,7 +579,27 @@ def main():
                 cli_args.append("--verbose")
             sys.exit(burp_intelligence_main(cli_args))
 
-        parser.error("burp requires a supported subcommand (validate, lifecycle-validate, intelligence-validate)")
+        if args.burp_command == "attack-paths":
+            from reconforge.burp.attack_paths import main as burp_attack_paths_main
+
+            cli_args = ["--mcp-url", args.mcp_url, "--refinement-rounds", str(args.refinement_rounds)]
+            for endpoint in args.endpoint:
+                cli_args.extend(["--endpoint", endpoint])
+            for domain in args.allow_domain:
+                cli_args.extend(["--allow-domain", domain])
+            for domain in args.deny_domain:
+                cli_args.extend(["--deny-domain", domain])
+            if args.no_subdomains:
+                cli_args.append("--no-subdomains")
+            if args.json:
+                cli_args.append("--json")
+            if args.output:
+                cli_args.extend(["--output", args.output])
+            if args.verbose:
+                cli_args.append("--verbose")
+            sys.exit(burp_attack_paths_main(cli_args))
+
+        parser.error("burp requires a supported subcommand (validate, lifecycle-validate, intelligence-validate, attack-paths)")
 
     else:
         print(f"Unknown module: {args.module}")
