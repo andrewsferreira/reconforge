@@ -31,10 +31,9 @@ dev = [
 reconforge = "reconforge:main"
 
 [tool.setuptools]
-py-modules = ["reconforge"]
 
 [tool.setuptools.packages.find]
-include = ["core*", "modules*", "mcp_validation*"]
+
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.md"]

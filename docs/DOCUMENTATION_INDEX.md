@@ -19,6 +19,7 @@
 | Understand findings/severity | [FINDINGS.md](#findingsmd) + [SEVERITY_CRITERIA.md](#severity_criteriamd) |
 | Run multi-module workflows | [WORKFLOW_GUIDE.md](#workflow_guidemd) |
 | Integrate Burp MCP provider | [BURP_MCP_INTEGRATION.md](#burp_mcp_integrationmd) |
+
 | Review audit & stabilization | [AUDIT_REPORT.md](#audit_reportmd) + [FINAL_STABILIZATION_REPORT.md](#final_stabilization_reportmd) |
 
 ---
@@ -190,6 +191,14 @@ Web Module build summary: 26 Python files (3,499 lines), 4 phases, 9 tool wrappe
 **Status:** ✅ Complete (152 lines)
 
 Early-stage module inventory report (March 17, 2026): 2 modules at that point, 60 Python files, 12,910 LOC, 12 core services, 3 git commits. Historical snapshot of the project's growth.
+
+---
+
+### burp_validation.md
+📍 **Location:** [`docs/burp_validation.md`](burp_validation.md)
+**Status:** ✅ Complete
+
+Official internal validator runbook for Burp MCP integration. Covers CLI/module/programmatic usage, output fields, readiness semantics (`READY`/`PARTIAL`/`FAILED`), error handling behavior, and practical next steps after successful validation.
 
 ---
 
