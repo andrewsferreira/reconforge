@@ -138,7 +138,7 @@ def test_provider_discovery_and_safe_calls():
     server, base_url = _start_server()
     try:
         provider = BurpMcpProvider(
-            config=BurpMcpConfig(base_url=base_url, sse_path="/sse", message_path_fallback="/rpc", rpc_timeout_seconds=2, connect_timeout_seconds=2)
+            config=BurpMcpConfig(base_url=base_url, sse_path="/sse", message_path_fallback="/rpc", rpc_timeout_seconds=2, connect_timeout_seconds=2, scope_allowed_domains=("example.com",), scope_allow_subdomains=True)
         )
         state = provider.start()
 
@@ -151,7 +151,7 @@ def test_provider_discovery_and_safe_calls():
         assert records[0].host == "example.com"
         assert records[0].status_code == 200
 
-        sent = provider.send_http1_request({})
+        sent = provider.send_http1_request({"url": "https://example.com/submit"})
         assert sent[0].method == "POST"
         assert sent[0].status_code == 201
 
@@ -240,7 +240,7 @@ def test_observed_burp_accepted_then_async_sse_response():
     thread.start()
     host, port = server.server_address
     base_url = f"http://{host}:{port}"
-    provider = BurpMcpProvider(config=BurpMcpConfig(base_url=base_url, sse_path="/", message_path_fallback="/"))
+    provider = BurpMcpProvider(config=BurpMcpConfig(base_url=base_url, sse_path="/", message_path_fallback="/", scope_allowed_domains=("example.org",), scope_allow_subdomains=True))
     try:
         state = provider.start()
         assert state.session.session_id == "sess-observed"
