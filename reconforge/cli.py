@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 # Ensure the project root is on the path
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.authorization_gate import ScopeAuthorization
 
@@ -54,6 +54,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(dest="module", help="Module to run")
+
+    burp_parser = subparsers.add_parser(
+        "burp",
+        help="Burp MCP provider utilities",
+        description="Validate and inspect Burp MCP provider integration",
+    )
+    burp_subparsers = burp_parser.add_subparsers(dest="burp_command", help="Burp subcommand")
+    burp_validate_parser = burp_subparsers.add_parser(
+        "validate", help="Validate Burp MCP connectivity, capabilities, and safe execution"
+    )
+    burp_validate_parser.add_argument(
+        "--url",
+        default=None,
+        help="Burp MCP base URL (defaults to BURP_MCP_URL or http://127.0.0.1:9876)",
+    )
+    burp_validate_parser.add_argument("--json", action="store_true", help="Print structured JSON report")
+    burp_validate_parser.add_argument("--output", default="", help="Optional output path for JSON report")
+    burp_validate_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
     # Network module
     net_parser = subparsers.add_parser("network", help="Network reconnaissance")
@@ -459,6 +477,23 @@ def main():
 
         results = module.run(phases=phases)
         sys.exit(0 if results.get("phases") else 1)
+
+    elif args.module == "burp":
+        from reconforge.burp.validate import main as burp_validate_main
+
+        if args.burp_command != "validate":
+            parser.error("burp requires a subcommand (try: reconforge burp validate)")
+
+        cli_args = []
+        if args.url:
+            cli_args.extend(["--url", args.url])
+        if args.json:
+            cli_args.append("--json")
+        if args.output:
+            cli_args.extend(["--output", args.output])
+        if args.verbose:
+            cli_args.append("--verbose")
+        sys.exit(burp_validate_main(cli_args))
 
     else:
         print(f"Unknown module: {args.module}")
