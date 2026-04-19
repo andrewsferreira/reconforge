@@ -69,9 +69,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Burp MCP base URL (defaults to BURP_MCP_URL or http://127.0.0.1:9876)",
     )
+    burp_validate_parser.add_argument("--rpc-timeout", type=float, default=None, help="RPC timeout seconds")
+    burp_validate_parser.add_argument("--connect-timeout", type=float, default=None, help="SSE/connect timeout seconds")
+    burp_validate_parser.add_argument("--debug", action="store_true", help="Enable provider debug mode")
     burp_validate_parser.add_argument("--json", action="store_true", help="Print structured JSON report")
     burp_validate_parser.add_argument("--output", default="", help="Optional output path for JSON report")
     burp_validate_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
+
+    burp_lifecycle_parser = burp_subparsers.add_parser(
+        "lifecycle-validate", help="Run full Burp MCP web request/replay/mutation/session lifecycle validation"
+    )
+    burp_lifecycle_parser.add_argument("--target-url", required=True, help="Target URL for baseline request capture/replay")
+    burp_lifecycle_parser.add_argument("--mcp-url", default="http://127.0.0.1:9876", help="Burp MCP base URL")
+    burp_lifecycle_parser.add_argument("--allow-domain", action="append", default=[], help="Allowed scope domain")
+    burp_lifecycle_parser.add_argument("--deny-domain", action="append", default=[], help="Denied scope domain")
+    burp_lifecycle_parser.add_argument("--no-subdomains", action="store_true", help="Disable subdomain allowance")
+    burp_lifecycle_parser.add_argument("--json", action="store_true", help="Print structured JSON report")
+    burp_lifecycle_parser.add_argument("--output", default="", help="Optional output path for JSON report")
+    burp_lifecycle_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
     # Network module
     net_parser = subparsers.add_parser("network", help="Network reconnaissance")
@@ -479,21 +494,45 @@ def main():
         sys.exit(0 if results.get("phases") else 1)
 
     elif args.module == "burp":
-        from reconforge.burp.validate import main as burp_validate_main
+        if args.burp_command == "validate":
+            from reconforge.burp.validate import main as burp_validate_main
 
-        if args.burp_command != "validate":
-            parser.error("burp requires a subcommand (try: reconforge burp validate)")
+            cli_args = []
+            if args.url:
+                cli_args.extend(["--url", args.url])
+            if args.rpc_timeout is not None:
+                cli_args.extend(["--rpc-timeout", str(args.rpc_timeout)])
+            if args.connect_timeout is not None:
+                cli_args.extend(["--connect-timeout", str(args.connect_timeout)])
+            if args.debug:
+                cli_args.append("--debug")
+            if args.json:
+                cli_args.append("--json")
+            if args.output:
+                cli_args.extend(["--output", args.output])
+            if args.verbose:
+                cli_args.append("--verbose")
+            sys.exit(burp_validate_main(cli_args))
 
-        cli_args = []
-        if args.url:
-            cli_args.extend(["--url", args.url])
-        if args.json:
-            cli_args.append("--json")
-        if args.output:
-            cli_args.extend(["--output", args.output])
-        if args.verbose:
-            cli_args.append("--verbose")
-        sys.exit(burp_validate_main(cli_args))
+        if args.burp_command == "lifecycle-validate":
+            from reconforge.burp.web_validate import main as burp_web_validate_main
+
+            cli_args = ["--target-url", args.target_url, "--mcp-url", args.mcp_url]
+            for domain in args.allow_domain:
+                cli_args.extend(["--allow-domain", domain])
+            for domain in args.deny_domain:
+                cli_args.extend(["--deny-domain", domain])
+            if args.no_subdomains:
+                cli_args.append("--no-subdomains")
+            if args.json:
+                cli_args.append("--json")
+            if args.output:
+                cli_args.extend(["--output", args.output])
+            if args.verbose:
+                cli_args.append("--verbose")
+            sys.exit(burp_web_validate_main(cli_args))
+
+        parser.error("burp requires a supported subcommand (validate, lifecycle-validate)")
 
     else:
         print(f"Unknown module: {args.module}")
