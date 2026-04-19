@@ -10,6 +10,7 @@ if TYPE_CHECKING:  # avoid circular imports at runtime
     from core.findings_manager import FindingsManager
     from core.loot_manager import LootManager
     from core.attack_workflow import AttackWorkflow
+    from core.reporting.models import ReportingBundle
 
 
 class OutputManager:
@@ -81,6 +82,30 @@ class OutputManager:
         """Get path for evidence chain manifest."""
         return self.module_dir(module) / "evidence.manifest.json"
 
+    def reporting_root(self) -> Path:
+        """Get root directory for phase-5 reporting artifacts."""
+        root = self.base / "reporting"
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+
+    def reporting_layer_dir(self, layer: str) -> Path:
+        """Get a specific reporting layer directory.
+
+        Valid layers:
+        - raw
+        - normalized
+        - correlated
+        - reports
+        - manifests
+        - structured
+        """
+        allowed = {"raw", "normalized", "correlated", "reports", "manifests", "structured"}
+        if layer not in allowed:
+            raise ValueError(f"Unsupported reporting layer: {layer}")
+        d = self.reporting_root() / layer
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
     def write_evidence_manifest(self, module: str, execution_id: str) -> Path:
         """Write a chained-hash manifest for all module artifacts.
 
@@ -119,6 +144,13 @@ class OutputManager:
         }
         manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return manifest_path
+
+    def generate_reporting_bundle(self, bundle: "ReportingBundle") -> Dict[str, Path]:
+        """Generate phase-5 reporting artifacts under deterministic directories."""
+        from core.reporting.pipeline import ReportingPipeline
+
+        pipeline = ReportingPipeline()
+        return pipeline.generate(bundle, self.base)
 
     # ── Unified engagement report (IF-2) ────────────────────────────
 
