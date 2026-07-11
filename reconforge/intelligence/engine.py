@@ -198,12 +198,11 @@ class VulnerabilityIntelligenceEngine:
 
     def _metrics_from_observation(self, observation: HTTPObservation) -> ResponseMetrics:
         signature = f"{observation.response_status}:{observation.response_length}:{hash(observation.response_body)}"
-        indicators = [kw for kw in ("error", "unauthorized", "forbidden", "invalid", "exception") if kw in observation.response_body.lower()]
         return ResponseMetrics(
             status_code=observation.response_status,
             response_length=observation.response_length,
             response_signature=signature,
-            key_indicators=indicators,
+            key_indicators=_key_indicators(observation.response_body),
         )
 
     def _difference(self, original: ResponseMetrics, mutated: ResponseMetrics) -> DifferenceIntelligence:
@@ -240,16 +239,40 @@ class VulnerabilityIntelligenceEngine:
     ) -> list[VulnerabilityClassification]:
         findings: list[VulnerabilityClassification] = []
         param_norm = _canonical_param(parameter)
+        mutated_indicators = _key_indicators(mutated.response_body)
+        baseline_indicators = _key_indicators(baseline.response_body)
+        denial_words = {"unauthorized", "forbidden", "invalid"}
 
         if param_norm in {"id", "user_identifier"} and diff.behavior_flag == "significant_variation" and mutated.response_status == 200:
+            corroborating = 0
+            contradicting = 0
+            reasons: list[str] = []
+            if diff.content_delta:
+                corroborating += 1
+                reasons.append("response body content changed, not just length")
+            if not (denial_words & set(mutated_indicators)):
+                corroborating += 1
+                reasons.append("mutated response shows no denial/error wording")
+            else:
+                contradicting += 1
+                reasons.append(f"mutated response contains denial wording: {sorted(denial_words & set(mutated_indicators))}")
+            baseline_value = dict(parse_qsl(baseline.query, keep_blank_values=True)).get(parameter, "")
+            if mutated_value and mutated_value != baseline_value:
+                corroborating += 1
+                reasons.append("mutated identifier differs from the baseline's own value (accessed a different resource, not a re-request)")
+            confidence, reason_str = _evidence_confidence(
+                base=0.55, corroborating=corroborating, contradicting=contradicting,
+                magnitude=diff.length_delta_relative, reasons=reasons,
+            )
             findings.append(
                 VulnerabilityClassification(
                     type="IDOR_candidate",
-                    confidence=0.85,
+                    confidence=confidence,
                     evidence=[
                         f"parameter={parameter}",
                         f"status_delta={diff.status_delta}",
                         f"length_delta={diff.length_delta_absolute}",
+                        f"confidence_reason={reason_str}",
                     ],
                     endpoint=endpoint,
                     method=method,
@@ -258,11 +281,31 @@ class VulnerabilityIntelligenceEngine:
             )
 
         if param_norm in {"auth", "token"} and mutated.response_status == 200:
+            corroborating = 0
+            contradicting = 0
+            reasons = []
+            baseline_denied = baseline.response_status != 200 or bool(denial_words & set(baseline_indicators))
+            if baseline_denied:
+                corroborating += 1
+                reasons.append(f"baseline request was denied (status={baseline.response_status}) before mutation, succeeded after")
+            else:
+                contradicting += 1
+                reasons.append("baseline request already succeeded before mutation — mutating this parameter changed nothing observable")
+            if diff.length_delta_relative > 0.2:
+                corroborating += 1
+                reasons.append(f"response shape changed materially (length_delta_relative={diff.length_delta_relative})")
+            confidence, reason_str = _evidence_confidence(
+                base=0.5, corroborating=corroborating, contradicting=contradicting,
+                magnitude=0.0, reasons=reasons,
+            )
             findings.append(
                 VulnerabilityClassification(
                     type="auth_bypass_candidate",
-                    confidence=0.8,
-                    evidence=[f"parameter={parameter}", f"mutated_value={mutated_value}", f"status={mutated.response_status}"],
+                    confidence=confidence,
+                    evidence=[
+                        f"parameter={parameter}", f"mutated_value={mutated_value}", f"status={mutated.response_status}",
+                        f"confidence_reason={reason_str}",
+                    ],
                     endpoint=endpoint,
                     method=method,
                     parameter=parameter,
@@ -270,11 +313,22 @@ class VulnerabilityIntelligenceEngine:
             )
 
         if mutated_value and mutated_value in (mutated.response_body or ""):
+            corroborating = 0
+            reasons = []
+            if len(mutated_value) > 6:
+                corroborating += 1
+                reasons.append(f"reflected value is distinctive (len={len(mutated_value)}, low chance of coincidental match)")
+            if mutated.response_body.count(mutated_value) > 1:
+                corroborating += 1
+                reasons.append(f"value reflected {mutated.response_body.count(mutated_value)} times, not just once")
+            confidence, reason_str = _evidence_confidence(
+                base=0.45, corroborating=corroborating, contradicting=0, magnitude=0.0, reasons=reasons,
+            )
             findings.append(
                 VulnerabilityClassification(
                     type="reflection_detected",
-                    confidence=0.6,
-                    evidence=[f"reflected_value={mutated_value}", f"parameter={parameter}"],
+                    confidence=confidence,
+                    evidence=[f"reflected_value={mutated_value}", f"parameter={parameter}", f"confidence_reason={reason_str}"],
                     endpoint=endpoint,
                     method=method,
                     parameter=parameter,
@@ -284,11 +338,22 @@ class VulnerabilityIntelligenceEngine:
         if diff.behavior_flag == "significant_variation" and (
             "error" in mutated.response_body.lower() or "invalid" in mutated.response_body.lower() or mutated.response_status >= 400
         ):
+            corroborating = 0
+            reasons = []
+            if mutated.response_status >= 500:
+                corroborating += 1
+                reasons.append(f"server error status ({mutated.response_status}), a stronger signal than routine 4xx validation")
+            if len(mutated_indicators) > 1:
+                corroborating += 1
+                reasons.append(f"multiple error keywords matched: {mutated_indicators}")
+            confidence, reason_str = _evidence_confidence(
+                base=0.5, corroborating=corroborating, contradicting=0, magnitude=0.0, reasons=reasons,
+            )
             findings.append(
                 VulnerabilityClassification(
                     type="enumeration_vector",
-                    confidence=0.7,
-                    evidence=[f"status_delta={diff.status_delta}", f"behavior={diff.behavior_flag}"],
+                    confidence=confidence,
+                    evidence=[f"status_delta={diff.status_delta}", f"behavior={diff.behavior_flag}", f"confidence_reason={reason_str}"],
                     endpoint=endpoint,
                     method=method,
                     parameter=parameter,
@@ -458,3 +523,53 @@ def _score_to_priority(score: float) -> str:
 
 def _avg(values: list[float]) -> float:
     return round(sum(values) / len(values), 3) if values else 0.0
+
+
+_INDICATOR_KEYWORDS = ("error", "unauthorized", "forbidden", "invalid", "exception")
+
+
+def _key_indicators(response_body: str) -> list[str]:
+    """Keywords found in a response body that hint at denial/error state."""
+    body_lower = (response_body or "").lower()
+    return [kw for kw in _INDICATOR_KEYWORDS if kw in body_lower]
+
+
+# Heuristic classification confidence is capped below "confirmed" territory —
+# these rules pattern-match HTTP behavior, they never independently prove a
+# vulnerability. See core/findings_manager.py's confidence/severity cap table
+# for the same principle applied to the recon-module finding pipeline.
+_HEURISTIC_CONFIDENCE_FLOOR = 0.15
+_HEURISTIC_CONFIDENCE_CEILING = 0.9
+
+
+def _evidence_confidence(
+    *, base: float, corroborating: int, contradicting: int, magnitude: float, reasons: list[str],
+) -> tuple[float, str]:
+    """Derive a classification's confidence from concrete evidence factors
+    instead of a fixed literal per rule.
+
+    Args:
+        base: Starting point for this rule family — reflects how specific
+            the *pattern match itself* is (e.g. an identifier parameter
+            plus a 200 plus a content change is a more specific pattern
+            than a substring reflection), not a final answer.
+        corroborating: count of independent signals that support the
+            classification; each adds a fixed increment.
+        contradicting: count of signals that undercut it (e.g. the mutated
+            response still shows denial wording); each subtracts a larger
+            increment than a corroborating signal adds, since contradicting
+            evidence should dominate rather than average out.
+        magnitude: normalized [0, 1] measure of how strong the primary
+            signal was (e.g. response length delta ratio) — blended in at
+            a small weight so it nudges rather than dominates the score.
+        reasons: human-readable factors that produced this score, joined
+            into the returned reason string for the finding's evidence list.
+
+    Returns:
+        (confidence, reason_string) — confidence is always within
+        [_HEURISTIC_CONFIDENCE_FLOOR, _HEURISTIC_CONFIDENCE_CEILING].
+    """
+    score = base + (0.08 * corroborating) - (0.18 * contradicting) + (0.05 * min(max(magnitude, 0.0), 1.0))
+    score = round(min(max(score, _HEURISTIC_CONFIDENCE_FLOOR), _HEURISTIC_CONFIDENCE_CEILING), 2)
+    reason = f"base={base}, +{corroborating} corroborating, -{contradicting} contradicting: " + "; ".join(reasons)
+    return score, reason
