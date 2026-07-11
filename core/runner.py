@@ -23,6 +23,9 @@ from core.exceptions import (
     ToolNotFoundError,
     TimeoutError as ReconTimeoutError,
     ScopeViolationError,
+    KillSwitchBlockedError,
+    PolicyBlockedError,
+    InvalidCommandError,
 )
 from core.risk_policy import RiskPolicyEngine
 from core.logger import sanitize_log
@@ -62,6 +65,20 @@ def validate_arg(value: str, label: str = "argument") -> str:
             f"Potentially unsafe characters in {label}: {value!r}"
         )
     return value
+
+
+# Synthetic (non-subprocess) returncodes Runner.run() uses to signal why a
+# command never produced a real process exit code, distinct from an actual
+# subprocess exit code (which is always >= 0, or negative-signal-number on
+# POSIX — none of which collide with this range). Named here instead of
+# scattered magic literals so both callers checking RunResult.returncode
+# and run_or_raise()'s dispatch (below) share one definition.
+RC_TIMEOUT = -1
+RC_TOOL_NOT_FOUND = -2
+RC_UNEXPECTED_ERROR = -3
+RC_INVALID_COMMAND = -4
+RC_KILL_SWITCH_BLOCKED = -5
+RC_POLICY_BLOCKED = -6
 
 
 @dataclass
@@ -191,7 +208,7 @@ class Runner:
             self.logger.error("Execution blocked by kill-switch control")
             return RunResult(
                 command=cmd_display,
-                returncode=-5,
+                returncode=RC_KILL_SWITCH_BLOCKED,
                 stdout="",
                 stderr="Execution blocked: kill-switch is active",
                 duration=0.0,
@@ -202,7 +219,18 @@ class Runner:
         if isinstance(command, (list, tuple)):
             cmd_list = [str(a) for a in command]
         else:
-            cmd_list = shlex.split(str(command))
+            try:
+                cmd_list = shlex.split(str(command))
+            except ValueError as e:
+                # e.g. "No closing quotation" — shlex.split() can raise on
+                # malformed string commands. Must be handled here, not left
+                # to the try/except below: it runs before that block starts.
+                self.logger.error(f"Invalid command: {e}")
+                self._record_metrics("unknown", 0.0, success=False)
+                return RunResult(
+                    command=cmd_display, returncode=RC_INVALID_COMMAND, stdout="",
+                    stderr=str(e), duration=0.0, success=False
+                )
         tool_name = cmd_list[0] if cmd_list else "unknown"
         policy_decision = RiskPolicyEngine.check(cmd_list)
         if not policy_decision.allowed:
@@ -210,7 +238,7 @@ class Runner:
             self._record_metrics(tool_name, 0.0, success=False)
             return RunResult(
                 command=cmd_display,
-                returncode=-6,
+                returncode=RC_POLICY_BLOCKED,
                 stdout="",
                 stderr=policy_decision.reason,
                 duration=0.0,
@@ -253,7 +281,7 @@ class Runner:
             self.logger.error(f"Command timed out after {effective_timeout}s: {cmd_display}")
             self._record_metrics(tool_name, duration, success=False)
             return RunResult(
-                command=cmd_display, returncode=-1, stdout="",
+                command=cmd_display, returncode=RC_TIMEOUT, stdout="",
                 stderr=f"Timeout after {effective_timeout}s",
                 duration=duration, success=False
             )
@@ -262,7 +290,7 @@ class Runner:
             self.logger.error(f"Tool not found: {tool_name}")
             self._record_metrics(tool_name, 0.0, success=False)
             return RunResult(
-                command=cmd_display, returncode=-2, stdout="",
+                command=cmd_display, returncode=RC_TOOL_NOT_FOUND, stdout="",
                 stderr=f"Tool not found: {tool_name}",
                 duration=0.0, success=False
             )
@@ -271,7 +299,7 @@ class Runner:
             self.logger.error(f"Invalid command: {e}")
             self._record_metrics(tool_name, 0.0, success=False)
             return RunResult(
-                command=cmd_display, returncode=-4, stdout="",
+                command=cmd_display, returncode=RC_INVALID_COMMAND, stdout="",
                 stderr=str(e), duration=0.0, success=False
             )
         except Exception as e:
@@ -279,7 +307,7 @@ class Runner:
             self.logger.error(f"Command failed: {e}")
             self._record_metrics(tool_name, duration, success=False)
             return RunResult(
-                command=cmd_display, returncode=-3, stdout="",
+                command=cmd_display, returncode=RC_UNEXPECTED_ERROR, stdout="",
                 stderr=str(e), duration=duration, success=False
             )
 
@@ -306,23 +334,37 @@ class Runner:
         """Execute a command and raise on failure.
 
         Same interface as :meth:`run`, but raises structured exceptions
-        instead of returning a failed :class:`RunResult`.
+        instead of returning a failed :class:`RunResult`. Use this instead
+        of :meth:`run` when the command is a hard precondition for
+        continuing (e.g. the first step of a phase everything else in that
+        phase depends on) — most call sites in this codebase intentionally
+        use :meth:`run` and inspect ``RunResult.success`` instead, so one
+        failing tool doesn't abort an entire multi-tool module run.
 
         Raises:
             ToolNotFoundError: If the binary is not found.
             ReconTimeoutError: If the command times out.
-            ExecutionError: If the command exits with a non-zero code.
+            KillSwitchBlockedError: If the global kill-switch is active.
+            PolicyBlockedError: If the risk policy engine blocked it.
+            InvalidCommandError: If the command could not be parsed.
+            ExecutionError: If the command exits with any other non-zero code.
         """
         result = self.run(command, timeout=timeout, output_file=output_file,
                           env=env, stdin_data=stdin_data)
         if result.success:
             return result
 
-        if result.returncode == -2:
+        if result.returncode == RC_TOOL_NOT_FOUND:
             tool = result.command.split()[0] if result.command else "unknown"
             raise ToolNotFoundError(tool)
-        if result.returncode == -1 and "Timeout" in result.stderr:
+        if result.returncode == RC_TIMEOUT:
             raise ReconTimeoutError(result.command, timeout or self.timeout)
+        if result.returncode == RC_KILL_SWITCH_BLOCKED:
+            raise KillSwitchBlockedError(result.command)
+        if result.returncode == RC_POLICY_BLOCKED:
+            raise PolicyBlockedError(result.command, reason=result.stderr)
+        if result.returncode == RC_INVALID_COMMAND:
+            raise InvalidCommandError(result.command, reason=result.stderr)
 
         raise ExecutionError(
             command=result.command,

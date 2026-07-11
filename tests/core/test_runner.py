@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from core.exceptions import ExecutionError
 from core.runner import Runner, RunResult, quote_args, validate_arg
 
 
@@ -75,6 +76,16 @@ def test_run_missing_tool(runner):
     result = runner.run("nonexistent_tool_xyz123")
     assert result.success is False
     assert result.returncode == -2
+
+
+def test_run_malformed_string_command_returns_graceful_result(runner):
+    """shlex.split() raises ValueError on malformed string commands (e.g. an
+    unterminated quote) — this must produce a failed RunResult, not an
+    uncaught exception, same as any other execution failure mode."""
+    with pytest.warns(DeprecationWarning):
+        result = runner.run('echo "unterminated')
+    assert result.success is False
+    assert result.returncode == -4
 
 
 def test_run_timeout(runner):
@@ -221,3 +232,70 @@ def test_expired_scope_blocks_execution_mid_run():
     scope.valid_until = scope.valid_until.replace(year=2000)
     with pytest.raises(ScopeViolationError):
         runner.run(["echo", "hello"])
+
+
+# ── run_or_raise() / check_tool_or_raise() ───────────────────────────
+#
+# These typed-exception entry points previously had zero test coverage
+# (and zero real call sites) — see docs/ARCHITECTURE_REVIEW.md P1.
+
+def test_run_or_raise_returns_result_on_success(runner):
+    result = runner.run_or_raise(["echo", "hello"])
+    assert result.success is True
+
+
+def test_run_or_raise_raises_tool_not_found(runner):
+    from core.exceptions import ToolNotFoundError
+
+    with pytest.raises(ToolNotFoundError):
+        runner.run_or_raise(["nonexistent_tool_xyz123"])
+
+
+def test_run_or_raise_raises_timeout(runner):
+    from core.exceptions import TimeoutError as ReconTimeoutError
+
+    with pytest.raises(ReconTimeoutError):
+        runner.run_or_raise(["sleep", "60"], timeout=1)
+
+
+def test_run_or_raise_raises_kill_switch_blocked(runner, monkeypatch):
+    from core.exceptions import KillSwitchBlockedError
+
+    monkeypatch.setenv("RECONFORGE_KILL_SWITCH", "1")
+    with pytest.raises(KillSwitchBlockedError):
+        runner.run_or_raise(["echo", "hello"])
+
+
+def test_run_or_raise_raises_policy_blocked(runner, monkeypatch):
+    from core.exceptions import PolicyBlockedError
+
+    monkeypatch.setenv("RECONFORGE_POLICY_ENFORCE", "1")
+    monkeypatch.setenv("RECONFORGE_APPROVAL_TIER", "low")
+    with pytest.raises(PolicyBlockedError):
+        runner.run_or_raise(["sqlmap", "-u", "https://example.com", "--os-shell"])
+
+
+def test_run_or_raise_raises_invalid_command(runner):
+    from core.exceptions import InvalidCommandError
+
+    with pytest.raises(InvalidCommandError):
+        # Unbalanced quote — shlex.split raises ValueError on this string
+        # command (deprecated string form; still supported for back-compat).
+        with pytest.warns(DeprecationWarning):
+            runner.run_or_raise('echo "unterminated')
+
+
+def test_run_or_raise_raises_generic_execution_error_on_nonzero_exit(runner):
+    with pytest.raises(ExecutionError):
+        runner.run_or_raise(["false"])
+
+
+def test_check_tool_or_raise_returns_true_for_present_tool(runner):
+    assert runner.check_tool_or_raise("echo") is True
+
+
+def test_check_tool_or_raise_raises_for_missing_tool(runner):
+    from core.exceptions import ToolNotFoundError
+
+    with pytest.raises(ToolNotFoundError):
+        runner.check_tool_or_raise("nonexistent_tool_xyz123")

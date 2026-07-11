@@ -91,6 +91,29 @@ class TimeoutError(ExecutionError):
                          detail=f"Timed out after {timeout}s")
 
 
+class KillSwitchBlockedError(ExecutionError):
+    """Raised when execution is blocked by the global kill-switch."""
+
+    def __init__(self, command: str):
+        super().__init__(command=command, returncode=-5,
+                         detail="Execution blocked: kill-switch is active")
+
+
+class PolicyBlockedError(ExecutionError):
+    """Raised when execution is blocked by the risk policy engine."""
+
+    def __init__(self, command: str, reason: str = ""):
+        self.reason = reason
+        super().__init__(command=command, returncode=-6, detail=reason)
+
+
+class InvalidCommandError(ExecutionError):
+    """Raised when a command could not be parsed/split for execution."""
+
+    def __init__(self, command: str, reason: str = ""):
+        super().__init__(command=command, returncode=-4, detail=reason)
+
+
 # ── Scope / Authorization ───────────────────────────────────────────
 
 class ScopeViolationError(ReconForgeError):
