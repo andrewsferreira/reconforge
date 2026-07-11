@@ -20,3 +20,4 @@ venv/
 
 # ReconForge runtime artifacts
 outputs/
+.abacus.donotdelete
