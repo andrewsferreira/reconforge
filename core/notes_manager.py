@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
+from core.logger import sanitize_log
+
 
 class NotesManager:
     """Manage session notes with timestamped entries."""
@@ -31,7 +33,18 @@ class NotesManager:
         self.add(description, "finding")
 
     def add_command_note(self, command: str, result_summary: str = ""):
-        self.add(f"Command: `{command}` → {result_summary}", "command")
+        """Record a command note, with secrets redacted from both fields.
+
+        Session notes are persisted to disk as plain Markdown, so commands
+        and result summaries (which may embed CLI-supplied credentials or
+        tokens, e.g. from an authenticated tool run or a raw stderr excerpt)
+        must never carry them through unredacted — same rule as command
+        logs and the structured logger.
+        """
+        self.add(
+            f"Command: `{sanitize_log(command)}` → {sanitize_log(result_summary)}",
+            "command",
+        )
 
     def to_markdown(self) -> str:
         lines = ["# Session Notes\n"]

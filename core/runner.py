@@ -25,6 +25,7 @@ from core.exceptions import (
     ScopeViolationError,
 )
 from core.risk_policy import RiskPolicyEngine
+from core.logger import sanitize_log
 
 if TYPE_CHECKING:
     from core.authorization_gate import ScopeAuthorization
@@ -166,6 +167,15 @@ class Runner:
                 stacklevel=2,
             )
             cmd_display = str(command)
+
+        # Redact secrets (passwords, tokens, hashes, ...) once, up front, so
+        # every downstream consumer of cmd_display — the logger, the
+        # in-memory command log, RunResult.command, and anything a caller
+        # persists from it — sees the redacted form. Redacting only at some
+        # call sites (as before) is exactly how secrets leaked into
+        # save_command_log()/session notes while the logger's own output
+        # stayed clean.
+        cmd_display = sanitize_log(cmd_display)
 
         effective_timeout = timeout or self.timeout
         self.logger.command(cmd_display)

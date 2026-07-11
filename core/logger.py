@@ -11,6 +11,11 @@ from typing import Optional
 
 
 # ── Credential sanitization patterns ────────────────────────────────
+# Order matters: "Bearer <token>" must be redacted *before* the generic
+# "authorization=<value>" pattern below, otherwise the generic pattern's
+# \S+ only consumes the literal word "Bearer" (stopping at the following
+# space) and leaves the actual token in "Authorization: Bearer <token>"
+# unredacted.
 _SANITIZE_PATTERNS = [
     # password=... / -p ... / --password ...  (quoted or unquoted)
     (re.compile(
@@ -18,6 +23,9 @@ _SANITIZE_PATTERNS = [
      r"\1=***REDACTED***"),
     # -p <value> (short flag in CLI commands)
     (re.compile(r"""(?<!\w)-p\s+(?![\-])\S+"""), "-p ***REDACTED***"),
+    # Base64 Bearer tokens (at least 20 chars) — must run before the
+    # generic api_key/token/secret/authorization pattern (see note above).
+    (re.compile(r"""(?i)Bearer\s+[A-Za-z0-9+/=]{20,}"""), "Bearer ***REDACTED***"),
     # API keys / tokens / secrets (common env / header patterns)
     (re.compile(
         r"""(?i)(api[_-]?key|token|secret|authorization|bearer)\s*[=:]\s*['"]?\S+['"]?"""),
@@ -26,8 +34,6 @@ _SANITIZE_PATTERNS = [
     (re.compile(r"""(?i)[a-f0-9]{32}:[a-f0-9]{32}"""), "***HASH_REDACTED***"),
     # Standalone 32-hex strings that look like hashes (MD5/NTLM)
     (re.compile(r"""\b[a-f0-9]{32}\b"""), "***HASH_REDACTED***"),
-    # Base64 Bearer tokens (at least 20 chars)
-    (re.compile(r"""(?i)Bearer\s+[A-Za-z0-9+/=]{20,}"""), "Bearer ***REDACTED***"),
 ]
 
 

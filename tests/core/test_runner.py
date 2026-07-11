@@ -105,6 +105,33 @@ def test_command_log(runner):
     assert len(log) == 2
 
 
+def test_command_log_redacts_password(runner):
+    """The persisted command log must never carry a plaintext secret through,
+    even though the console/JSONL logger already redacts separately."""
+    runner.run(["smbclient", "-U", "admin", "-p", "SuperSecret123", "//10.10.10.1/share"])
+    log = runner.get_command_log()
+    assert len(log) == 1
+    assert "SuperSecret123" not in log[0]
+    assert "REDACTED" in log[0]
+
+
+def test_run_result_command_redacts_password(runner):
+    """RunResult.command (returned to every caller, including anything that
+    persists it downstream) must be redacted, not just the logger output."""
+    result = runner.run(["curl", "-H", "Authorization: Bearer abcdEFGH12345678ijklMNOP", "http://x"])
+    assert "abcdEFGH12345678ijklMNOP" not in result.command
+    assert "REDACTED" in result.command
+
+
+def test_save_command_log_writes_redacted_content(runner, tmp_path):
+    runner.run(["hydra", "-l", "admin", "-p", "hunter2hunter2", "ssh://10.10.10.1"])
+    out = tmp_path / "commands.log"
+    runner.save_command_log(out)
+    content = out.read_text()
+    assert "hunter2hunter2" not in content
+    assert "REDACTED" in content
+
+
 def test_kill_switch_blocks_execution(runner, monkeypatch):
     monkeypatch.setenv("RECONFORGE_KILL_SWITCH", "1")
     result = runner.run(["echo", "hello"])

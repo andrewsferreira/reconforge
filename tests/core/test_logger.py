@@ -51,6 +51,18 @@ def test_clean_message_unchanged():
     assert sanitize_log(msg) == msg
 
 
+def test_redact_authorization_header_bearer_token():
+    """Regression test: the generic 'authorization=<value>' pattern used to
+    run before the Bearer-token pattern, so its \\S+ only consumed the
+    literal word "Bearer" and left the actual token in
+    "Authorization: Bearer <token>" unredacted. Patterns are now ordered so
+    this can't happen."""
+    msg = "curl -H 'Authorization: Bearer abcdEFGH12345678ijklMNOP' http://x"
+    result = sanitize_log(msg)
+    assert "abcdEFGH12345678ijklMNOP" not in result
+    assert "REDACTED" in result
+
+
 # ── ReconLogger basic ─────────────────────────────────────────────
 
 def test_logger_creates(tmp_path):
