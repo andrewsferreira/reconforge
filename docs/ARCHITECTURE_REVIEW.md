@@ -1,6 +1,6 @@
 # ReconForge — Architecture Review
 
-**Date:** 2026-07-11
+**Date:** 2026-07-11 (P0 remediation pass completed same day — see §11 checklists and the `remediation/p0-release-blockers` branch history for what changed and why)
 **Scope:** Full repository audit prior to public release, per the ReconForge engineering mandate (see [AGENTS.md](../AGENTS.md)).
 **Method:** Static review of `core/`, `modules/`, `reconforge/`, `mcp_validation/`, `tests/`, `docs/`, `.github/`, and packaging config, cross-checked against actual command execution (`pytest`, `ruff check`, `mypy`, `bandit`) rather than documentation claims alone.
 **Status of this document:** living. Update it as remediation lands; do not delete resolved items — mark them done and keep the history.
@@ -161,22 +161,29 @@ These must be resolved before the repository is made public, in this order (each
 
 ## 11. Prioritized Remediation Plan
 
-### P0 — Blocks public release
-- [ ] Add LICENSE (Apache-2.0 or MIT), fix README license section, add ethical-use/disclosure policy — §10.1
-- [ ] Investigate and remove/document `.abacus.donotdelete` — §10.2
-- [ ] Fix all `reconforge.py` references across README + docs — §10.3
-- [ ] Reconcile and correct test-count claims across all 5 documents — §10.3
-- [ ] Fix the 4 currently-failing tests — §10.4
-- [ ] Fix `core/target_parser.py` hostname validation bypass (wire in `core/validators.py`) — §4 S1, §10.5
-- [ ] Enforce scope/authorization inside `core/runner.py` at every execution, not just CLI-parse time — §4 S2, §10.6
-- [ ] Re-validate scope on redirects / newly discovered targets — §4 S3, §10.6
-- [ ] Route command logs and session notes through `sanitize_log()` before persistence — §4 S5, §10.7
-- [ ] Fix CI so it actually passes: correct mypy/bandit file targets, resolve the `mcp_validation` syntax error (by fixing or removing the package) — §10.8
+### P0 — Blocks public release — all closed 2026-07-11, see `remediation/p0-release-blockers`
+- [x] Add LICENSE (Apache-2.0), fix README license section, add SECURITY.md with ethical-use/disclosure policy — §10.1
+- [x] `.abacus.donotdelete` untracked from git (kept on disk pending owner confirmation of purpose; not deleted) — §10.2
+- [x] Fix all `reconforge.py` references across README + docs + CLI (25 occurrences); added `reconforge/__main__.py` so `python -m reconforge` also works — §10.3
+- [x] Reconcile and correct test-count claims across all affected documents (445, verified) — §10.3
+- [x] Fix the 4 currently-failing tests (root cause: tests loaded the deleted top-level `reconforge.py`) — §10.4
+- [x] Fix `core/target_parser.py` hostname validation bypass (now wired to `core/validators.py`); added rejection tests for shell metacharacters, leading `-`, newline/null-byte injection, oversized input — §4 S1, §10.5
+- [x] Enforce scope/authorization inside `core/runner.py` at construction *and* every `run()` call (catches mid-scan approval expiry too); wired through all 5 modules, `WorkflowOrchestrator`, and CLI — §4 S2, §10.6
+- [x] Re-validate scope for the one concrete "discovered target" mechanism in the codebase — `WorkflowOrchestrator` auto-handoff now propagates scope to every spawned module, including handoff steps; proven with an end-to-end test. **Not yet covered:** `reconforge/intelligence/engine.py`'s HTTP mutation path (still unwired to any scope check — real gap, tracked below) — §4 S3, §10.6
+- [x] Route command logs and session notes through `sanitize_log()` before persistence; also fixed a real redaction-order bug found while testing (`Authorization: Bearer <token>` was only partially redacted) — §4 S5, §10.7
+- [x] Fix CI so it actually passes: corrected mypy/bandit file targets, fixed `mcp_validation/run_validation.py`'s syntax error *and* its actually-broken `main()` (it never called the validator), triaged all 76 bandit findings surfaced once bandit was actually scanning the real package (fixed a real SSRF-ish scheme-override bug in the Burp MCP adapter along the way), added an honest `[tool.coverage]` gate (50%, matching real ~52% coverage — the previous 85% was never true and was never enforced anywhere), fixed a packaging-smoke-test fragility (`--no-build-isolation` failing on any environment without setuptools/wheel pre-installed) — §10.8
+
+**New follow-ups discovered while fixing the above** (not previously in this document):
+- `reconforge/intelligence/engine.py`'s HTTP mutation/attack-path engine still has no scope check on mutated/derived URLs — the P0 fix closed the auto-handoff path but not this one. Promote to P0/P1 before this engine is used against anything beyond a fully-owned lab.
+- Coverage is genuinely ~52%, not 85% — raising it is real, substantial work, tracked as a new P1 item below, not something fixed in this pass.
+- `mcp_validation/` was previously mischaracterized in this document as a fully orphaned duplicate of `core/adapters/burp/*`. On closer reading it's mostly a thin, legitimate re-export/wrapper around `core.adapters.burp.*` plus its own `ValidationReport` model and CLI runner — a real, distinct operational validation harness, just not wired into the main `reconforge` CLI as a subcommand. It was repaired (was non-functional — see mcp-validation fix commit), not removed. The "consolidate or remove" P1 item below is revised accordingly.
 
 ### P1 — Major quality/security issues
 - [ ] Consolidate the two orchestration architectures (`core/orchestrator/*` vs the real recon flow) — decide, document, delete the loser — §3, §8
 - [ ] Consolidate the two scope/authorization mechanisms — §4 S4, §5
-- [ ] Remove `mcp_validation/` (duplicate of `core/adapters/burp/*`) — §5, §8
+- [ ] Decide whether `mcp_validation/` should become a `reconforge burp` subcommand or stay a separate operational harness — it is a legitimate, working, non-duplicate tool (correction: see P0 §11 "New follow-ups"), just currently undiscoverable from the main CLI — §5, §8
+- [ ] Add a scope check to `reconforge/intelligence/engine.py`'s HTTP mutation/attack-path path — the auto-handoff scope fix (P0) does not cover this engine — new item, see P0 §11 "New follow-ups"
+- [ ] Raise real test coverage from ~52% back toward 85% — the CI gate is now honest (50%) rather than silently failing, but closing this gap is real, substantial work, not yet done — new item, see P0 §11 "New follow-ups"
 - [ ] Decide the fate of the two dead reporting pipelines (`OutputManager.generate_engagement_report`, `core/reporting/`) — wire one in as canonical, delete the rest — §3, §8
 - [ ] Wire `core/validators.py` into actual target parsing everywhere — §4 S9, §8
 - [ ] Fix attack-path "validated" semantics so HTTP-request-succeeded is not conflated with vulnerability-confirmed — §7
@@ -194,10 +201,10 @@ These must be resolved before the repository is made public, in this order (each
 - [ ] Extend the `Finding` model with missing fields (CWE/CAPEC/MITRE ATT&CK, port/protocol/service, status, confidence_reason, raw_evidence_reference) — §9
 - [ ] Add finding-level deduplication/correlation — §9
 - [ ] Extend attack-path graph to cover AD/network assets, not just HTTP endpoints — §9
-- [ ] Fix the two silently-swallowed `except Exception: pass` blocks — §4 S8
+- [x] `modules/surface/parsers/surface_parser.py`'s silent swallow fixed (narrowed + surfaced via `result.raw_output`); `core/secrets_manager.py:48`'s `except Exception: self._file_cache = {}` is still open — §4 S8
 - [ ] Enable risk policy enforcement by default (or document clearly why it defaults off) — §4 S10
-- [ ] Add `[tool.coverage]` config with the 85% gate codified, not just passed via CLI flag
-- [ ] Add SECURITY.md and CODE_OF_CONDUCT.md
+- [x] Add `[tool.coverage]` config — done, but the codified floor is an honest 50% (real coverage), not 85% (never true) — see P0 §11
+- [x] Add SECURITY.md — done. CODE_OF_CONDUCT.md still open.
 
 ### P3 — Optional enhancements
 - [ ] Add framework/tool version + config-hash provenance to reports
