@@ -5,7 +5,7 @@ import pytest
 
 
 def _load_cli_module():
-    cli_path = Path(__file__).resolve().parents[1] / "reconforge.py"
+    cli_path = Path(__file__).resolve().parents[1] / "reconforge" / "cli.py"
     spec = importlib.util.spec_from_file_location("reconforge_cli", cli_path)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader

@@ -284,7 +284,7 @@ def _derive_autonomous_next_steps(module_name: str, result: Dict[str, Any], ctx:
         if 80 in port_numbers or 443 in port_numbers or {"http", "https"} & services:
             _add_autonomous_step(
                 ctx,
-                command=f"python reconforge.py web --target http://{host}",
+                command=f"reconforge web --target http://{host}",
                 reason=f"HTTP surface detected on {host}; continue web attack-surface and vuln probing.",
                 priority="high",
             )
@@ -298,7 +298,7 @@ def _derive_autonomous_next_steps(module_name: str, result: Dict[str, Any], ctx:
         if 445 in port_numbers or 139 in port_numbers or "smb" in banner_blob:
             _add_autonomous_step(
                 ctx,
-                command=f"python reconforge.py network --target {host} --phases service,auth --brute-force",
+                command=f"reconforge network --target {host} --phases service,auth --brute-force",
                 reason=f"SMB/NetBIOS evidence on {host}; escalate to authenticated service checks.",
                 priority="high",
             )
@@ -883,13 +883,13 @@ class WorkflowOrchestrator:
             if not isinstance(suggestion, dict):
                 continue
             command = str(suggestion.get("command", "")).strip()
-            if not command.startswith("python reconforge.py "):
+            if not command.startswith("reconforge "):
                 continue
 
             tokens = shlex.split(command)
-            if len(tokens) < 4:
+            if len(tokens) < 3:
                 continue
-            module_name = tokens[2]
+            module_name = tokens[1]
             if module_name not in {"surface", "network", "web", "api"}:
                 continue
 

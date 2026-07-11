@@ -9,8 +9,8 @@ import pytest
 
 
 def _load_cli_module():
-    """Load top-level reconforge.py as a module (not the package)."""
-    cli_path = Path(__file__).resolve().parents[1] / "reconforge.py"
+    """Load reconforge/cli.py as a standalone module (not via the package __init__)."""
+    cli_path = Path(__file__).resolve().parents[1] / "reconforge" / "cli.py"
     spec = importlib.util.spec_from_file_location("reconforge_cli", cli_path)
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
@@ -36,7 +36,7 @@ def test_surface_main_passes_encrypt_loot_to_module():
         with patch.object(
             sys,
             "argv",
-            ["reconforge.py", "surface", "--target", "10.10.10.1", "--encrypt-loot", "--dry-run"],
+            ["reconforge", "surface", "--target", "10.10.10.1", "--encrypt-loot", "--dry-run"],
         ):
             with pytest.raises(SystemExit) as exc:
                 cli.main()
