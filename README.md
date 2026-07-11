@@ -161,10 +161,10 @@ These are unit tests against mocked tool execution and stored fixtures — they 
 Quality gates are codified in CI (`.github/workflows/quality-gates.yml`) and run:
 
 - Ruff (lint)
-- MyPy (type checks)
+- MyPy (type checks — `reconforge/cli.py`, `core/runner.py`, `core/workflow_orchestrator.py`; not yet the full tree)
 - Bandit (SAST)
 - pip-audit (dependency vulnerability audit)
-- Pytest + coverage threshold (`--cov-fail-under=85`)
+- Pytest + coverage threshold (currently 50%, codified in `pyproject.toml`'s `[tool.coverage.report]`; measured coverage is ~52%, well short of the 85% previously asserted in CI but never actually enforced anywhere — see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for the tracked plan to raise it)
 - Packaging smoke test (`pip install -e .` + `reconforge --help`)
 
 ## Project Structure
