@@ -21,6 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.authorization_gate import ScopeAuthorization
+from core.exceptions import ReconForgeError
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -353,6 +354,14 @@ def main():
     except ValueError as e:
         parser.error(str(e))
 
+    try:
+        _dispatch(args, parser)
+    except ReconForgeError as e:
+        parser.error(str(e))
+
+
+def _dispatch(args, parser) -> None:
+    """Run the module selected by ``args.module``. Exits the process on completion."""
     if args.module == "network":
         from modules.network.network_module import NetworkModule
 
