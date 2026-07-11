@@ -23,7 +23,7 @@ Two modules extend this base pattern:
 
 ```mermaid
 graph TB
-    CLI["reconforge.py<br/>(CLI Entry Point)"]
+    CLI["reconforge<br/>(CLI Entry Point)"]
     WO["WorkflowOrchestrator<br/>core/workflow_orchestrator.py"]
 
     CLI --> WO
@@ -126,7 +126,9 @@ graph TB
 
 ```
 reconforge/
-├── reconforge.py                  # CLI entry-point (argparse)
+├── reconforge/                     # installable CLI package
+│   ├── cli.py                      # argparse dispatcher (entry point: `reconforge` / `python -m reconforge`)
+│   └── __main__.py
 ├── config/
 │   ├── tools.yaml                 # Tool binary paths, timeouts, scan profiles
 │   └── profiles.yaml              # OPSEC-aware scan profiles
@@ -342,7 +344,7 @@ Every tool/technique has a noise level (`low`, `medium`, `high`, `very_high`). T
 ## Data Flow
 
 ```
-CLI (reconforge.py)
+CLI (reconforge)
     │
     ▼
 Module Orchestrator (e.g., NetworkModule)

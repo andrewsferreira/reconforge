@@ -75,7 +75,7 @@ The Web Module adds full web application reconnaissance to ReconForge with a fou
 
 ## Integration Points
 
-- **CLI:** `reconforge.py web --target <URL> [--phases ...] [--dry-run] [-v]`
+- **CLI:** `reconforge web --target <URL> [--phases ...] [--dry-run] [-v]`
 - **Config:** `config/tools.yaml` (web tool definitions), `config/profiles.yaml` (OPSEC profiles)
 - **Core:** `core/detection_map.py` (noise levels), `core/opsec_checks.py` (gating)
 - **Output:** `outputs/<target>/web/` (raw data, parsed results, reports)

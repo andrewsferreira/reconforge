@@ -48,19 +48,19 @@ discover, test, and assess API security posture.
 
 ```bash
 # Basic scan (phases 1-3)
-python reconforge.py api --target https://api.example.com/v1
+reconforge api --target https://api.example.com/v1
 
 # Stealth mode
-python reconforge.py api --target https://api.example.com --opsec stealth
+reconforge api --target https://api.example.com --opsec stealth
 
 # Full scan including authorization testing
-python reconforge.py api --target https://api.example.com --phases discovery,authentication,fuzzing,authorization
+reconforge api --target https://api.example.com --phases discovery,authentication,fuzzing,authorization
 
 # With authentication
-python reconforge.py api --target https://api.example.com --auth-token "Bearer eyJ..."
+reconforge api --target https://api.example.com --auth-token "Bearer eyJ..."
 
 # Custom headers
-python reconforge.py api --target https://api.example.com --header "X-Api-Key: abc123" --header "X-Custom: value"
+reconforge api --target https://api.example.com --header "X-Api-Key: abc123" --header "X-Custom: value"
 ```
 
 ### Python API

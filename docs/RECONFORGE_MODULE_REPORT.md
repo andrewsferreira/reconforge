@@ -143,11 +143,11 @@
 
 ## CLI Integration
 
-Both modules are registered in `reconforge.py` via argparse subparsers:
+Both modules are registered in `reconforge` via argparse subparsers:
 
 ```
-reconforge.py network  →  Network reconnaissance module
-reconforge.py ad       →  Active Directory reconnaissance module
+reconforge network  →  Network reconnaissance module
+reconforge ad       →  Active Directory reconnaissance module
 ```
 
 ---

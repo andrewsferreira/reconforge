@@ -31,7 +31,7 @@ automation.  Instead of running modules one at a time, you define a
 ### Full Reconnaissance (all modules, conditional)
 
 ```bash
-python reconforge.py workflow --target 10.10.10.1 --opsec normal
+reconforge workflow --target 10.10.10.1 --opsec normal
 ```
 
 This builds the default pipeline:
@@ -43,14 +43,14 @@ surface → network → ad (if LDAP/Kerberos found) → web (if HTTP found) → 
 ### Targeted Modules
 
 ```bash
-python reconforge.py workflow --target 10.10.10.1 \
+reconforge workflow --target 10.10.10.1 \
     --modules network,web --opsec stealth
 ```
 
 ### With Engagement Tracking
 
 ```bash
-python reconforge.py workflow --target 10.10.10.1 \
+reconforge workflow --target 10.10.10.1 \
     --engagement "Acme Assessment" --client "Acme Corp" --operator "alice"
 ```
 
@@ -362,7 +362,7 @@ All workflow-related errors inherit from `ReconForgeError`:
 ## CLI Reference
 
 ```
-python reconforge.py workflow [OPTIONS]
+reconforge workflow [OPTIONS]
 
 Options:
   --target TARGET       Target IP, hostname, or CIDR

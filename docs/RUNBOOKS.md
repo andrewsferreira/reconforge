@@ -32,7 +32,7 @@ Practical end-to-end workflows for common assessment scenarios. Each runbook pro
 Map open ports and services on the target host to understand the full exposure before focusing on the web application.
 
 ```bash
-python reconforge.py surface --target app.target.com --opsec normal -v
+reconforge surface --target app.target.com --opsec normal -v
 ```
 
 **What this does:**
@@ -62,19 +62,19 @@ python reconforge.py surface --target app.target.com --opsec normal -v
 Run the web module against the target URL. In normal OPSEC mode, this runs surface discovery, content enumeration, and vulnerability scanning (phases 1–3). The exploit phase (phase 4) is opt-in only.
 
 ```bash
-python reconforge.py web --target https://app.target.com --opsec normal -v
+reconforge web --target https://app.target.com --opsec normal -v
 ```
 
 To run with specific phases:
 
 ```bash
-python reconforge.py web --target https://app.target.com --phases surface,content,vuln -v
+reconforge web --target https://app.target.com --phases surface,content,vuln -v
 ```
 
 To include file extension fuzzing:
 
 ```bash
-python reconforge.py web --target https://app.target.com --phases surface,content -e php,asp,aspx -v
+reconforge web --target https://app.target.com --phases surface,content -e php,asp,aspx -v
 ```
 
 **What each phase does:**
@@ -110,7 +110,7 @@ python reconforge.py web --target https://app.target.com --phases surface,conten
 If the surface or web phases reveal API endpoints (e.g., `/api/`, `/v1/`, Swagger/OpenAPI specs):
 
 ```bash
-python reconforge.py api --target https://app.target.com/api/v1 --opsec normal -v
+reconforge api --target https://app.target.com/api/v1 --opsec normal -v
 ```
 
 **Expected output directory:** `outputs/https___app.target.com_api_v1/api/`
@@ -122,8 +122,8 @@ Output structure mirrors the web module: `raw/`, `parsed/`, `findings.json`, `fi
 If you need to minimize detection (e.g., testing IDS/WAF response or red team engagement):
 
 ```bash
-python reconforge.py surface --target app.target.com --opsec stealth -v
-python reconforge.py web --target https://app.target.com --opsec stealth -v
+reconforge surface --target app.target.com --opsec stealth -v
+reconforge web --target https://app.target.com --opsec stealth -v
 ```
 
 In stealth mode:
@@ -182,13 +182,13 @@ Review `findings.md` in each module output directory. Findings are classified by
 Start with network recon to discover live hosts and services. This feeds into the AD module's conditional execution.
 
 ```bash
-python reconforge.py network --target 10.10.10.0/24 --opsec normal -v
+reconforge network --target 10.10.10.0/24 --opsec normal -v
 ```
 
 For a single DC target:
 
 ```bash
-python reconforge.py network --target 10.10.10.1 --opsec normal -v
+reconforge network --target 10.10.10.1 --opsec normal -v
 ```
 
 **What each phase does:**
@@ -217,19 +217,19 @@ python reconforge.py network --target 10.10.10.1 --opsec normal -v
 Run the AD module against the Domain Controller. Unauthenticated:
 
 ```bash
-python reconforge.py ad --target 10.10.10.1 --domain corp.local --opsec normal -v
+reconforge ad --target 10.10.10.1 --domain corp.local --opsec normal -v
 ```
 
 Authenticated (recommended for deeper enumeration):
 
 ```bash
-python reconforge.py ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --dc-ip 10.10.10.1 -v
+reconforge ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --dc-ip 10.10.10.1 -v
 ```
 
 To run specific phases only:
 
 ```bash
-python reconforge.py ad --target 10.10.10.1 --domain corp.local --phases passive,identity -v
+reconforge ad --target 10.10.10.1 --domain corp.local --phases passive,identity -v
 ```
 
 **AD Module Phases:**
@@ -262,7 +262,7 @@ python reconforge.py ad --target 10.10.10.1 --domain corp.local --phases passive
 For full coverage in a lab environment:
 
 ```bash
-python reconforge.py ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --opsec aggressive -v
+reconforge ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --opsec aggressive -v
 ```
 
 This enables all phases including `bloodhound` collection, RID cycling, full NSE scripts, and all impacket tools.
@@ -272,7 +272,7 @@ This enables all phases including `bloodhound` collection, RID cycling, full NSE
 Chain network and AD modules automatically with the workflow engine:
 
 ```bash
-python reconforge.py workflow --target 10.10.10.1 --modules network,ad --opsec normal \
+reconforge workflow --target 10.10.10.1 --modules network,ad --opsec normal \
     --engagement "Q1 Internal Pentest" --client "Acme Corp" -v
 ```
 
@@ -343,7 +343,7 @@ The workflow engine:
 Run the API module with your auth token:
 
 ```bash
-python reconforge.py api --target https://api.target.com/v1 \
+reconforge api --target https://api.target.com/v1 \
     --auth-token "Bearer eyJhbGciOiJIUzI1NiIs..." \
     --opsec normal -v
 ```
@@ -351,7 +351,7 @@ python reconforge.py api --target https://api.target.com/v1 \
 With custom headers (e.g., API key):
 
 ```bash
-python reconforge.py api --target https://api.target.com/v1 \
+reconforge api --target https://api.target.com/v1 \
     --header "X-Api-Key: abc123def456" \
     --opsec normal -v
 ```
@@ -359,7 +359,7 @@ python reconforge.py api --target https://api.target.com/v1 \
 With multiple headers:
 
 ```bash
-python reconforge.py api --target https://api.target.com/v1 \
+reconforge api --target https://api.target.com/v1 \
     --header "Authorization: Bearer eyJ..." \
     --header "X-Custom-Header: value" \
     --opsec normal -v
@@ -370,7 +370,7 @@ python reconforge.py api --target https://api.target.com/v1 \
 Discovery only (lowest noise):
 
 ```bash
-python reconforge.py api --target https://api.target.com/v1 \
+reconforge api --target https://api.target.com/v1 \
     --auth-token "Bearer eyJ..." \
     --phases discovery -v
 ```
@@ -378,7 +378,7 @@ python reconforge.py api --target https://api.target.com/v1 \
 Discovery + authentication testing:
 
 ```bash
-python reconforge.py api --target https://api.target.com/v1 \
+reconforge api --target https://api.target.com/v1 \
     --auth-token "Bearer eyJ..." \
     --phases discovery,authentication -v
 ```
@@ -386,7 +386,7 @@ python reconforge.py api --target https://api.target.com/v1 \
 Full assessment including authorization testing (opt-in):
 
 ```bash
-python reconforge.py api --target https://api.target.com/v1 \
+reconforge api --target https://api.target.com/v1 \
     --auth-token "Bearer eyJ..." \
     --phases discovery,authentication,fuzzing,authorization \
     --opsec aggressive -v
@@ -444,7 +444,7 @@ python reconforge.py api --target https://api.target.com/v1 \
 For minimal footprint (e.g., bug bounty with restrictive scope):
 
 ```bash
-python reconforge.py api --target https://api.target.com/v1 \
+reconforge api --target https://api.target.com/v1 \
     --auth-token "Bearer eyJ..." \
     --opsec stealth -v
 ```
@@ -480,7 +480,7 @@ In stealth mode, only the `discovery` phase runs with httpx probing and spec det
 Always preview commands before live execution on sensitive targets:
 
 ```bash
-python reconforge.py web --target https://app.target.com --opsec normal --dry-run -v
+reconforge web --target https://app.target.com --opsec normal --dry-run -v
 ```
 
 Dry run logs all commands that **would** execute without actually running them.
@@ -490,7 +490,7 @@ Dry run logs all commands that **would** execute without actually running them.
 To encrypt loot files (credentials, hashes, tokens):
 
 ```bash
-python reconforge.py network --target 10.10.10.1 --encrypt-loot
+reconforge network --target 10.10.10.1 --encrypt-loot
 ```
 
 Loot is encrypted with Fernet symmetric encryption. The key is stored at `~/.reconforge/loot.key`. To decrypt:
@@ -506,10 +506,10 @@ Save and resume workflow engagements:
 
 ```bash
 # Start an engagement
-python reconforge.py workflow --target 10.10.10.1 --engagement "Q1 Pentest" --client "Acme" -v
+reconforge workflow --target 10.10.10.1 --engagement "Q1 Pentest" --client "Acme" -v
 
 # Resume from saved state
-python reconforge.py workflow --target 10.10.10.1 --resume outputs/workflow/engagement_20250321_143000.json
+reconforge workflow --target 10.10.10.1 --resume outputs/workflow/engagement_20250321_143000.json
 ```
 
 ### Output Directory Convention

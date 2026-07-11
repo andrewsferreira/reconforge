@@ -103,19 +103,19 @@ results = module.run()
 
 ```bash
 # Full scan
-python reconforge.py network --target 10.10.10.1
+reconforge network --target 10.10.10.1
 
 # Stealth mode
-python reconforge.py network --target 10.10.10.1 --opsec stealth
+reconforge network --target 10.10.10.1 --opsec stealth
 
 # Aggressive with brute-force
-python reconforge.py network --target 10.10.10.1 --opsec aggressive --brute-force
+reconforge network --target 10.10.10.1 --opsec aggressive --brute-force
 
 # Specific phases
-python reconforge.py network --target 10.10.10.1 --phases discovery,scanning
+reconforge network --target 10.10.10.1 --phases discovery,scanning
 
 # Verbose output
-python reconforge.py network --target 10.10.10.1 -v
+reconforge network --target 10.10.10.1 -v
 ```
 
 ## Output Structure
@@ -211,7 +211,7 @@ The module tracks:
 ### nmap requires root for SYN scan
 ```bash
 # Run with sudo or use connect scan
-sudo python reconforge.py network --target 10.10.10.1
+sudo reconforge network --target 10.10.10.1
 # Or the module will fall back to -sT connect scan
 ```
 

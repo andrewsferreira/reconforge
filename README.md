@@ -1,10 +1,12 @@
 # ReconForge
 
-**Modular Pentest Reconnaissance Framework**
+**An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 1.1.0 • 375/375 tests passing
+> Author: Andrews Ferreira • Version 1.1.1 • 445/445 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
-ReconForge automates the reconnaissance phase of penetration tests through five specialized modules and a cross-module workflow orchestrator. All commands are executed securely as `list[str]` via `subprocess.run` — **no `shell=True` anywhere in the codebase**.
+> **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
+
+ReconForge automates the reconnaissance phase of penetration tests through five specialized modules and a cross-module workflow orchestrator. All commands are executed securely as `list[str]` via `subprocess.run` — **no `shell=True` anywhere in the codebase**. It normalizes raw tool output into findings with an explicit confidence model (§ [FINDINGS.md](docs/FINDINGS.md)); it does not exploit targets and does not claim to be a complete Red Team platform. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) and [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for an honest account of what is implemented, tested, and still in progress.
 
 ## Modules
 
@@ -34,44 +36,54 @@ All modules share a common core providing:
 - **Workflow orchestration** — conditional multi-module pipelines with automatic data passing
 - **Configuration system** — `tools.yaml` + `profiles.yaml` as single source of truth, typed `ToolConfig` accessor
 
+## Safety and Scope
+
+- Only run ReconForge against systems and networks you own or are explicitly authorized to test (signed engagement, CTF/lab you control, etc.).
+- `--enforce-scope` gates execution against an explicit allowlist, but it is opt-in and currently checks the initial target only — see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for known gaps in scope enforcement that are being remediated before wider use.
+- `--dry-run` prints the exact commands ReconForge would execute without running them — use it to review behavior before pointing the tool at anything.
+- Intrusive phases (exploit candidates, brute force) require explicit opt-in flags; they are never run by default.
+
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install (editable, with dev tooling)
+pip install -e ".[dev]"
+
+# Or, without installing, from a repo checkout:
+# python -m reconforge <module> --target ...
 
 # Network recon
-python reconforge.py network --target 10.10.10.1
+reconforge network --target 10.10.10.1
 
 # AD recon
-python reconforge.py ad --target 10.10.10.1 --domain corp.local
+reconforge ad --target 10.10.10.1 --domain corp.local
 
 # Web recon
-python reconforge.py web --target https://example.com
+reconforge web --target https://example.com
 
 # API recon with authentication
-python reconforge.py api --target https://api.example.com --auth-token "Bearer eyJ..."
+reconforge api --target https://api.example.com --auth-token "Bearer eyJ..."
 
 # Attack surface mapping
-python reconforge.py surface --target 10.10.10.1
+reconforge surface --target 10.10.10.1
 
 # Full workflow (conditional: surface → network → ad → web → api)
-python reconforge.py workflow --target 10.10.10.1
+reconforge workflow --target 10.10.10.1
 
 # Targeted workflow with engagement tracking
-python reconforge.py workflow --target 10.10.10.1 --modules network,ad \
+reconforge workflow --target 10.10.10.1 --modules network,ad \
     --engagement "Q1 Pentest" --client "Acme Corp" --encrypt-loot
 
 # Workflow with guardrailed auto-handoff (follow-on module steps inferred from recon)
-python reconforge.py workflow --target 10.10.10.1 --auto-handoff --max-handoff-steps 5
+reconforge workflow --target 10.10.10.1 --auto-handoff --max-handoff-steps 5
 
 # Stealth mode
-python reconforge.py network --target 10.10.10.1 --opsec stealth
+reconforge network --target 10.10.10.1 --opsec stealth
 
 # Dry run (show commands without executing)
-python reconforge.py network --target 10.10.10.1 --dry-run -v
+reconforge network --target 10.10.10.1 --dry-run -v
 
-# Install as a CLI tool (recommended for operators)
+# Alternative install for operators (isolated CLI, no venv activation needed)
 pipx install .
 reconforge network --target 10.10.10.1
 ```
@@ -83,7 +95,7 @@ For repeatable testing in isolated environments, run ReconForge against a local 
 Example smoke-test command:
 
 ```bash
-python reconforge.py web --target http://127.0.0.1:8008 --phases surface,content -v
+reconforge web --target http://127.0.0.1:8008 --phases surface,content -v
 ```
 
 Expected artifacts:
@@ -137,10 +149,12 @@ outputs/<target>/<module>/
 ## Testing
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 python -m pytest
-# 375 tests, all passing (~3.1s)
+# 445 tests, all passing (~8.5s)
 ```
+
+These are unit tests against mocked tool execution and stored fixtures — they validate parsing, validation, and orchestration logic, not real binaries. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for what has and has not been validated against live tools.
 
 ## Quality Gates
 
@@ -156,8 +170,12 @@ Quality gates are codified in CI (`.github/workflows/quality-gates.yml`) and run
 ## Project Structure
 
 ```
-reconforge/
-├── reconforge.py              # CLI entry-point
+reconforge/                     # repository root
+├── reconforge/                 # installable CLI package
+│   ├── cli.py                  # argparse dispatcher (entry point: `reconforge` / `python -m reconforge`)
+│   ├── __main__.py
+│   ├── burp/                   # Burp Suite MCP validation subcommands
+│   └── entrypoints/
 ├── config/
 │   ├── tools.yaml             # Tool configuration
 │   └── profiles.yaml          # OPSEC profiles
@@ -187,9 +205,17 @@ reconforge/
 │   ├── api/                   # 4 tools, 4 parsers, 4 phases
 │   ├── surface/               # 2 tools, 1 parser, 6 intelligence, 4 phases
 │   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 375 tests (pytest)
+└── tests/                     # 445 tests (pytest)
 ```
+
+## Limitations
+
+ReconForge is a reconnaissance and evidence-normalization framework, not an exploitation platform, not a fully autonomous pentest, and not a stealth tool by default — noise profiles document *expected* telemetry, they do not guarantee it goes undetected. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for the full, current list of gaps, and [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for the prioritized remediation plan being worked through before wider release.
+
+## Security
+
+External tools invoked by ReconForge (nmap, nuclei, sqlmap, etc.) retain their own licenses and are not distributed with this project — see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md) for what's expected to be installed separately. For responsible disclosure of a security issue in ReconForge itself, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-Internal use — see project documentation for terms.
+Licensed under the [Apache License 2.0](LICENSE). Third-party tools ReconForge shells out to are governed by their own licenses.

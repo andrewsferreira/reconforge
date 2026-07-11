@@ -32,7 +32,7 @@ No issues were found that would block documentation or represent a correctness r
 
 | Field | Detail |
 |---|---|
-| **Location** | `reconforge.py` — `surface` subparser (line ~220) |
+| **Location** | `reconforge` — `surface` subparser (line ~220) |
 | **Description** | The `surface` subparser does not expose `--encrypt-loot`, unlike all other module subparsers (`network`, `ad`, `web`, `api`, `workflow`). The `SurfaceModule.__init__` already accepts `encrypt_loot=False`, so the backend supports it — only the CLI flag is missing. |
 | **Impact** | Users cannot enable loot encryption when invoking the surface module from the CLI. Functional impact is low since surface scans rarely produce credential-type loot. |
 | **Fix** | Add `surface_parser.add_argument("--encrypt-loot", ...)` and pass `encrypt_loot=args.encrypt_loot` in the surface branch of `main()`. |
@@ -143,7 +143,7 @@ No issues were found that would block documentation or represent a correctness r
 | **No test coverage for web/network/surface/AD parsers** | Parser tests exist for `nmap`, `arjun`, `ffuf`, `nuclei_api` only. Web-specific parsers (`gobuster`, `whatweb`, `nikto`, `wpscan`, `wafw00f`) and AD-specific parsers (`bloodhound`, `delegation`, `impacket`, `netexec`) lack dedicated tests. | Medium |
 | **No test coverage for AD/web/network/surface phases** | Phase logic is indirectly tested via module integration tests, but no unit tests target individual phases. | Medium |
 | **No test for findings clamping** | `FindingsManager._clamp_severity` is well-implemented but not tested via a dedicated `test_findings_manager.py`. Logic is partially covered by `test_api_module.py`. | Low |
-| **No integration/E2E tests** | No tests exercise the full `reconforge.py` CLI → module → tool → parser → findings pipeline. Tests are unit-level only. | Medium |
+| **No integration/E2E tests** | No tests exercise the full `reconforge` CLI → module → tool → parser → findings pipeline. Tests are unit-level only. | Medium |
 | **HTML report generation is basic** | `OutputManager._write_html_report` uses naive string escaping, not a proper Markdown→HTML converter. Tables and code blocks render as `<pre>` text. | Low |
 
 ### 5.2 Minor Inconsistencies (Not Bugs)

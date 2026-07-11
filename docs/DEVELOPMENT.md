@@ -6,7 +6,7 @@
 
 ```
 reconforge/
-├── reconforge.py              # CLI entry-point
+├── reconforge/                 # installable CLI package (cli.py, __main__.py)
 ├── config/
 │   ├── tools.yaml             # Tool configuration (single source of truth)
 │   └── profiles.yaml          # OPSEC profiles (single source of truth)
@@ -17,7 +17,7 @@ reconforge/
 │   ├── api/                   # 4 tools, 4 parsers, 4 phases
 │   ├── surface/               # 2 tools, 1 parser, 6 intelligence components, 4 phases
 │   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 375 tests (pytest)
+└── tests/                     # 445 tests (pytest)
 ```
 
 ## Adding a New Tool
@@ -288,10 +288,10 @@ python -m pytest tests/ --cov=core --cov=modules -v
 ruff check .
 
 # Type checks
-mypy --follow-imports=skip --ignore-missing-imports reconforge.py core/runner.py core/workflow_orchestrator.py
+mypy --follow-imports=skip --ignore-missing-imports reconforge core/runner.py core/workflow_orchestrator.py
 
 # Static security analysis
-bandit -r core modules reconforge.py -c pyproject.toml
+bandit -r core modules reconforge -c pyproject.toml
 
 # Dependency vulnerability audit
 pip-audit

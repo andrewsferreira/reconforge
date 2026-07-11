@@ -4,10 +4,13 @@
 Author: Andrews Ferreira
 Version: 1.1.0
 
-Usage:
-    python reconforge.py network --target <target> [options]
-    python reconforge.py ad --target <dc-ip> --domain <domain> [options]
-    python reconforge.py api --target <api-url> [options]
+Usage (after `pip install -e .` or `pipx install .`):
+    reconforge network --target <target> [options]
+    reconforge ad --target <dc-ip> --domain <domain> [options]
+    reconforge api --target <api-url> [options]
+
+Without installing, from a repo checkout:
+    python -m reconforge network --target <target> [options]
 """
 
 import argparse
@@ -27,29 +30,29 @@ def build_parser() -> argparse.ArgumentParser:
         description="ReconForge - Modular Pentest Reconnaissance Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  reconforge.py network --target 10.10.10.1
-  reconforge.py network --target 10.10.10.0/24 --opsec stealth
-  reconforge.py network --target 10.10.10.1 --opsec aggressive --brute-force
-  reconforge.py network --target 10.10.10.1 --phases discovery,scanning -v
+  reconforge network --target 10.10.10.1
+  reconforge network --target 10.10.10.0/24 --opsec stealth
+  reconforge network --target 10.10.10.1 --opsec aggressive --brute-force
+  reconforge network --target 10.10.10.1 --phases discovery,scanning -v
 
-  reconforge.py ad --target 10.10.10.1 --domain corp.local
-  reconforge.py ad --target 10.10.10.1 --domain corp.local --opsec stealth
-  reconforge.py ad --target 10.10.10.1 --domain corp.local -u user -p pass --dc-ip 10.10.10.1
-  reconforge.py ad --target 10.10.10.1 --domain corp.local --phases passive,identity -v
+  reconforge ad --target 10.10.10.1 --domain corp.local
+  reconforge ad --target 10.10.10.1 --domain corp.local --opsec stealth
+  reconforge ad --target 10.10.10.1 --domain corp.local -u user -p pass --dc-ip 10.10.10.1
+  reconforge ad --target 10.10.10.1 --domain corp.local --phases passive,identity -v
 
-  reconforge.py web --target https://example.com
-  reconforge.py web --target https://example.com --opsec stealth
-  reconforge.py web --target https://example.com --opsec aggressive --phases surface,content,vuln,exploit
-  reconforge.py web --target https://example.com --phases surface,content -e php,asp -v
+  reconforge web --target https://example.com
+  reconforge web --target https://example.com --opsec stealth
+  reconforge web --target https://example.com --opsec aggressive --phases surface,content,vuln,exploit
+  reconforge web --target https://example.com --phases surface,content -e php,asp -v
 
-  reconforge.py api --target https://api.example.com/v1
-  reconforge.py api --target https://api.example.com --opsec stealth
-  reconforge.py api --target https://api.example.com --auth-token "Bearer eyJ..."
-  reconforge.py api --target https://api.example.com --phases discovery,authentication,fuzzing,authorization -v
+  reconforge api --target https://api.example.com/v1
+  reconforge api --target https://api.example.com --opsec stealth
+  reconforge api --target https://api.example.com --auth-token "Bearer eyJ..."
+  reconforge api --target https://api.example.com --phases discovery,authentication,fuzzing,authorization -v
 
-  reconforge.py workflow --target 10.10.10.1
-  reconforge.py workflow --target 10.10.10.1 --modules network,ad,web
-  reconforge.py workflow --target 10.10.10.1 --opsec stealth --engagement "Q1 Pentest" --client "Acme"
+  reconforge workflow --target 10.10.10.1
+  reconforge workflow --target 10.10.10.1 --modules network,ad,web
+  reconforge workflow --target 10.10.10.1 --opsec stealth --engagement "Q1 Pentest" --client "Acme"
 """
     )
 

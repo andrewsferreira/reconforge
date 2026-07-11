@@ -52,7 +52,7 @@ which nmap  # should return a path
 
 **A:** SYN scans (`-sS`) and UDP scans require root privileges. Either:
 
-1. Run with sudo: `sudo python reconforge.py network --target 10.10.10.1`
+1. Run with sudo: `sudo reconforge network --target 10.10.10.1`
 2. Or the framework falls back to connect scans (`-sT`) which don't require root but are noisier
 
 ### Q: How do I install the cryptography package for encrypted loot?
@@ -166,7 +166,7 @@ outputs/workflow/engagement_YYYYMMDD_HHMMSS.json
 Resume with:
 
 ```bash
-python reconforge.py workflow --target 10.10.10.1 \
+reconforge workflow --target 10.10.10.1 \
     --resume outputs/workflow/engagement_20250321_143000.json
 ```
 
@@ -261,13 +261,13 @@ The `ProfileLoader` (`core/profile_loader.py`) resolves profiles by name. Module
 **A:** For the web module, use `--wordlist`:
 
 ```bash
-python reconforge.py web --target https://target.com --wordlist /path/to/custom-wordlist.txt
+reconforge web --target https://target.com --wordlist /path/to/custom-wordlist.txt
 ```
 
 For the API module:
 
 ```bash
-python reconforge.py api --target https://api.target.com/v1 --wordlist /path/to/api-wordlist.txt
+reconforge api --target https://api.target.com/v1 --wordlist /path/to/api-wordlist.txt
 ```
 
 The wordlist is passed to the underlying fuzzing tools (gobuster, ffuf). If no wordlist is specified, the tools use their own defaults.
@@ -389,7 +389,7 @@ Check `raw/` for the actual tool output and file a bug if the parser doesn't han
 
 ### Q: A module crashed — what happens?
 
-**A:** In standalone mode (`python reconforge.py <module>`), a module crash propagates to the CLI and exits with code 1.
+**A:** In standalone mode (`reconforge <module>`), a module crash propagates to the CLI and exits with code 1.
 
 In workflow mode, the behavior depends on the step's `critical` flag:
 - **Non-critical step:** Logged as failed, workflow continues to next step
@@ -408,7 +408,7 @@ The engagement state is saved regardless, and can be resumed.
 Resume with:
 
 ```bash
-python reconforge.py workflow --target 10.10.10.1 \
+reconforge workflow --target 10.10.10.1 \
     --resume outputs/workflow/engagement_YYYYMMDD_HHMMSS.json
 ```
 

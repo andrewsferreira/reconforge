@@ -111,7 +111,7 @@ if isinstance(cmd, str):
 ## Release Process
 
 1. Update `CHANGELOG.md` — move `[Unreleased]` entries to `[X.Y.Z] — YYYY-MM-DD`.
-2. Update version string in `reconforge.py` header.
+2. Update `version` in `pyproject.toml` and the matching docstring comment in `reconforge/cli.py`.
 3. Run full test suite: `python -m pytest tests/ -v` (all tests must pass).
 4. Tag: `git tag -a vX.Y.Z -m "Release X.Y.Z"`.
 5. Push tag: `git push origin vX.Y.Z`.
@@ -120,10 +120,13 @@ if isinstance(cmd, str):
 
 ## Version Location
 
-The canonical version is declared in:
+The canonical, packaging-facing version is declared in:
 
 ```
-reconforge.py  →  line 5  →  Version: X.Y.Z
+pyproject.toml  →  [project] → version = "X.Y.Z"
 ```
 
-No `__version__` module attribute exists yet. When added, it will be the single source of truth, imported by `reconforge.py` and referenced in docs.
+`reconforge/cli.py`'s module docstring also carries a `Version: X.Y.Z` comment for readers browsing the
+source; it is not read programmatically and must be updated by hand alongside `pyproject.toml`. No
+`__version__` module attribute or `--version` CLI flag exists yet — see
+[docs/ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) for related packaging follow-ups.

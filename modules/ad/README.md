@@ -34,31 +34,31 @@ Phase 4: Delegation Discovery   Phase 5: Bloodhound Collection
 
 ```bash
 # Basic unauthenticated scan
-python reconforge.py ad --target 10.10.10.1 --domain corp.local
+reconforge ad --target 10.10.10.1 --domain corp.local
 
 # Authenticated scan with credentials
-python reconforge.py ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd'
+reconforge ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd'
 
 # Stealth mode — passive phase only
-python reconforge.py ad --target 10.10.10.1 --domain corp.local --opsec stealth
+reconforge ad --target 10.10.10.1 --domain corp.local --opsec stealth
 
 # Aggressive mode — all phases, maximum coverage
-python reconforge.py ad --target 10.10.10.1 --domain corp.local --opsec aggressive
+reconforge ad --target 10.10.10.1 --domain corp.local --opsec aggressive
 
 # Specific phases only
-python reconforge.py ad --target 10.10.10.1 --domain corp.local --phases passive,identity
+reconforge ad --target 10.10.10.1 --domain corp.local --phases passive,identity
 
 # Delegation discovery only
-python reconforge.py ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --phases delegation
+reconforge ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --phases delegation
 
 # Bloodhound collection (requires credentials)
-python reconforge.py ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --phases bloodhound
+reconforge ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --phases bloodhound
 
 # Full advanced scan — all five phases
-python reconforge.py ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --opsec aggressive
+reconforge ad --target 10.10.10.1 --domain corp.local -u jsmith -p 'P@ssw0rd' --opsec aggressive
 
 # Dry-run (show commands without execution)
-python reconforge.py ad --target 10.10.10.1 --domain corp.local --dry-run -v
+reconforge ad --target 10.10.10.1 --domain corp.local --dry-run -v
 ```
 
 ## CLI Options

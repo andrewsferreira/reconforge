@@ -208,7 +208,7 @@ OPSEC BLOCKED: '<description>' not allowed in <mode> mode (noise: <level>)
 Hydra brute-force testing is **opt-in only** via `--brute-force`:
 
 ```bash
-python reconforge.py network --target 10.10.10.1 --brute-force
+reconforge network --target 10.10.10.1 --brute-force
 ```
 
 Without this flag, hydra is never invoked. Even with the flag, the tool configuration enforces safety limits:
@@ -370,7 +370,7 @@ ReconForge is designed exclusively for **authorized security assessments**. Ever
 The `--engagement` and `--client` flags in workflow mode exist to maintain audit trails:
 
 ```bash
-python reconforge.py workflow --target 10.10.10.1 \
+reconforge workflow --target 10.10.10.1 \
     --engagement "Q1 Pentest" --client "Acme Corp" --operator "J. Smith"
 ```
 

@@ -5,7 +5,7 @@
 ## CLI Entry Point
 
 ```bash
-python reconforge.py <module> [options]
+reconforge <module> [options]
 ```
 
 Available modules: `network`, `ad`, `web`, `api`, `surface`, `workflow`
@@ -37,16 +37,16 @@ These flags are available across all modules unless noted otherwise:
 
 ```bash
 # Basic scan
-python reconforge.py network --target 10.10.10.1
+reconforge network --target 10.10.10.1
 
 # CIDR range in stealth mode
-python reconforge.py network --target 10.10.10.0/24 --opsec stealth
+reconforge network --target 10.10.10.0/24 --opsec stealth
 
 # Aggressive with brute-force (opt-in)
-python reconforge.py network --target 10.10.10.1 --opsec aggressive --brute-force
+reconforge network --target 10.10.10.1 --opsec aggressive --brute-force
 
 # Specific phases only
-python reconforge.py network --target 10.10.10.1 --phases discovery,scanning -v
+reconforge network --target 10.10.10.1 --phases discovery,scanning -v
 ```
 
 ### Phases
@@ -70,16 +70,16 @@ python reconforge.py network --target 10.10.10.1 --phases discovery,scanning -v
 
 ```bash
 # Basic AD recon
-python reconforge.py ad --target 10.10.10.1 --domain corp.local
+reconforge ad --target 10.10.10.1 --domain corp.local
 
 # Stealth mode (passive only)
-python reconforge.py ad --target 10.10.10.1 --domain corp.local --opsec stealth
+reconforge ad --target 10.10.10.1 --domain corp.local --opsec stealth
 
 # Authenticated enumeration
-python reconforge.py ad --target 10.10.10.1 --domain corp.local -u admin -p 'P@ssw0rd' --dc-ip 10.10.10.1
+reconforge ad --target 10.10.10.1 --domain corp.local -u admin -p 'P@ssw0rd' --dc-ip 10.10.10.1
 
 # Specific phases
-python reconforge.py ad --target 10.10.10.1 --domain corp.local --phases passive,identity -v
+reconforge ad --target 10.10.10.1 --domain corp.local --phases passive,identity -v
 ```
 
 ### Phases
@@ -107,16 +107,16 @@ python reconforge.py ad --target 10.10.10.1 --domain corp.local --phases passive
 
 ```bash
 # Basic web recon
-python reconforge.py web --target https://example.com
+reconforge web --target https://example.com
 
 # Stealth mode
-python reconforge.py web --target https://example.com --opsec stealth
+reconforge web --target https://example.com --opsec stealth
 
 # Full aggressive scan including exploit phase
-python reconforge.py web --target https://example.com --opsec aggressive --phases surface,content,vuln,exploit
+reconforge web --target https://example.com --opsec aggressive --phases surface,content,vuln,exploit
 
 # With custom extensions
-python reconforge.py web --target https://example.com --phases surface,content -e php,asp -v
+reconforge web --target https://example.com --phases surface,content -e php,asp -v
 ```
 
 ### Phases
@@ -144,16 +144,16 @@ python reconforge.py web --target https://example.com --phases surface,content -
 
 ```bash
 # Basic API recon
-python reconforge.py api --target https://api.example.com/v1
+reconforge api --target https://api.example.com/v1
 
 # Stealth mode (discovery only)
-python reconforge.py api --target https://api.example.com --opsec stealth
+reconforge api --target https://api.example.com --opsec stealth
 
 # With authentication token
-python reconforge.py api --target https://api.example.com --auth-token "Bearer eyJ..."
+reconforge api --target https://api.example.com --auth-token "Bearer eyJ..."
 
 # Full scan including authorization testing
-python reconforge.py api --target https://api.example.com --phases discovery,authentication,fuzzing,authorization -v
+reconforge api --target https://api.example.com --phases discovery,authentication,fuzzing,authorization -v
 ```
 
 ### Phases
@@ -179,13 +179,13 @@ python reconforge.py api --target https://api.example.com --phases discovery,aut
 
 ```bash
 # Basic attack surface mapping
-python reconforge.py surface --target 10.10.10.1
+reconforge surface --target 10.10.10.1
 
 # Stealth mode
-python reconforge.py surface --target 10.10.10.1 --opsec stealth
+reconforge surface --target 10.10.10.1 --opsec stealth
 
 # Aggressive full-port scan
-python reconforge.py surface --target 10.10.10.1 --opsec aggressive
+reconforge surface --target 10.10.10.1 --opsec aggressive
 ```
 
 ### Phases
@@ -203,19 +203,19 @@ python reconforge.py surface --target 10.10.10.1 --opsec aggressive
 
 ```bash
 # Full recon (conditional branching)
-python reconforge.py workflow --target 10.10.10.1
+reconforge workflow --target 10.10.10.1
 
 # Targeted modules
-python reconforge.py workflow --target 10.10.10.1 --modules network,ad,web
+reconforge workflow --target 10.10.10.1 --modules network,ad,web
 
 # With engagement tracking
-python reconforge.py workflow --target 10.10.10.1 --engagement "Q1 Pentest" --client "Acme Corp" --operator "Andrews"
+reconforge workflow --target 10.10.10.1 --engagement "Q1 Pentest" --client "Acme Corp" --operator "Andrews"
 
 # Stealth full recon
-python reconforge.py workflow --target 10.10.10.1 --opsec stealth
+reconforge workflow --target 10.10.10.1 --opsec stealth
 
 # Resume a paused engagement
-python reconforge.py workflow --target 10.10.10.1 --resume /path/to/engagement.json
+reconforge workflow --target 10.10.10.1 --resume /path/to/engagement.json
 ```
 
 ### Workflow-Specific Flags
@@ -291,13 +291,13 @@ When `--encrypt-loot` is specified:
 ### Quick Network Scan
 
 ```bash
-python reconforge.py network -t 10.10.10.1 --phases discovery,scanning
+reconforge network -t 10.10.10.1 --phases discovery,scanning
 ```
 
 ### Full AD Engagement
 
 ```bash
-python reconforge.py workflow -t 10.10.10.1 \
+reconforge workflow -t 10.10.10.1 \
     --modules network,ad \
     --opsec normal \
     --engagement "Corp AD Assessment" \
@@ -308,13 +308,13 @@ python reconforge.py workflow -t 10.10.10.1 \
 ### Stealth Web Assessment
 
 ```bash
-python reconforge.py web -t https://target.com --opsec stealth -v
+reconforge web -t https://target.com --opsec stealth -v
 ```
 
 ### API Security Audit with Token
 
 ```bash
-python reconforge.py api -t https://api.target.com/v2 \
+reconforge api -t https://api.target.com/v2 \
     --auth-token "Bearer eyJhbGciOiJIUzI1NiIs..." \
     --phases discovery,authentication,fuzzing,authorization \
     --opsec aggressive -v

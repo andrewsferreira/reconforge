@@ -61,7 +61,7 @@ Rules:
 
 ## Test Expectations
 
-All PRs must pass the full test suite (currently 348 tests).
+All PRs must pass the full test suite (run `pytest --collect-only -q` for the current count — do not hardcode a number in docs, it drifts).
 
 ### Requirements
 
@@ -137,7 +137,7 @@ python -m pytest tests/ --cov=core --cov=modules --cov-report=term-missing
 
 - Squash-merge to `main`. Single clean commit per PR.
 - At least one approving review required.
-- CI must be green (all 348+ tests passing).
+- CI must be green (full test suite passing, no `continue-on-error` on security jobs).
 
 ---
 

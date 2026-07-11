@@ -134,7 +134,7 @@ All documented features verified against actual implementation:
 
 | Check | Result |
 |-------|--------|
-| CLI flags match `reconforge.py` `add_argument()` calls | ✅ All match |
+| CLI flags match `reconforge` `add_argument()` calls | ✅ All match |
 | Phase slugs match `VALID_PHASES` in module classes | ✅ All match |
 | Exception names match `core/exceptions.py` class definitions | ✅ All match |
 | Severity levels match `FindingsManager` constants | ✅ All match |

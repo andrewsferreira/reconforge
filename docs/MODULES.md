@@ -392,16 +392,16 @@ The `WorkflowContext` data bus carries discovered data between steps:
 
 ```bash
 # Full recon (conditional branching)
-python reconforge.py workflow --target 10.10.10.1
+reconforge workflow --target 10.10.10.1
 
 # Targeted modules
-python reconforge.py workflow --target 10.10.10.1 --modules network,ad,web
+reconforge workflow --target 10.10.10.1 --modules network,ad,web
 
 # With engagement tracking
-python reconforge.py workflow --target 10.10.10.1 --engagement "Q1 Pentest" --client "Acme"
+reconforge workflow --target 10.10.10.1 --engagement "Q1 Pentest" --client "Acme"
 
 # Resume a paused engagement
-python reconforge.py workflow --target 10.10.10.1 --resume /path/to/engagement.json
+reconforge workflow --target 10.10.10.1 --resume /path/to/engagement.json
 ```
 
 ---

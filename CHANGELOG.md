@@ -76,7 +76,7 @@ Initial stable release. All 348 tests passing.
 - `core/opsec_checks.py` + `core/detection_map.py`: Technique-level OPSEC gating with noise-level mapping.
 - `core/exceptions.py`: Structured hierarchy (`ReconForgeError` → `ConfigError`, `ValidationError`, `ExecutionError`, `ModuleError`, `WorkflowError`).
 - `core/logger.py`: Color-coded logging with credential sanitization.
-- CLI entry point (`reconforge.py`) with argparse subcommands per module.
+- CLI entry point (`reconforge`) with argparse subcommands per module.
 
 ### Known Issues
 - `surface` subparser missing `--encrypt-loot` CLI flag (backend supports it; cosmetic-only).
