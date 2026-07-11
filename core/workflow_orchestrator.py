@@ -772,7 +772,11 @@ class WorkflowOrchestrator:
                         t0 = datetime.fromisoformat(step_result.start_time)
                         t1 = datetime.fromisoformat(step_result.end_time)
                         step_result.duration_seconds = (t1 - t0).total_seconds()
-                    except Exception:
+                    except ValueError:
+                        # duration is a nice-to-have metric; leave it at its
+                        # default (0.0) rather than let a timestamp-parsing
+                        # edge case fail the whole step-result finalization.
+                        # nosec B110
                         pass
 
             self._results.append(step_result)

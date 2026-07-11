@@ -31,6 +31,12 @@ def dispatch_workflow_event(summary: Dict[str, Any]) -> List[str]:
 
 
 def _post_json(url: str, payload: Dict[str, Any]) -> bool:
+    if not url.startswith(("http://", "https://")):
+        # Endpoints come from operator-set env vars, not attacker input, but
+        # reject non-http(s) schemes (file://, ftp://, ...) before urlopen
+        # regardless — the same discipline required of any URL target.
+        return False
+
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url=url,
@@ -39,7 +45,7 @@ def _post_json(url: str, payload: Dict[str, Any]) -> bool:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=4) as resp:
+        with urllib.request.urlopen(req, timeout=4) as resp:  # nosec B310 - scheme checked above
             return 200 <= resp.status < 300
     except Exception:
         return False

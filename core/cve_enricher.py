@@ -52,7 +52,9 @@ def lookup_cves_for_cpe(cpe: str, limit: int = 3) -> List[str]:
     req = urllib.request.Request(url, headers={"User-Agent": "ReconForge/1.1.0"})
     cves: List[str] = []
     try:
-        with urllib.request.urlopen(req, timeout=4) as resp:
+        # url's scheme+host is the fixed literal above; only the
+        # percent-encoded query string is variable.
+        with urllib.request.urlopen(req, timeout=4) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8"))
             vulns = data.get("vulnerabilities", [])
             for item in vulns:

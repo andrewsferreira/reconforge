@@ -102,6 +102,10 @@ class SecretManager:
         token = os.getenv("VAULT_TOKEN", "")
         if not base_url or not token or "#" not in key:
             return default
+        if not base_url.startswith(("http://", "https://")):
+            # VAULT_ADDR is operator-set config, not attacker input, but
+            # reject non-http(s) schemes before urlopen regardless.
+            return default
 
         path_ref, field = key.split("#", 1)
         parts = path_ref.strip("/").split("/", 1)
@@ -112,7 +116,7 @@ class SecretManager:
         req = urllib.request.Request(url, method="GET")
         req.add_header("X-Vault-Token", token)
         try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310 - scheme checked above
                 payload = json.loads(resp.read().decode("utf-8"))
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
             return default

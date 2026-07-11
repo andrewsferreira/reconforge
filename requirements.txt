@@ -4,5 +4,8 @@ pyyaml>=6.0
 # Optional — loot encryption (--encrypt-loot)
 cryptography>=41.0
 
+# XML-safe nmap/AD output parsing (XXE protection)
+defusedxml>=0.7.1
+
 # Optional — testing
 # See requirements-dev.txt / pyproject.toml [project.optional-dependencies.dev]

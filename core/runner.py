@@ -8,7 +8,7 @@ Author: Andrews Ferreira
 """
 
 import re
-import subprocess
+import subprocess  # nosec B404 - this is the framework's sole, audited execution layer (list[str] args, shell=False always; see Runner.run)
 import shlex
 import shutil
 import os
@@ -219,7 +219,7 @@ class Runner:
 
         start = time.time()
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # nosec B603 - cmd_list is always list[str], shell=False (never shell=True); target/args validated upstream (core/target_parser.py, validate_arg)
                 cmd_list,
                 capture_output=True, text=True,
                 timeout=effective_timeout, env=env,

@@ -11,7 +11,9 @@ Author: Andrews Ferreira
 """
 
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - only used for type hints (Element, ParseError); parsing itself goes through defusedxml below
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -76,9 +78,9 @@ class ADNmapParser:
         """Parse nmap XML output for AD data."""
         result = ADNmapResult()
         try:
-            tree = ET.parse(xml_path)
+            tree = DefusedET.parse(xml_path)
             root = tree.getroot()
-        except (ET.ParseError, FileNotFoundError, OSError):
+        except (ET.ParseError, FileNotFoundError, OSError, DefusedXmlException):
             return result
 
         for host_elem in root.findall(".//host"):

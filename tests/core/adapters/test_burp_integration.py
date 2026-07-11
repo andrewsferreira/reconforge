@@ -122,6 +122,32 @@ def test_sse_line_parser_extracts_event_fields():
     assert complete is True
 
 
+def test_endpoint_hint_with_non_http_scheme_is_rejected():
+    """A malicious/compromised Burp MCP server sending an "endpoint" SSE
+    hint like "file:///etc/passwd" must not be adopted — urllib.parse.urljoin
+    lets an absolute-scheme hint override the base URL's scheme entirely."""
+    conn = BurpSseConnection(BurpMcpConfig(base_url="http://127.0.0.1:9876/"))
+    fallback = conn.state.message_endpoint
+    conn._consume_endpoint_hint("file:///etc/passwd")
+    assert conn.state.message_endpoint == fallback
+    assert not conn.state.message_endpoint.startswith("file:")
+
+
+def test_endpoint_hint_with_http_scheme_is_accepted():
+    conn = BurpSseConnection(BurpMcpConfig(base_url="http://127.0.0.1:9876/"))
+    conn._consume_endpoint_hint("/rpc?sessionId=abc")
+    assert conn.state.message_endpoint == "http://127.0.0.1:9876/rpc?sessionId=abc"
+
+
+def test_post_json_refuses_non_http_message_endpoint():
+    from core.adapters.burp.exceptions import BurpNotReachableError
+
+    conn = BurpSseConnection(BurpMcpConfig(base_url="http://127.0.0.1:9876/"))
+    conn.state.message_endpoint = "file:///etc/passwd"
+    with pytest.raises(BurpNotReachableError, match="non-http"):
+        conn.post_json({"foo": "bar"})
+
+
 def test_wait_for_response_timeout_raises():
     conn = BurpSseConnection(BurpMcpConfig(base_url="http://127.0.0.1:1", rpc_timeout_seconds=0.1, max_retries=0))
     with pytest.raises(BurpResponseTimeoutError):

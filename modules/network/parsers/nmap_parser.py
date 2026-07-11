@@ -9,7 +9,9 @@ Extracts:
 - Service banners
 """
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - only used for type hints (Element, ParseError); parsing itself goes through defusedxml below
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 import re
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
@@ -140,9 +142,9 @@ class NmapParser:
         result = NmapResult()
 
         try:
-            tree = ET.parse(xml_path)
+            tree = DefusedET.parse(xml_path)
             root = tree.getroot()
-        except (ET.ParseError, FileNotFoundError) as e:
+        except (ET.ParseError, FileNotFoundError, DefusedXmlException) as e:
             result.raw_output = f"Error parsing XML: {e}"
             return result
 

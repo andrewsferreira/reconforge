@@ -70,9 +70,11 @@ class BurpSseConnection:
 
     def _open_sse(self) -> None:
         url = urllib.parse.urljoin(self.config.base_url, self.config.sse_path)
+        if not url.startswith(("http://", "https://")):
+            raise BurpNotReachableError(f"Refusing non-http(s) Burp MCP base_url: {url!r}")
         req = urllib.request.Request(url, headers={"Accept": "text/event-stream", "Cache-Control": "no-cache"}, method="GET")
         try:
-            self._sse_response = urllib.request.urlopen(req, timeout=self.config.connect_timeout_seconds)
+            self._sse_response = urllib.request.urlopen(req, timeout=self.config.connect_timeout_seconds)  # nosec B310 - scheme checked above
         except urllib.error.URLError as exc:
             raise BurpNotReachableError(f"SSE connection failed: {exc}") from exc
         self._reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
@@ -143,6 +145,19 @@ class BurpSseConnection:
 
     def _consume_endpoint_hint(self, endpoint_hint: str) -> None:
         resolved = urllib.parse.urljoin(self.config.base_url, endpoint_hint)
+        if not resolved.startswith(("http://", "https://")):
+            # urljoin lets an absolute-scheme hint override the base URL's
+            # scheme entirely (e.g. a "file:///etc/passwd" endpoint hint
+            # would otherwise be adopted verbatim). The Burp MCP server is
+            # config-trusted, not attacker-controlled, but a compromised or
+            # spoofed server is exactly the threat this guards against —
+            # keep the existing/fallback endpoint instead of adopting this one.
+            LOGGER.warning(json.dumps({
+                "event": "burp_sse_endpoint_hint_rejected",
+                "reason": "non-http(s) scheme",
+                "hint": endpoint_hint[:200],
+            }))
+            return
         self.state.message_endpoint = resolved
 
         parsed = urllib.parse.urlparse(resolved)
@@ -161,13 +176,18 @@ class BurpSseConnection:
         endpoint = self.state.message_endpoint
         if not endpoint:
             raise BurpNotReachableError("No message endpoint available for JSON-RPC")
+        if not endpoint.startswith(("http://", "https://")):
+            # Defense in depth: _consume_endpoint_hint already rejects
+            # non-http(s) endpoints, but never urlopen an unexpected scheme
+            # here either.
+            raise BurpNotReachableError(f"Refusing non-http(s) message endpoint: {endpoint!r}")
         headers = {"Content-Type": "application/json"}
         if self.state.session_id:
             headers["x-session-id"] = self.state.session_id
         body = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self.config.rpc_timeout_seconds) as resp:
+            with urllib.request.urlopen(req, timeout=self.config.rpc_timeout_seconds) as resp:  # nosec B310 - scheme checked above
                 text = resp.read().decode("utf-8", errors="replace")
         except urllib.error.URLError as exc:
             raise BurpNotReachableError(f"JSON-RPC POST failed: {exc}") from exc
@@ -204,7 +224,7 @@ class BurpSseConnection:
         if self._sse_response is not None:
             try:
                 self._sse_response.close()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001  # nosec B110 - best-effort teardown of a possibly already-closed/broken socket; must never block shutdown
                 pass
             self._sse_response = None
         if self._reader_thread and self._reader_thread.is_alive():

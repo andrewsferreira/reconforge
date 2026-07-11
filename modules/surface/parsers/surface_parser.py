@@ -7,7 +7,9 @@ mapping. Extracts open ports, services, versions, and HTTP metadata.
 """
 
 import json
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B405 - only used for type hints (Element, ParseError); parsing itself goes through defusedxml below
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -62,7 +64,7 @@ class SurfaceParser:
             return result
 
         try:
-            tree = ET.parse(xml_path)
+            tree = DefusedET.parse(xml_path)
             root = tree.getroot()
 
             for host in root.findall(".//host"):
@@ -83,7 +85,7 @@ class SurfaceParser:
                     )
                     result.ports.append(port_info)
 
-        except ET.ParseError:
+        except (ET.ParseError, DefusedXmlException):
             pass
 
         return result
@@ -142,22 +144,29 @@ class SurfaceParser:
 
         try:
             content = json_path.read_text(encoding="utf-8", errors="replace")
-            for line in content.strip().splitlines():
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+        except OSError as e:
+            result.raw_output = f"Error reading httpx JSON output: {e}"
+            return result
 
-                svc = ServiceInfo(
-                    url=entry.get("url", ""),
-                    status_code=entry.get("status_code", 0),
-                    title=entry.get("title", ""),
-                    technologies=entry.get("technologies", []),
-                    content_length=entry.get("content_length", 0),
-                    web_server=entry.get("webserver", ""),
-                )
-                result.services.append(svc)
-        except Exception:
-            pass
+        for line in content.strip().splitlines():
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(entry, dict):
+                # A line that's valid JSON but not an object (e.g. a bare
+                # number/array/string) has no fields to extract — skip it
+                # rather than letting .get() raise on a non-dict.
+                continue
+
+            svc = ServiceInfo(
+                url=entry.get("url", ""),
+                status_code=entry.get("status_code", 0),
+                title=entry.get("title", ""),
+                technologies=entry.get("technologies", []),
+                content_length=entry.get("content_length", 0),
+                web_server=entry.get("webserver", ""),
+            )
+            result.services.append(svc)
 
         return result

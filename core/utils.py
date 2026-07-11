@@ -38,8 +38,8 @@ def truncate(text: str, max_len: int = 500) -> str:
 
 
 def md5sum(text: str) -> str:
-    """Get MD5 hash of text."""
-    return hashlib.md5(text.encode()).hexdigest()
+    """Get an MD5 digest of text for non-cryptographic use (fingerprinting/dedup only)."""
+    return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
 
 def parse_port_range(port_spec: str) -> List[int]:
