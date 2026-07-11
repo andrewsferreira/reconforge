@@ -36,6 +36,10 @@ class AttackPathStep:
     parameter: str
     action: str
     expected_outcome: str
+    # Finding type this step chains through (e.g. "IDOR_candidate") — used
+    # by _step_corroborated() to check a type-appropriate success signal
+    # instead of "the request didn't error," which any request satisfies.
+    finding_type: str = ""
     evidence: dict[str, Any] = field(default_factory=dict)
 
 
@@ -46,6 +50,23 @@ class AttackPath:
     primitive_types: list[str]
     impact: str
     confidence: float
+    # Three honest tiers, matching docs/ATTACK_PATHS.md terminology:
+    #   "unreachable"   — at least one step's request errored/timed out.
+    #   "reachable"     — every step got an HTTP response, but at least one
+    #                     didn't match its expected success signal (e.g. a
+    #                     404/403 instead of 200) — the chain could not be
+    #                     replayed as hypothesized.
+    #   "corroborated"  — every step both completed AND matched its
+    #                     expected success signal. This is still a
+    #                     heuristic replay, NOT confirmed exploitation
+    #                     (that requires an actual authorized-lab
+    #                     validation — see docs/CONFIDENCE_MODEL.md) —
+    #                     it means the hypothesis survived a live retest,
+    #                     nothing more.
+    status: str
+    # DEPRECATED: True iff status == "corroborated". Kept so any existing
+    # caller reading this boolean gets the *stricter* of the two possible
+    # readings rather than silently breaking; new code should read `status`.
     validated: bool
     evidence: list[dict[str, Any]]
     priority: str
@@ -205,6 +226,7 @@ class AttackPathGenerationEngine:
                                 primitive_types=[src_finding.type, dst_finding.type],
                                 impact=impact,
                                 confidence=confidence,
+                                status="unreachable",  # not yet replayed; _validate_paths sets the real status
                                 validated=False,
                                 evidence=[],
                                 priority="unknown",
@@ -242,6 +264,7 @@ class AttackPathGenerationEngine:
                 parameter=left.parameter,
                 action=f"exploit_{left.type}",
                 expected_outcome="obtain pivotable identifier/data",
+                finding_type=left.type,
             ),
             AttackPathStep(
                 step_id="S2",
@@ -250,6 +273,7 @@ class AttackPathGenerationEngine:
                 parameter=right.parameter,
                 action=f"pivot_via_cluster_{relationship.cluster}",
                 expected_outcome="access related downstream resource",
+                finding_type="",  # transitional step, not itself a finding to re-confirm
             ),
             AttackPathStep(
                 step_id="S3",
@@ -258,36 +282,55 @@ class AttackPathGenerationEngine:
                 parameter=right.parameter,
                 action=f"confirm_{right.type}",
                 expected_outcome="confirm chained impact",
+                finding_type=right.type,
             ),
         ]
 
     def _validate_paths(self, paths: list[AttackPath]) -> list[AttackPath]:
-        validated_paths: list[AttackPath] = []
+        """Replay each path's steps and classify the result honestly.
+
+        A step's HTTP request completing (any status) only proves the
+        endpoint is reachable — it says nothing about whether the
+        hypothesized vulnerability actually chains. Reachability and
+        corroboration are tracked separately so a 404/403 on replay can't
+        be mistaken for a successful exploit chain (the bug this replaces:
+        `reliability = 1.0 if path.validated else 0.0` was previously set
+        from "did every request avoid erroring," not from the requests
+        actually reproducing each step's expected outcome).
+        """
+        results: list[AttackPath] = []
         for path in paths:
             evidence: list[dict[str, Any]] = []
-            valid = True
+            reachable = True
+            corroborated = True
             for step in path.steps:
                 test_url = self._mutate_step_url(step.endpoint, step.parameter)
                 observation = self.collector.collect_request(
                     test_url,
                     arguments={"method": step.method},
                 )
+                step_ok = _step_corroborated(step.finding_type, observation.response_status)
                 step.evidence = {
                     "target_url": test_url,
                     "status": observation.response_status,
                     "length": observation.response_length,
                     "evidence_id": observation.evidence_id,
+                    "corroborated": step_ok,
                 }
                 evidence.append(step.evidence)
                 if observation.response_status == 0:
-                    valid = False
+                    reachable = False
+                    corroborated = False
                     break
+                if not step_ok:
+                    corroborated = False
 
-            path.validated = valid
+            path.status = "corroborated" if corroborated else ("reachable" if reachable else "unreachable")
+            path.validated = path.status == "corroborated"
             path.evidence = evidence
-            if valid:
-                validated_paths.append(path)
-        return validated_paths
+            if reachable:
+                results.append(path)
+        return results
 
     @staticmethod
     def _mutate_step_url(endpoint: str, parameter: str) -> str:
@@ -319,6 +362,7 @@ class AttackPathGenerationEngine:
                     parameter=next_finding.parameter,
                     action=f"expand_{next_finding.type}",
                     expected_outcome="deepen exploitation path",
+                    finding_type=next_finding.type,
                 )
                 refined.append(
                     AttackPath(
@@ -327,6 +371,7 @@ class AttackPathGenerationEngine:
                         primitive_types=[*base.primitive_types, next_finding.type],
                         impact=base.impact,
                         confidence=min(1.0, round(base.confidence + 0.05, 3)),
+                        status="unreachable",  # not yet replayed; _validate_paths sets the real status
                         validated=False,
                         evidence=[],
                         priority="unknown",
@@ -339,7 +384,13 @@ class AttackPathGenerationEngine:
     def _prioritize_path(self, path: AttackPath) -> AttackPath:
         impact_weight = {"privilege escalation": 4.0, "data exposure": 3.5, "access control bypass": 3.8}.get(path.impact, 2.5)
         exploitability = max(1.0, 4.0 - (len(path.steps) * 0.5))
-        reliability = 1.0 if path.validated else 0.0
+        # Graduated, not binary: a chain that replayed but didn't match its
+        # expected outcome ("reachable") is not equivalent evidence to one
+        # that did ("corroborated") — the old `1.0 if validated else 0.0`
+        # conflated "the HTTP request didn't error" with "the vulnerability
+        # chain was confirmed," letting a merely-reachable path reach the
+        # same score as a corroborated one.
+        reliability = {"corroborated": 1.0, "reachable": 0.4, "unreachable": 0.0}.get(path.status, 0.0)
         score = round((impact_weight * path.confidence * exploitability * reliability), 2)
 
         if score >= 9:
@@ -377,3 +428,33 @@ class AttackPathGenerationEngine:
         if not report.mutations:
             failures.append("missing_mutation_coverage: no mutation intelligence available")
         return failures
+
+
+# ---------- module-level helpers ----------
+
+def _step_corroborated(finding_type: str, status: int) -> bool:
+    """Does a replayed step's response status match what that finding type
+    itself uses as its success signal (see reconforge/intelligence/engine.py
+    ::_classify for the matching gates), rather than merely "some response
+    came back"?
+
+    - IDOR_candidate / auth_bypass_candidate: their own classification gate
+      requires status == 200; corroboration on replay requires the same.
+    - enumeration_vector: its classification gate is status >= 400 (or
+      error wording) — a 200 on replay would actually *contradict* it.
+    - "" (transitional pivot step, e.g. S2 in _build_steps): pivot steps
+      describe traversal ("reach the next resource"), not a vulnerability
+      signal to reconfirm — the destination endpoint may itself be an
+      enumeration_vector target expecting an error status, so a pivot
+      step must not impose its own status expectation on top of that.
+      Reachability (status != 0) is already enforced separately in
+      _validate_paths; this only decides whether the step counts toward
+      *corroboration*, so it always does.
+    - reflection_detected / any other/unknown type: no finding-specific
+      status signal exists to re-check either, same reasoning as above.
+    """
+    if finding_type in {"IDOR_candidate", "auth_bypass_candidate"}:
+        return status == 200
+    if finding_type == "enumeration_vector":
+        return status >= 400
+    return True

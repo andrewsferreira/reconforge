@@ -43,7 +43,14 @@ AttackPathGenerationEngine = attack_mod.AttackPathGenerationEngine
 
 
 class _CollectorStub:
+    """Returns a status matching each endpoint's finding-type success
+    signal (200 for the IDOR endpoint, 404 for the enumeration endpoint,
+    per reconforge/attack_paths/engine.py::_step_corroborated), so replay
+    genuinely corroborates the hypothesized chain rather than the test
+    fixture accidentally contradicting its own findings."""
+
     def collect_request(self, url, arguments=None, http_version="http1"):
+        status = 404 if "/api/order" in url else 200
         return HTTPObservation(
             target_url=url,
             scheme="https",
@@ -53,13 +60,28 @@ class _CollectorStub:
             query=url.split("?", 1)[1] if "?" in url else "",
             request_headers={},
             request_body="",
-            response_status=200,
+            response_status=status,
             response_length=123,
             response_body="ok",
             response_headers={},
             source_tool="send_http1_request",
             source_provider="burp_mcp",
             evidence_id="ev-1",
+        )
+
+
+class _AlwaysOkCollectorStub:
+    """Always returns 200 — realistic for an IDOR-only chain, but wrong for
+    an enumeration_vector step (which expects an error/denial status), so
+    it exercises the "reachable but not corroborated" path."""
+
+    def collect_request(self, url, arguments=None, http_version="http1"):
+        return HTTPObservation(
+            target_url=url, scheme="https", host="target.local", method="GET",
+            path=url.split("?", 1)[0], query=url.split("?", 1)[1] if "?" in url else "",
+            request_headers={}, request_body="", response_status=200,
+            response_length=123, response_body="ok", response_headers={},
+            source_tool="send_http1_request", source_provider="burp_mcp", evidence_id="ev-1",
         )
 
 
@@ -121,9 +143,39 @@ def test_attack_path_generation_produces_validated_paths():
     assert report.graph.nodes
     assert report.primitives
     assert report.attack_paths
+    assert report.attack_paths[0].status == "corroborated"
     assert report.attack_paths[0].validated is True
     assert report.attack_paths[0].evidence
+    assert all(step_evidence["corroborated"] for step_evidence in report.attack_paths[0].evidence)
     assert report.attack_paths[0].priority in {"critical", "high", "medium", "low"}
+
+
+def test_reachable_but_uncorroborated_path_is_labeled_honestly_and_scores_lower():
+    """A path where every request completes (no errors) but the responses
+    don't match what the chained findings actually predict must not be
+    reported as equivalent to a corroborated one — this is the exact bug
+    docs/ARCHITECTURE_REVIEW.md flagged: 'validated=True'/'priority=critical'
+    could previously be produced from nothing more than a non-erroring
+    HTTP response."""
+    corroborated_engine = AttackPathGenerationEngine(_CollectorStub())
+    corroborated_report = corroborated_engine.run(_report(), refinement_rounds=0)
+    corroborated_path = corroborated_report.attack_paths[0]
+
+    uncorroborated_engine = AttackPathGenerationEngine(_AlwaysOkCollectorStub())
+    uncorroborated_report = uncorroborated_engine.run(_report(), refinement_rounds=0)
+    uncorroborated_path = uncorroborated_report.attack_paths[0]
+
+    assert corroborated_path.status == "corroborated"
+    assert corroborated_path.validated is True
+
+    assert uncorroborated_path.status == "reachable"
+    assert uncorroborated_path.validated is False
+    # every request still completed, so the path is kept (not dropped like
+    # an unreachable one), just honestly labeled and scored lower
+    assert uncorroborated_path.evidence
+
+    assert uncorroborated_path.score < corroborated_path.score
+    assert uncorroborated_path.priority != "critical"
 
 
 def test_failure_analysis_when_no_relationships():
