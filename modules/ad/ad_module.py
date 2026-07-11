@@ -24,7 +24,10 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.authorization_gate import ScopeAuthorization
 
 from core.logger import ReconLogger
 from core.runner import Runner
@@ -89,7 +92,9 @@ class ADModule:
                  config_dir: Optional[str] = None,
                  username: str = "", password: str = "",
                  dc_ip: str = "",
-                 encrypt_loot: bool = False):
+                 encrypt_loot: bool = False,
+                 scope: Optional["ScopeAuthorization"] = None,
+                 approval_id: Optional[str] = None):
         self.target_str = target
         self.target = parse_target(target)
         self.domain = domain
@@ -108,7 +113,8 @@ class ADModule:
             log_dir=self.output.module_dir(self.MODULE_NAME),
             execution_id=self.execution_id,
         )
-        self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run)
+        self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run,
+                              target=target, scope=scope, approval_id=approval_id)
         self.config = ConfigLoader(config_dir=config_dir)
         self.workflow = AttackWorkflow()
         self.loot = LootManager(encrypt=encrypt_loot)

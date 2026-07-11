@@ -120,3 +120,77 @@ def test_policy_engine_blocks_high_risk_without_approval(runner, monkeypatch):
     assert result.success is False
     assert result.returncode == -6
     assert "policy blocked" in result.stderr.lower()
+
+
+# ── Scope enforcement ────────────────────────────────────────────────
+
+def _make_scope(allowed_targets, approval_id="APPROVAL-1", expired=False):
+    from datetime import datetime, timedelta, timezone
+
+    from core.authorization_gate import ScopeAuthorization
+
+    valid_until = datetime.now(timezone.utc) + timedelta(hours=-1 if expired else 1)
+    return ScopeAuthorization(
+        allowed_targets=allowed_targets,
+        approval_id=approval_id,
+        valid_until=valid_until,
+    )
+
+
+def test_no_scope_configured_allows_execution():
+    logger = MagicMock()
+    runner = Runner(logger=logger, timeout=5, dry_run=True, target="10.10.10.1")
+    result = runner.run(["echo", "hello"])
+    assert result.success is True
+
+
+def test_target_in_scope_allows_construction_and_execution():
+    logger = MagicMock()
+    scope = _make_scope(["10.10.10.1"])
+    runner = Runner(
+        logger=logger, timeout=5, dry_run=True,
+        target="10.10.10.1", scope=scope, approval_id="APPROVAL-1",
+    )
+    result = runner.run(["echo", "hello"])
+    assert result.success is True
+
+
+def test_target_out_of_scope_blocks_construction():
+    from core.exceptions import ScopeViolationError
+
+    logger = MagicMock()
+    scope = _make_scope(["10.10.10.1"])
+    with pytest.raises(ScopeViolationError):
+        Runner(
+            logger=logger, timeout=5, dry_run=True,
+            target="10.10.10.99", scope=scope, approval_id="APPROVAL-1",
+        )
+
+
+def test_wrong_approval_id_blocks_construction():
+    from core.exceptions import ScopeViolationError
+
+    logger = MagicMock()
+    scope = _make_scope(["10.10.10.1"])
+    with pytest.raises(ScopeViolationError):
+        Runner(
+            logger=logger, timeout=5, dry_run=True,
+            target="10.10.10.1", scope=scope, approval_id="WRONG-ID",
+        )
+
+
+def test_expired_scope_blocks_execution_mid_run():
+    """A scope that was valid at construction but expires before run() must
+    still block — this covers approvals expiring during a long-running scan."""
+    from core.exceptions import ScopeViolationError
+
+    logger = MagicMock()
+    scope = _make_scope(["10.10.10.1"])
+    runner = Runner(
+        logger=logger, timeout=5, dry_run=True,
+        target="10.10.10.1", scope=scope, approval_id="APPROVAL-1",
+    )
+    # Simulate the approval expiring after construction but before execution.
+    scope.valid_until = scope.valid_until.replace(year=2000)
+    with pytest.raises(ScopeViolationError):
+        runner.run(["echo", "hello"])

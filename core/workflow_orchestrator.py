@@ -26,7 +26,10 @@ import traceback
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.authorization_gate import ScopeAuthorization
 
 from core.logger import ReconLogger
 from core.credential_vault import CredentialVault
@@ -375,8 +378,15 @@ def _run_module(module_name: str, target: str, *,
                 encrypt_loot: bool = False,
                 credential_vault: Optional[CredentialVault] = None,
                 extra_config: Optional[Dict[str, Any]] = None,
+                scope: Optional["ScopeAuthorization"] = None,
+                approval_id: Optional[str] = None,
                 ) -> Dict[str, Any]:
     """Dynamically import and run a ReconForge module.
+
+    *scope*/*approval_id* are propagated into the spawned module's Runner
+    so a target discovered mid-workflow (e.g. via auto-handoff) is
+    re-validated against the same engagement scope as the initial target,
+    rather than only being checked once at CLI start.
 
     Returns the module result dict.
     """
@@ -389,6 +399,7 @@ def _run_module(module_name: str, target: str, *,
             opsec_mode=opsec_mode, verbose=verbose,
             dry_run=dry_run, timeout=timeout,
             encrypt_loot=encrypt_loot,
+            scope=scope, approval_id=approval_id,
         )
         if credential_vault:
             _inject_creds_network(mod, credential_vault)
@@ -411,6 +422,7 @@ def _run_module(module_name: str, target: str, *,
             password=extra.get("password", ""),
             dc_ip=extra.get("dc_ip", ""),
             encrypt_loot=encrypt_loot,
+            scope=scope, approval_id=approval_id,
         )
         if credential_vault:
             _inject_creds_ad(mod, credential_vault)
@@ -426,6 +438,7 @@ def _run_module(module_name: str, target: str, *,
             opsec_mode=opsec_mode, verbose=verbose,
             dry_run=dry_run, timeout=timeout,
             encrypt_loot=encrypt_loot,
+            scope=scope, approval_id=approval_id,
         )
         if credential_vault:
             _inject_creds_web(mod, credential_vault)
@@ -447,6 +460,7 @@ def _run_module(module_name: str, target: str, *,
             encrypt_loot=encrypt_loot,
             headers=extra.get("headers", []),
             auth_token=extra.get("auth_token", ""),
+            scope=scope, approval_id=approval_id,
         )
         if credential_vault:
             _inject_creds_api(mod, credential_vault)
@@ -465,6 +479,7 @@ def _run_module(module_name: str, target: str, *,
             target=target, output_base=output_base,
             opsec_mode=opsec_mode, verbose=verbose,
             dry_run=dry_run, timeout=timeout,
+            scope=scope, approval_id=approval_id,
         )
         result = mod.run(phases=extra.get("phases"))
         if credential_vault:
@@ -547,6 +562,8 @@ class WorkflowOrchestrator:
         max_handoff_steps: int = 5,
         credential_vault: Optional[CredentialVault] = None,
         engagement: Optional[EngagementManager] = None,
+        scope: Optional["ScopeAuthorization"] = None,
+        approval_id: Optional[str] = None,
     ):
         self.targets = targets or []
         self.opsec_mode = opsec_mode
@@ -557,6 +574,8 @@ class WorkflowOrchestrator:
         self.encrypt_loot = encrypt_loot
         self.auto_handoff = auto_handoff
         self.max_handoff_steps = max_handoff_steps
+        self.scope = scope
+        self.approval_id = approval_id
 
         self.logger = ReconLogger(name="workflow", verbose=verbose)
         self.vault = credential_vault or CredentialVault(encrypt=encrypt_loot)
@@ -702,6 +721,8 @@ class WorkflowOrchestrator:
                     encrypt_loot=self.encrypt_loot,
                     credential_vault=self.vault,
                     extra_config=step.config,
+                    scope=self.scope,
+                    approval_id=self.approval_id,
                 )
 
                 # Extract context for downstream steps

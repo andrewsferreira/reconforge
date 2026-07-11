@@ -325,12 +325,17 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def enforce_scope_gate(args: argparse.Namespace) -> None:
-    """Enforce E1 scope/approval checks when explicitly enabled."""
+def enforce_scope_gate(args: argparse.Namespace) -> "ScopeAuthorization | None":
+    """Enforce E1 scope/approval checks when explicitly enabled.
+
+    Returns the parsed ScopeAuthorization (so it can be propagated into the
+    module's Runner and re-checked at every command execution, not just
+    here), or None when --enforce-scope was not requested.
+    """
     if not getattr(args, "enforce_scope", False):
-        return
+        return None
     if getattr(args, "dry_run", False):
-        return
+        return None
 
     if not getattr(args, "scope_file", ""):
         raise ValueError("--enforce-scope requires --scope-file")
@@ -339,6 +344,7 @@ def enforce_scope_gate(args: argparse.Namespace) -> None:
 
     auth = ScopeAuthorization.from_file(args.scope_file)
     auth.assert_authorized(target=args.target, provided_approval_id=args.approval_id)
+    return auth
 
 
 def main():
@@ -350,18 +356,19 @@ def main():
         parser.print_help()
         sys.exit(1)
     try:
-        enforce_scope_gate(args)
+        scope = enforce_scope_gate(args)
     except ValueError as e:
         parser.error(str(e))
 
     try:
-        _dispatch(args, parser)
+        _dispatch(args, parser, scope=scope)
     except ReconForgeError as e:
         parser.error(str(e))
 
 
-def _dispatch(args, parser) -> None:
+def _dispatch(args, parser, scope: "ScopeAuthorization | None" = None) -> None:
     """Run the module selected by ``args.module``. Exits the process on completion."""
+    approval_id = getattr(args, "approval_id", None)
     if args.module == "network":
         from modules.network.network_module import NetworkModule
 
@@ -375,6 +382,8 @@ def _dispatch(args, parser) -> None:
             dry_run=args.dry_run,
             timeout=args.timeout,
             encrypt_loot=args.encrypt_loot,
+            scope=scope,
+            approval_id=approval_id,
         )
 
         results = module.run(
@@ -401,6 +410,8 @@ def _dispatch(args, parser) -> None:
             password=args.password,
             dc_ip=args.dc_ip,
             encrypt_loot=args.encrypt_loot,
+            scope=scope,
+            approval_id=approval_id,
         )
 
         results = module.run(phases=phases)
@@ -420,6 +431,8 @@ def _dispatch(args, parser) -> None:
             dry_run=args.dry_run,
             timeout=args.timeout,
             encrypt_loot=args.encrypt_loot,
+            scope=scope,
+            approval_id=approval_id,
         )
 
         results = module.run(
@@ -449,6 +462,8 @@ def _dispatch(args, parser) -> None:
             encrypt_loot=args.encrypt_loot,
             headers=args.headers,
             auth_token=args.auth_token,
+            scope=scope,
+            approval_id=approval_id,
         )
 
         results = module.run(
@@ -495,6 +510,8 @@ def _dispatch(args, parser) -> None:
                 max_handoff_steps=args.max_handoff_steps,
                 credential_vault=vault,
                 engagement=engagement,
+                scope=scope,
+                approval_id=approval_id,
             )
         else:
             wf = WorkflowOrchestrator.full_recon(
@@ -509,6 +526,8 @@ def _dispatch(args, parser) -> None:
                 max_handoff_steps=args.max_handoff_steps,
                 credential_vault=vault,
                 engagement=engagement,
+                scope=scope,
+                approval_id=approval_id,
             )
 
         summary = wf.run()

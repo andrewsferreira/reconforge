@@ -91,6 +91,12 @@ class TimeoutError(ExecutionError):
                          detail=f"Timed out after {timeout}s")
 
 
+# ── Scope / Authorization ───────────────────────────────────────────
+
+class ScopeViolationError(ReconForgeError):
+    """Raised when a target/command falls outside the authorized engagement scope."""
+
+
 # ── Module / Workflow ───────────────────────────────────────────────
 
 class ModuleError(ReconForgeError):

@@ -19,7 +19,10 @@ import json
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.authorization_gate import ScopeAuthorization
 
 from core.logger import ReconLogger
 from core.runner import Runner
@@ -74,6 +77,8 @@ class SurfaceModule:
         timeout: int = 900,
         config_dir: Optional[str] = None,
         encrypt_loot: bool = False,
+        scope: Optional["ScopeAuthorization"] = None,
+        approval_id: Optional[str] = None,
     ) -> None:
         """Initialise the Surface module.
 
@@ -86,6 +91,10 @@ class SurfaceModule:
             timeout: Default timeout for commands.
             config_dir: Path to config directory.
             encrypt_loot: Encrypt loot files with Fernet.
+            scope: Optional authorized-scope document (--enforce-scope);
+                propagated to the Runner so every command execution is
+                re-checked against it, not just the initial CLI gate.
+            approval_id: Approval id to check against *scope*.
         """
         self.target = parse_target(target)
         self.opsec_mode = opsec_mode
@@ -99,7 +108,8 @@ class SurfaceModule:
             log_dir=self.output.module_dir(self.MODULE_NAME),
             execution_id=self.execution_id,
         )
-        self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run)
+        self.runner = Runner(logger=self.logger, timeout=timeout, dry_run=dry_run,
+                              target=target, scope=scope, approval_id=approval_id)
         self.config = ConfigLoader(config_dir=config_dir)
         self.workflow = AttackWorkflow()
         self.loot = LootManager(encrypt=encrypt_loot)

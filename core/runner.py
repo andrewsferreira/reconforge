@@ -16,14 +16,18 @@ import time
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, TYPE_CHECKING, Union
 
 from core.exceptions import (
     ExecutionError,
     ToolNotFoundError,
     TimeoutError as ReconTimeoutError,
+    ScopeViolationError,
 )
 from core.risk_policy import RiskPolicyEngine
+
+if TYPE_CHECKING:
+    from core.authorization_gate import ScopeAuthorization
 
 
 # Characters / patterns that should never appear in a single argument
@@ -78,10 +82,28 @@ class Runner:
     argument **list** (no shell=True) produced by :func:`shlex.split`.
     """
 
-    def __init__(self, logger, timeout: int = 300, dry_run: bool = False):
+    def __init__(self, logger, timeout: int = 300, dry_run: bool = False,
+                 target: Optional[str] = None,
+                 scope: Optional["ScopeAuthorization"] = None,
+                 approval_id: Optional[str] = None):
+        """
+        Args:
+            target: The primary target this runner executes commands against.
+                Required for scope enforcement to take effect.
+            scope: Optional authorized-scope document (from --scope-file /
+                --enforce-scope). When set, *target* must be within scope —
+                checked both here at construction time (fail closed before
+                any command runs) and again at the top of every run() call,
+                so a scope that expires mid-execution also blocks further
+                commands.
+            approval_id: Approval id to check against *scope*.
+        """
         self.logger = logger
         self.timeout = timeout
         self.dry_run = dry_run
+        self.target = target
+        self.scope = scope
+        self.approval_id = approval_id
         self._command_log: List[str] = []
         self._metrics: Dict[str, Any] = {
             "total_commands": 0,
@@ -89,6 +111,22 @@ class Runner:
             "total_duration_seconds": 0.0,
             "tools": {},  # tool -> stats
         }
+        self._assert_target_in_scope()
+
+    def _assert_target_in_scope(self) -> None:
+        """Raise ScopeViolationError if self.target is outside self.scope.
+
+        No-op when no scope is configured (--enforce-scope was not used) or
+        no target is bound to this runner.
+        """
+        if self.scope is None or self.target is None:
+            return
+        try:
+            self.scope.assert_authorized(
+                target=self.target, provided_approval_id=self.approval_id or ""
+            )
+        except ValueError as e:
+            raise ScopeViolationError(str(e)) from e
 
     def check_tool(self, tool_name: str) -> bool:
         """Check if an external tool is available on PATH."""
@@ -108,7 +146,14 @@ class Runner:
 
         Returns:
             :class:`RunResult` with captured stdout/stderr.
+
+        Raises:
+            ScopeViolationError: If this runner is scope-bound and the bound
+                target is no longer authorized (e.g. the approval expired
+                during a long-running scan).
         """
+        self._assert_target_in_scope()
+
         # Normalise to a display string for logging
         if isinstance(command, (list, tuple)):
             cmd_display = " ".join(shlex.quote(str(a)) for a in command)
