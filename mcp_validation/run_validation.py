@@ -11,7 +11,10 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from mcp_validation.burp.models import ValidationConfig
+from mcp_validation.burp.validator import BurpMcpValidator
 
+LOGGER = logging.getLogger(__name__)
 
 
 def configure_logging(verbose: bool) -> None:
@@ -27,7 +30,19 @@ def main() -> int:
     args = parser.parse_args()
 
     configure_logging(args.verbose)
- main
+
+    validator = BurpMcpValidator(ValidationConfig(base_url=args.url))
+    report = validator.run()
+    output_path = validator.save_report(report, Path(args.output))
+
+    LOGGER.info("Recommendation: %s", report.recommendation)
+    LOGGER.info("Tools discovered: %d", report.tool_count)
+    LOGGER.info("Report written to: %s", output_path)
+    if report.errors:
+        for err in report.errors:
+            LOGGER.error("[%s] %s: %s", err.stage, err.error_type, err.message)
+
+    return 0 if report.success else 1
 
 
 if __name__ == "__main__":
