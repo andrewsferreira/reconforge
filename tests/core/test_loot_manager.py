@@ -70,10 +70,20 @@ def test_save_plaintext(tmp_path):
     lm = LootManager()
     lm.add("credential", "root:toor", "test", "test")
     path = tmp_path / "loot.json"
-    lm.save(path)
+    with pytest.warns(UserWarning, match="PLAINTEXT"):
+        lm.save(path)
     assert path.exists()
     data = json.loads(path.read_text())
     assert len(data) == 1
+
+
+def test_save_plaintext_sets_restrictive_permissions(tmp_path):
+    lm = LootManager()
+    lm.add("credential", "root:toor", "test", "test")
+    path = tmp_path / "loot.json"
+    with pytest.warns(UserWarning, match="PLAINTEXT"):
+        lm.save(path)
+    assert (path.stat().st_mode & 0o777) == 0o600
 
 
 def test_summary():
@@ -120,3 +130,41 @@ def test_encrypt_decrypt_cycle(tmp_path, monkeypatch):
     data = json.loads(plaintext)
     assert len(data) == 1
     assert data[0]["value"] == "admin:secret"
+
+
+@pytest.mark.skipif(not _has_crypto(), reason="cryptography not installed")
+def test_encrypted_save_sets_restrictive_permissions(tmp_path, monkeypatch):
+    import core.loot_manager as lm_mod
+    key_dir = tmp_path / "keys"
+    key_dir.mkdir()
+    monkeypatch.setattr(lm_mod, "_KEY_DIR", key_dir)
+    monkeypatch.setattr(lm_mod, "_KEY_FILE", key_dir / "loot.key")
+
+    lm = LootManager(encrypt=True)
+    lm.add("credential", "admin:secret", "test", "network")
+    out = tmp_path / "loot.json"
+    lm.save(out)
+
+    enc_path = out.with_suffix(".json.enc")
+    assert (enc_path.stat().st_mode & 0o777) == 0o600
+
+
+@pytest.mark.skipif(not _has_crypto(), reason="cryptography not installed")
+def test_env_var_key_used_instead_of_file(tmp_path, monkeypatch):
+    from cryptography.fernet import Fernet
+    import core.loot_manager as lm_mod
+
+    key_dir = tmp_path / "keys"
+    key_dir.mkdir()
+    monkeypatch.setattr(lm_mod, "_KEY_DIR", key_dir)
+    monkeypatch.setattr(lm_mod, "_KEY_FILE", key_dir / "loot.key")
+    monkeypatch.setenv("RECONFORGE_LOOT_KEY", Fernet.generate_key().decode())
+
+    lm = LootManager(encrypt=True)
+    lm.add("credential", "admin:secret", "test", "network")
+    out = tmp_path / "loot.json"
+    lm.save(out)
+
+    assert not (key_dir / "loot.key").exists()  # env key used, no file written
+    plaintext = LootManager.load_encrypted(out.with_suffix(".json.enc"))
+    assert json.loads(plaintext)[0]["value"] == "admin:secret"

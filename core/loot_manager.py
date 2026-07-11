@@ -3,11 +3,19 @@
 Supports optional Fernet symmetric encryption via ``--encrypt-loot``.
 When encryption is enabled, loot files are written as encrypted blobs
 and a key file is stored in ``~/.reconforge/loot.key``.
+
+Security properties and limitations — see core/credential_vault.py's
+module docstring for the full explanation (same scheme, same caveats).
+In short: Fernet-at-rest, not a secret manager; the on-disk key
+(``~/.reconforge/loot.key``, mode 0600) protects against casual
+exposure, not against compromise of the operator's own account. Set
+``RECONFORGE_LOOT_KEY`` to supply the key out-of-band instead.
 """
 
 import base64
 import json
 import os
+import warnings
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional, Dict
 from pathlib import Path
@@ -26,10 +34,19 @@ _KEY_FILE = _KEY_DIR / "loot.key"
 
 
 def _get_or_create_key() -> bytes:
-    """Load existing Fernet key or generate a new one.
+    """Resolve the Fernet encryption key.
 
-    The key is stored at ``~/.reconforge/loot.key`` with mode 0600.
+    Precedence:
+      1. RECONFORGE_LOOT_KEY env var (base64 urlsafe Fernet key) — keeps
+         the key off disk entirely, recommended if the loot file itself
+         may leave this machine.
+      2. Existing on-disk key file.
+      3. Newly generated on-disk key file (mode 0600).
     """
+    env_key = os.environ.get("RECONFORGE_LOOT_KEY", "").strip()
+    if env_key:
+        return env_key.encode()
+
     _KEY_DIR.mkdir(parents=True, exist_ok=True)
     if _KEY_FILE.exists():
         return _KEY_FILE.read_bytes().strip()
@@ -155,8 +172,15 @@ class LootManager:
             encrypted = fernet.encrypt(plaintext.encode("utf-8"))
             enc_path = path.with_suffix(path.suffix + ".enc")
             enc_path.write_bytes(encrypted)
+            enc_path.chmod(0o600)
         else:
+            warnings.warn(
+                f"Writing loot to {path} in PLAINTEXT (encrypt=False). "
+                "Pass encrypt=True / --encrypt-loot to encrypt loot files at rest.",
+                stacklevel=2,
+            )
             path.write_text(plaintext)
+            path.chmod(0o600)
 
     def save_contract(self, path: Path, execution_id: str = "", module: str = "") -> None:
         path = Path(path)
@@ -179,9 +203,13 @@ class LootManager:
         """
         if not _HAS_CRYPTO:
             raise RuntimeError("cryptography package required to decrypt loot")
-        if not _KEY_FILE.exists():
-            raise FileNotFoundError(f"Loot key not found at {_KEY_FILE}")
-        key = _KEY_FILE.read_bytes().strip()
+        env_key = os.environ.get("RECONFORGE_LOOT_KEY", "").strip()
+        if env_key:
+            key = env_key.encode()
+        else:
+            if not _KEY_FILE.exists():
+                raise FileNotFoundError(f"Loot key not found at {_KEY_FILE}")
+            key = _KEY_FILE.read_bytes().strip()
         fernet = Fernet(key)
         encrypted = Path(path).read_bytes()
         return fernet.decrypt(encrypted).decode("utf-8")

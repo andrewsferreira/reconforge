@@ -163,6 +163,51 @@ def test_save_and_load_json(tmp_path):
     assert vault2.count() == vault.count()
 
 
+def test_save_plaintext_sets_restrictive_permissions(tmp_path):
+    vault = CredentialVault()
+    vault.add_password("admin", "P@ss123", source="test")
+    path = tmp_path / "vault.json"
+    vault.save(path)
+    assert (path.stat().st_mode & 0o777) == 0o600
+
+
+def test_save_encrypted_sets_restrictive_permissions(tmp_path):
+    vault = CredentialVault(encrypt=True, key_path=tmp_path / "vault.key")
+    vault.add_password("admin", "P@ss123", source="test")
+    path = tmp_path / "vault.json"
+    vault.save(path)
+    enc_path = path.with_suffix(path.suffix + ".enc")
+    assert enc_path.exists()
+    assert (enc_path.stat().st_mode & 0o777) == 0o600
+
+
+def test_save_plaintext_warns():
+    vault = CredentialVault()
+    vault.add_password("admin", "P@ss123", source="test")
+    with pytest.warns(UserWarning, match="PLAINTEXT"):
+        vault.save(Path("/tmp/_reconforge_test_vault_warn.json"))
+    Path("/tmp/_reconforge_test_vault_warn.json").unlink(missing_ok=True)
+
+
+def test_env_var_key_used_instead_of_file(tmp_path, monkeypatch):
+    from cryptography.fernet import Fernet
+
+    env_key = Fernet.generate_key().decode()
+    monkeypatch.setenv("RECONFORGE_VAULT_KEY", env_key)
+    key_path = tmp_path / "vault.key"
+
+    vault = CredentialVault(encrypt=True, key_path=key_path)
+    vault.add_password("admin", "P@ss123", source="test")
+    path = tmp_path / "vault.json"
+    vault.save(path)
+
+    assert not key_path.exists()  # env key used, no file-based key written
+
+    vault2 = CredentialVault(key_path=key_path)
+    vault2.load(path.with_suffix(path.suffix + ".enc"))
+    assert vault2.count() == 1
+
+
 def test_to_json():
     vault = CredentialVault()
     vault.add_password("admin", "P@ss")

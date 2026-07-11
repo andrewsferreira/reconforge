@@ -7,6 +7,26 @@ draw from.  Supports multiple credential types (usernames, passwords,
 hashes, tokens, API keys, SSH keys), automatic deduplication, optional
 Fernet encryption, and export/import capabilities.
 
+Security properties and limitations (read before relying on this for
+anything beyond a lab/engagement laptop you control):
+
+- Encryption is Fernet (AES-128-CBC + HMAC-SHA256), a solid symmetric
+  scheme for data at rest — it is NOT a secret-management system. There
+  is no access control, no audit trail, no rotation, and no separation
+  of duties.
+- By default the key is generated once and stored at a fixed path
+  (``~/.reconforge/vault.key``, mode 0600). Anyone with read access to
+  that path AND the vault file — i.e. the same local user account —
+  can decrypt everything. This protects against casual disk browsing,
+  accidental inclusion in backups/screenshots/git, and loss of a single
+  file, but not against compromise of the operator's own account.
+- Set ``RECONFORGE_VAULT_KEY`` (a base64 urlsafe Fernet key) to supply
+  the key out-of-band instead of relying on the on-disk key file —
+  recommended when the vault file itself may be shared, synced, or
+  backed up somewhere the key should not follow it.
+- Saving with ``encrypt=False`` writes plaintext credentials to disk. A
+  warning is logged/emitted every time this happens; it is never silent.
+
 Usage::
 
     vault = CredentialVault()
@@ -21,8 +41,10 @@ Usage::
 """
 
 import json
+import os
 import re
 import uuid
+import warnings
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
@@ -359,8 +381,15 @@ class CredentialVault:
             enc = fernet.encrypt(plaintext.encode())
             enc_path = path.with_suffix(path.suffix + ".enc")
             enc_path.write_bytes(enc)
+            enc_path.chmod(0o600)
         else:
+            warnings.warn(
+                f"Writing credential vault to {path} in PLAINTEXT (encrypt=False). "
+                "Pass encrypt=True / --encrypt-loot to encrypt vault files at rest.",
+                stacklevel=2,
+            )
             path.write_text(plaintext)
+            path.chmod(0o600)
 
     def load(self, path: Path):
         """Load credentials from a JSON (or encrypted) file.
@@ -385,7 +414,19 @@ class CredentialVault:
             self._add(cred)
 
     def _get_or_create_key(self) -> bytes:
-        """Load or create the Fernet encryption key."""
+        """Resolve the Fernet encryption key.
+
+        Precedence:
+          1. RECONFORGE_VAULT_KEY env var (base64 urlsafe Fernet key) —
+             keeps the key off disk entirely, recommended if the vault
+             file itself may leave this machine.
+          2. Existing on-disk key file.
+          3. Newly generated on-disk key file (mode 0600).
+        """
+        env_key = os.environ.get("RECONFORGE_VAULT_KEY", "").strip()
+        if env_key:
+            return env_key.encode()
+
         self._key_path.parent.mkdir(parents=True, exist_ok=True)
         if self._key_path.exists():
             return self._key_path.read_bytes().strip()

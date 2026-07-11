@@ -34,6 +34,15 @@ Applies to all runtime artifacts generated under `outputs/<target>/<module>/`:
 4. **Sensitive data handling**
    - Enable `--encrypt-loot` for engagements handling credentials/tokens.
    - Avoid committing secrets, loot, command transcripts, or client identifiers.
+   - Vault/loot files (encrypted or not) are written with mode `0600`.
+   - By default the Fernet encryption key is stored at `~/.reconforge/{vault,loot}.key`
+     (mode `0600`) — this protects against casual disk exposure, not against
+     compromise of the operator's own account, since the key lives on the same
+     machine as the data. Set `RECONFORGE_VAULT_KEY` / `RECONFORGE_LOOT_KEY`
+     (a base64 urlsafe Fernet key) to supply the key out-of-band instead,
+     recommended whenever the output directory may be synced, backed up, or
+     shared somewhere the key should not follow it.
+   - Saving without `--encrypt-loot` emits an explicit warning — it is never silent.
 
 5. **Auditability**
    - Preserve `session.md` and final reports in approved storage for engagement traceability.
