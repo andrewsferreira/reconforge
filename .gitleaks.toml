@@ -1,0 +1,25 @@
+title = "ReconForge gitleaks config"
+
+# Extend gitleaks' built-in ruleset rather than replacing it.
+[extend]
+useDefault = true
+
+# Global allowlist. Every entry here must be a reviewed, understood false
+# positive — not a way to silence a real finding. See
+# docs/ARCHITECTURE_REVIEW.md for the secret-handling audit this config
+# supports.
+[allowlist]
+description = "Known false positives: secret-shaped fixtures used to test redaction logic, and doc examples"
+paths = [
+  # Test fixtures that intentionally contain secret-shaped strings to
+  # verify core/logger.py's sanitize_log() actually redacts them
+  # (Bearer tokens, API keys). The strings themselves are fake.
+  '''tests/core/test_logger\.py''',
+  '''tests/core/test_runner\.py''',
+  '''tests/core/test_notes_manager\.py''',
+]
+regexes = [
+  # docs/RUNBOOKS.md's `--header "X-Api-Key: abc123def456"` CLI usage
+  # example — a documentation placeholder, not a real key.
+  '''abc123def456''',
+]
