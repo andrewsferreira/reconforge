@@ -30,7 +30,7 @@
 | Arch Linux | ⚠️ Untested | Tools available via `pacman` / AUR; expected to work. |
 | macOS | ⚠️ Partial | Python core works. Some tools (`nmap`, `enum4linux`) available via Homebrew. `hydra`, `smbclient` require manual setup. Root-requiring scans (`-sS`, `-sU`) need `sudo`. |
 | Windows / WSL2 | ⚠️ Partial | WSL2 with Kali/Ubuntu image works. Native Windows unsupported — `subprocess.run` assumes POSIX tool paths. |
-| Docker | ✅ Supported | Run in any Linux-based container with tools installed. No official Dockerfile yet. |
+| Docker | ⚠️ Manual only | Runs fine in a Linux container with Python 3.10+ and the tools you need installed — no runtime assumption breaks it. There is no official Dockerfile or published image yet, so you build and maintain your own. |
 
 ---
 

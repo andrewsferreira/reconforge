@@ -6,6 +6,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [1.2.0] — 2026-07-12
+
+Public-release remediation pass: a full architecture/security audit (`docs/ARCHITECTURE_REVIEW.md`) followed by every P0 (release-blocking) and P1 (major quality/security) fix it identified.
+
+### Security
+
+- `core/target_parser.py`: fixed a hostname-validation bypass that accepted any string as a "validated" target, including shell metacharacters and flag-injection payloads.
+- `core/runner.py`: `--enforce-scope` is now enforced at every command execution (construction and every `run()` call, not just once at CLI start), and propagated through all 5 modules, `WorkflowOrchestrator`, and auto-handoff to targets discovered mid-run.
+- Command logs and session notes now route through the same secret-redaction path as the structured logger; fixed a redaction-ordering bug that let part of a Bearer token through.
+- Fixed a scheme-override bug in the Burp MCP adapter that could let a malicious/compromised MCP server redirect `urlopen` to `file://`.
+- `core/credential_vault.py`, `core/loot_manager.py`: vault/loot files now written with mode `0600`; saving without encryption now emits an explicit warning; added `RECONFORGE_VAULT_KEY` / `RECONFORGE_LOOT_KEY` env vars to supply the Fernet key out-of-band instead of relying solely on the on-disk key file.
+- Switched nmap/AD/surface XML parsing from `xml.etree.ElementTree` to `defusedxml` (XXE hardening).
+- Triaged all 76 bandit findings surfaced once CI's bandit target was corrected (previously silently pointed at a deleted file and never actually scanned the package).
+
+### Added
+
+- `LICENSE` (Apache-2.0), `SECURITY.md`, `.gitleaks.toml`, `.github/dependabot.yml`.
+- `reconforge/__main__.py` — `python -m reconforge ...` now works without installing.
+- `core/exceptions.py`: completed the typed exception hierarchy (`KillSwitchBlockedError`, `PolicyBlockedError`, `InvalidCommandError`) and wired `run_or_raise()`/`check_tool_or_raise()` to actually use it.
+
+### Fixed
+
+- 4 failing tests (root cause: they loaded a top-level `reconforge.py` deleted when the code moved into the `reconforge/` package) and 25 stale `reconforge.py` references across docs/CLI.
+- `mcp_validation/run_validation.py`: fixed a real syntax error and a `main()` that parsed CLI args but never called the validator.
+- `reconforge/attack_paths/engine.py`: attack paths were marked `validated=True` from any non-erroring HTTP response; now separated into `unreachable` / `reachable` / `corroborated` tiers based on whether the response actually matched the finding type's own signal.
+- `reconforge/intelligence/engine.py`: vulnerability-classification confidence is now derived from concrete evidence factors per finding type instead of a fixed literal per rule.
+- CI pipeline corrected end to end (mypy/bandit target paths, `ruff check .`, packaging smoke test's `--no-build-isolation` fragility) and given an honest coverage gate (50%, matching real ~52% coverage, replacing a never-true, never-enforced 85% claim).
+
+### Changed
+
+- README repositioned as "An evidence-driven reconnaissance and attack-path analysis framework for authorized penetration testing and Red Team laboratories," with explicit external-dependencies and heuristic-vs-confirmed sections.
+- `docs/PROJECT_SCORECARD.md` and `docs/INDEPENDENT_SECURITY_ASSESSMENT_2026-04-13.md` labeled as author self-assessments, not independent reviews.
+
 ## [1.1.0] — 2026-04-13
 
 Baseline/professionalization release focused on release alignment, quality gates, packaging, and artifact governance.

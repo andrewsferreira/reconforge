@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 1.1.1 • 445/445 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 1.2.0 • 499/499 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -18,6 +18,17 @@ ReconForge automates the reconnaissance phase of penetration tests through five 
 | **Surface** | IPs, hostnames | nmap (stealth), service_detector | port_discovery, service_fingerprint, vector_correlation, prioritization |
 | **AD** | Domain controllers | nmap, enum4linux-ng, Impacket, ldapsearch, smbclient, BloodHound, NetExec | passive_recon, identity_enumeration, configuration_enumeration, delegation_discovery, bloodhound_collection |
 | **Workflow** | Any target | All modules | Conditional multi-module pipeline |
+
+**None of the tools listed above ship with ReconForge.** ReconForge orchestrates, parses, and correlates the output of external security tools you install yourself (`nmap`, `ffuf`, `nuclei`, `impacket`, etc.) — it does not bundle, vendor, or auto-download them. Only `nmap` is required for every module that touches network/AD targets; everything else is optional and gracefully skipped if missing (a skipped tool narrows coverage, it never crashes a run). See [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md) for the full per-module tool list with install commands, supported OS/Python versions, and known-unsupported environments.
+
+## What is heuristic vs. confirmed
+
+Every finding carries a confidence level (`confirmed → high → medium → low → heuristic`), and severity is capped by confidence — a heuristic match can never present as a `critical` finding regardless of what the underlying issue would be if real. Two ends of the same scale, from an actual web-module rule:
+
+- **Heuristic**: a mutated request to an endpoint with a numeric ID returns HTTP 200 with a body that differs from the baseline. This is logged as an `IDOR_candidate` at low/medium confidence — it is evidence worth checking, not a claim that authorization is actually broken. A parameter that just happens to accept a wider ID range would look identical.
+- **Confirmed**: the same finding after a human or a dedicated validation step reproduces unauthorized access to another user's specific, identifiable data. Only then does it carry `confirmed` confidence and can it be reported as a real finding rather than a hypothesis.
+
+ReconForge does not perform that confirmation step automatically for anything beyond a handful of opt-in, explicitly-flagged checks — see [docs/FINDINGS.md](docs/FINDINGS.md) for the full rule set and severity-clamping table.
 
 ## Architecture
 
@@ -39,7 +50,7 @@ All modules share a common core providing:
 ## Safety and Scope
 
 - Only run ReconForge against systems and networks you own or are explicitly authorized to test (signed engagement, CTF/lab you control, etc.).
-- `--enforce-scope` gates execution against an explicit allowlist, but it is opt-in and currently checks the initial target only — see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for known gaps in scope enforcement that are being remediated before wider use.
+- `--enforce-scope` gates execution against an explicit allowlist. It is opt-in, but once enabled it is checked at every command execution (not just once at startup) and propagated to targets discovered mid-run (e.g. workflow auto-handoff) — not only the initial `--target`. Matching is still exact-string only (no CIDR/domain-suffix matching yet); see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for that and other tracked gaps.
 - `--dry-run` prints the exact commands ReconForge would execute without running them — use it to review behavior before pointing the tool at anything.
 - Intrusive phases (exploit candidates, brute force) require explicit opt-in flags; they are never run by default.
 
@@ -151,7 +162,7 @@ outputs/<target>/<module>/
 ```bash
 pip install -e ".[dev]"
 python -m pytest
-# 445 tests, all passing (~8.5s)
+# 499 tests, all passing (~9.6s)
 ```
 
 These are unit tests against mocked tool execution and stored fixtures — they validate parsing, validation, and orchestration logic, not real binaries. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for what has and has not been validated against live tools.
@@ -205,7 +216,7 @@ reconforge/                     # repository root
 │   ├── api/                   # 4 tools, 4 parsers, 4 phases
 │   ├── surface/               # 2 tools, 1 parser, 6 intelligence, 4 phases
 │   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 445 tests (pytest)
+└── tests/                     # 499 tests (pytest)
 ```
 
 ## Limitations
