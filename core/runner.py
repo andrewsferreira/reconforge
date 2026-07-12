@@ -100,10 +100,21 @@ class Runner:
     argument **list** (no shell=True) produced by :func:`shlex.split`.
     """
 
+    # Default cap on stdout/stderr captured into RunResult and any
+    # output_file, per stream. subprocess.run(capture_output=True) still
+    # buffers the full output in memory before this truncation runs — this
+    # bounds what propagates *downstream* (findings, reports, logs,
+    # output files), not peak memory during execution itself. True
+    # streaming enforcement would need a Popen + incremental-read loop
+    # instead of subprocess.run(); not done here (see
+    # docs/ARCHITECTURE_REVIEW.md).
+    DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024  # 10 MB
+
     def __init__(self, logger, timeout: int = 300, dry_run: bool = False,
                  target: Optional[str] = None,
                  scope: Optional["ScopeAuthorization"] = None,
-                 approval_id: Optional[str] = None):
+                 approval_id: Optional[str] = None,
+                 max_output_bytes: Optional[int] = None):
         """
         Args:
             target: The primary target this runner executes commands against.
@@ -115,6 +126,8 @@ class Runner:
                 so a scope that expires mid-execution also blocks further
                 commands.
             approval_id: Approval id to check against *scope*.
+            max_output_bytes: Cap on captured stdout/stderr per stream
+                (default 10 MB). Pass 0 to disable truncation entirely.
         """
         self.logger = logger
         self.timeout = timeout
@@ -122,6 +135,9 @@ class Runner:
         self.target = target
         self.scope = scope
         self.approval_id = approval_id
+        self.max_output_bytes = (
+            self.DEFAULT_MAX_OUTPUT_BYTES if max_output_bytes is None else max_output_bytes
+        )
         self._command_log: List[str] = []
         self._metrics: Dict[str, Any] = {
             "total_commands": 0,
@@ -149,6 +165,21 @@ class Runner:
     def check_tool(self, tool_name: str) -> bool:
         """Check if an external tool is available on PATH."""
         return shutil.which(tool_name) is not None
+
+    def _truncate_output(self, text: str) -> str:
+        """Cap *text* at self.max_output_bytes, appending a clear marker.
+
+        A cap of 0 disables truncation. Bounds what a huge/hostile tool
+        response propagates into RunResult and everything built from it
+        (findings, reports, logs) — see DEFAULT_MAX_OUTPUT_BYTES for what
+        this does and does not protect against.
+        """
+        if not self.max_output_bytes or len(text.encode("utf-8", errors="ignore")) <= self.max_output_bytes:
+            return text
+        truncated = text.encode("utf-8", errors="ignore")[: self.max_output_bytes].decode(
+            "utf-8", errors="ignore"
+        )
+        return f"{truncated}\n...[output truncated at {self.max_output_bytes} bytes]"
 
     # Environment variables passed through to every child process by
     # default. Anything not listed here — including any secret ReconForge
@@ -286,6 +317,8 @@ class Runner:
             duration = time.time() - start
 
             if output_file:
+                # output_file is raw evidence — written in full, untruncated,
+                # even when the in-memory RunResult below is capped.
                 output_file = Path(output_file)
                 output_file.parent.mkdir(parents=True, exist_ok=True)
                 output_file.write_text(proc.stdout)
@@ -293,8 +326,8 @@ class Runner:
             result = RunResult(
                 command=cmd_display,
                 returncode=proc.returncode,
-                stdout=proc.stdout,
-                stderr=proc.stderr,
+                stdout=self._truncate_output(proc.stdout),
+                stderr=self._truncate_output(proc.stderr),
                 duration=duration,
                 success=proc.returncode == 0,
                 output_file=str(output_file) if output_file else None,

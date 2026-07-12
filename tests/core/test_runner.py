@@ -334,3 +334,40 @@ def test_cwd_controls_subprocess_working_directory(runner, tmp_path):
     (tmp_path / "marker_file.txt").write_text("x")
     result = runner.run(["ls"], cwd=tmp_path)
     assert "marker_file.txt" in result.stdout
+
+
+# ── Output size limits ───────────────────────────────────────────────
+
+def test_output_is_truncated_beyond_max_output_bytes():
+    logger = MagicMock()
+    runner = Runner(logger=logger, timeout=5, dry_run=False, max_output_bytes=100)
+    result = runner.run(["python3", "-c", "print('A' * 1000)"])
+    assert len(result.stdout) < 1000
+    assert "truncated" in result.stdout
+
+
+def test_output_under_cap_is_not_modified():
+    logger = MagicMock()
+    runner = Runner(logger=logger, timeout=5, dry_run=False, max_output_bytes=1000)
+    result = runner.run(["echo", "hello"])
+    assert result.stdout.strip() == "hello"
+    assert "truncated" not in result.stdout
+
+
+def test_max_output_bytes_zero_disables_truncation():
+    logger = MagicMock()
+    runner = Runner(logger=logger, timeout=5, dry_run=False, max_output_bytes=0)
+    result = runner.run(["python3", "-c", "print('B' * 1000)"])
+    assert len(result.stdout) > 1000
+    assert "truncated" not in result.stdout
+
+
+def test_output_file_receives_full_untruncated_content(tmp_path):
+    """output_file is raw evidence and must never be truncated, even when
+    the in-memory RunResult is capped."""
+    logger = MagicMock()
+    runner = Runner(logger=logger, timeout=5, dry_run=False, max_output_bytes=100)
+    out = tmp_path / "raw.txt"
+    result = runner.run(["python3", "-c", "print('C' * 1000)"], output_file=out)
+    assert len(out.read_text()) > 1000
+    assert len(result.stdout) < 1000
