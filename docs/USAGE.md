@@ -24,12 +24,22 @@ These flags are available across all modules unless noted otherwise:
 | `--dry-run` | off | Show commands without executing |
 | `--timeout` | 600 | Default command timeout in seconds |
 | `--encrypt-loot` | off | Encrypt loot files with Fernet (`network`, `ad`, `web`, `api`, `workflow` only — **not available on the `surface` CLI**) |
+| `--authorized-target` | off | Explicit acknowledgement that you are authorized to test this target |
+| `--lab-mode` | off | Acknowledgement that this run targets a lab/CTF environment you control |
+| `--enforce-scope` / `--scope-file` / `--approval-id` | off | Validate the target against a signed scope file before every command execution |
 
 > **Note:** The `surface` subcommand does not expose `--encrypt-loot` on
 > the CLI.  The `SurfaceModule` Python class accepts `encrypt_loot` as a
 > constructor parameter (defaulting to `False`), so programmatic callers
 > and the workflow orchestrator can still enable it.  Only the CLI flag
 > is absent.
+
+> **Authorization is mandatory for every active run.** Every module refuses
+> to execute unless at least one of `--authorized-target`, `--lab-mode`, or a
+> validated `--enforce-scope` is present. The only exemption is `--dry-run`,
+> which never executes anything. The examples below omit these flags for
+> brevity — add `--authorized-target` (or `--lab-mode` for a self-controlled
+> lab target) to any example before running it for real.
 
 ---
 

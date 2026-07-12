@@ -182,6 +182,31 @@ def test_validate_url_rejects_no_scheme():
         validate_url("example.com")
 
 
+def test_validate_url_rejects_embedded_credentials():
+    with pytest.raises(ValidationError, match="userinfo"):
+        validate_url("http://admin:password@example.com")
+
+
+def test_validate_url_rejects_newline():
+    with pytest.raises(ValidationError, match="control"):
+        validate_url("http://example.com/\nSet-Cookie: evil=1")
+
+
+def test_validate_url_rejects_null_byte():
+    with pytest.raises(ValidationError, match="control"):
+        validate_url("http://example.com/\x00.txt")
+
+
+def test_validate_url_rejects_excessive_length():
+    with pytest.raises(ValidationError, match="length"):
+        validate_url("http://example.com/" + "a" * 3000)
+
+
+def test_validate_url_rejects_missing_host():
+    with pytest.raises(ValidationError):
+        validate_url("http://")
+
+
 # ── validate_domain ─────────────────────────────────────────────
 
 def test_validate_domain_simple():

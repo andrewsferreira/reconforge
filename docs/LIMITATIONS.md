@@ -374,6 +374,42 @@ reconforge workflow --target 10.10.10.1 \
     --engagement "Q1 Pentest" --client "Acme Corp" --operator "J. Smith"
 ```
 
+Every active run also requires an explicit authorization acknowledgement —
+`--authorized-target`, `--lab-mode`, or a validated `--enforce-scope` — see
+the main [README.md](../README.md#safety-and-scope) "Safety and Scope"
+section for the exact flags.
+
+### Scope Enforcement Does Not Follow Redirects for CLI Tool Wrappers
+
+`--enforce-scope` re-validates the target string against the scope file at
+every command execution (`core/runner.py`), and the workflow orchestrator
+propagates it to targets discovered mid-run via auto-handoff. This closes
+the gap for ReconForge's own orchestration logic.
+
+It does **not**, however, intercept HTTP redirects or DNS resolution
+performed *inside* a wrapped external tool. The `network`, `web`, and `api`
+modules shell out to tools like `nikto`, `ffuf`, `gobuster`, `sqlmap`, and
+`nuclei`, which follow redirects and resolve hostnames using their own
+internal HTTP clients — ReconForge has no visibility into requests those
+processes make once launched, and cannot block a tool from following a
+redirect to a host outside the approved scope.
+
+This is different from the Burp Suite MCP integration path
+(`reconforge burp` subcommands, `core/adapters/burp/*`), where every
+outbound HTTP request goes through `BurpMcpProvider._enforce_request_scope()`
+— a fail-closed `DomainScopeValidator` — before it is sent, including
+requests to mutated/discovered URLs (see
+[docs/ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) §4 for the underlying
+finding this corrected).
+
+**Practical implication:** if a scanned target 302-redirects to a different
+host, or a DNS name resolves somewhere unexpected, the wrapped CLI tool may
+still send requests to that host even under `--enforce-scope`. Operators
+running the `network`/`web`/`api` modules against a target that could
+redirect off-scope should confirm the target's redirect behavior manually
+before scanning, rather than relying on `--enforce-scope` as a hard
+technical guarantee for those three modules.
+
 ### Requires Operator Judgment
 
 ReconForge does not make risk decisions. It presents findings with severity, confidence, and evidence. The operator must:

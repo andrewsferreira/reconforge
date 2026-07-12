@@ -2,7 +2,7 @@
 """ReconForge - Modular Pentest Reconnaissance Framework.
 
 Author: Andrews Ferreira
-Version: 1.2.0
+Version: 2.0.0
 
 Usage (after `pip install -e .` or `pipx install .`):
     reconforge network --target <target> [options]
@@ -144,6 +144,12 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Path to scope authorization YAML/JSON file")
     net_parser.add_argument("--approval-id", default="",
                             help="Approval token/ID matching the scope file")
+    net_parser.add_argument("--authorized-target", action="store_true",
+                            help="Explicit acknowledgement that this target is authorized "
+                                 "for testing (required unless --enforce-scope or --lab-mode is used)")
+    net_parser.add_argument("--lab-mode", action="store_true",
+                            help="Acknowledge this run targets a lab/CTF environment you control "
+                                 "(required unless --authorized-target or --enforce-scope is used)")
 
     # AD module
     ad_parser = subparsers.add_parser("ad", help="Active Directory reconnaissance")
@@ -177,6 +183,12 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Path to scope authorization YAML/JSON file")
     ad_parser.add_argument("--approval-id", default="",
                            help="Approval token/ID matching the scope file")
+    ad_parser.add_argument("--authorized-target", action="store_true",
+                            help="Explicit acknowledgement that this target is authorized "
+                                 "for testing (required unless --enforce-scope or --lab-mode is used)")
+    ad_parser.add_argument("--lab-mode", action="store_true",
+                            help="Acknowledge this run targets a lab/CTF environment you control "
+                                 "(required unless --authorized-target or --enforce-scope is used)")
 
     # Web module
     web_parser = subparsers.add_parser(
@@ -216,6 +228,12 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Path to scope authorization YAML/JSON file")
     web_parser.add_argument("--approval-id", default="",
                             help="Approval token/ID matching the scope file")
+    web_parser.add_argument("--authorized-target", action="store_true",
+                            help="Explicit acknowledgement that this target is authorized "
+                                 "for testing (required unless --enforce-scope or --lab-mode is used)")
+    web_parser.add_argument("--lab-mode", action="store_true",
+                            help="Acknowledge this run targets a lab/CTF environment you control "
+                                 "(required unless --authorized-target or --enforce-scope is used)")
 
     # API module
     api_parser = subparsers.add_parser(
@@ -251,6 +269,12 @@ def build_parser() -> argparse.ArgumentParser:
                             help="Path to scope authorization YAML/JSON file")
     api_parser.add_argument("--approval-id", default="",
                             help="Approval token/ID matching the scope file")
+    api_parser.add_argument("--authorized-target", action="store_true",
+                            help="Explicit acknowledgement that this target is authorized "
+                                 "for testing (required unless --enforce-scope or --lab-mode is used)")
+    api_parser.add_argument("--lab-mode", action="store_true",
+                            help="Acknowledge this run targets a lab/CTF environment you control "
+                                 "(required unless --authorized-target or --enforce-scope is used)")
 
     # Workflow orchestrator
     wf_parser = subparsers.add_parser(
@@ -292,6 +316,12 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Path to scope authorization YAML/JSON file")
     wf_parser.add_argument("--approval-id", default="",
                            help="Approval token/ID matching the scope file")
+    wf_parser.add_argument("--authorized-target", action="store_true",
+                            help="Explicit acknowledgement that this target is authorized "
+                                 "for testing (required unless --enforce-scope or --lab-mode is used)")
+    wf_parser.add_argument("--lab-mode", action="store_true",
+                            help="Acknowledge this run targets a lab/CTF environment you control "
+                                 "(required unless --authorized-target or --enforce-scope is used)")
 
     # Surface module
     surface_parser = subparsers.add_parser(
@@ -321,6 +351,12 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="Path to scope authorization YAML/JSON file")
     surface_parser.add_argument("--approval-id", default="",
                                 help="Approval token/ID matching the scope file")
+    surface_parser.add_argument("--authorized-target", action="store_true",
+                            help="Explicit acknowledgement that this target is authorized "
+                                 "for testing (required unless --enforce-scope or --lab-mode is used)")
+    surface_parser.add_argument("--lab-mode", action="store_true",
+                            help="Acknowledge this run targets a lab/CTF environment you control "
+                                 "(required unless --authorized-target or --enforce-scope is used)")
 
     return parser
 
@@ -347,6 +383,32 @@ def enforce_scope_gate(args: argparse.Namespace) -> "ScopeAuthorization | None":
     return auth
 
 
+def require_authorization(args: argparse.Namespace, scope: "ScopeAuthorization | None") -> None:
+    """Refuse to run active modules without an explicit authorization signal.
+
+    At least one of the following must be present before any non-dry-run
+    execution: a successfully validated ``--enforce-scope`` (scope file +
+    approval), an explicit ``--authorized-target`` acknowledgement, or an
+    explicit ``--lab-mode`` acknowledgement. This closes the gap where a
+    user could run active scans against an arbitrary target with zero
+    acknowledgement of authorization.
+    """
+    if getattr(args, "dry_run", False):
+        return
+    if scope is not None:
+        return
+    if getattr(args, "authorized_target", False) or getattr(args, "lab_mode", False):
+        return
+
+    raise ValueError(
+        "Authorization required before active execution: pass "
+        "--authorized-target (you are authorized to test this target), "
+        "--lab-mode (this is a lab/CTF environment you control), or "
+        "--enforce-scope with --scope-file/--approval-id. Use --dry-run to "
+        "preview without this acknowledgement."
+    )
+
+
 def main():
     """Main entry point."""
     parser = build_parser()
@@ -357,6 +419,7 @@ def main():
         sys.exit(1)
     try:
         scope = enforce_scope_gate(args)
+        require_authorization(args, scope)
     except ValueError as e:
         parser.error(str(e))
 

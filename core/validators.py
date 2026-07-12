@@ -192,12 +192,23 @@ def parse_port_list(value: str) -> List[int]:
 
 # ── URL ─────────────────────────────────────────────────────────────
 
+_URL_MAX_LENGTH = 2048
+_CONTROL_CHAR_RE = re.compile(r'[\x00-\x1f\x7f]')
+
+
 def validate_url(value: str) -> str:
-    """Validate a URL (must have scheme and netloc).
+    """Validate a URL (must have scheme and netloc, no embedded credentials).
 
     Raises:
-        ValidationError: If *value* is not a well-formed URL.
+        ValidationError: If *value* is not a well-formed URL, contains
+            control characters, embeds userinfo credentials, or exceeds
+            the maximum accepted length.
     """
+    if len(value) > _URL_MAX_LENGTH:
+        raise ValidationError("url", value[:64] + "...", f"Exceeds maximum length ({_URL_MAX_LENGTH})")
+    if _CONTROL_CHAR_RE.search(value):
+        raise ValidationError("url", value, "Contains control characters or embedded newlines")
+
     value = value.strip()
     parsed = urlparse(value)
     if not parsed.scheme:
@@ -205,6 +216,10 @@ def validate_url(value: str) -> str:
     if parsed.scheme not in ("http", "https"):
         raise ValidationError("url", value, f"Unsupported scheme: {parsed.scheme}")
     if not parsed.netloc:
+        raise ValidationError("url", value, "Missing host")
+    if "@" in parsed.netloc:
+        raise ValidationError("url", value, "Embedded userinfo credentials are not allowed")
+    if not parsed.hostname:
         raise ValidationError("url", value, "Missing host")
     return value
 

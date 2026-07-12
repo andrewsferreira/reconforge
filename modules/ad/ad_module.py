@@ -42,6 +42,7 @@ from core.target_parser import parse_target
 from core.profile_loader import ProfileLoader
 from core.telemetry import ModuleTelemetry
 from core.data_contracts import SCHEMA_VERSION, build_contract
+from core.validators import validate_domain
 
 from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
 from modules.ad.tools.ldapsearch import ADLdapsearchTool
@@ -97,7 +98,7 @@ class ADModule:
                  approval_id: Optional[str] = None):
         self.target_str = target
         self.target = parse_target(target)
-        self.domain = domain
+        self.domain = validate_domain(domain) if domain else domain
         self.opsec_mode = opsec_mode
         self.username = username
         self.password = password

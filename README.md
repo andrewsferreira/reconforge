@@ -50,6 +50,7 @@ All modules share a common core providing:
 ## Safety and Scope
 
 - Only run ReconForge against systems and networks you own or are explicitly authorized to test (signed engagement, CTF/lab you control, etc.).
+- **Every active run requires an explicit authorization acknowledgement.** Pass one of `--authorized-target` (you are authorized to test this target), `--lab-mode` (this is a lab/CTF environment you control), or `--enforce-scope` with a valid `--scope-file`/`--approval-id`. Omitting all three causes ReconForge to refuse to run. `--dry-run` is exempt since it never executes anything.
 - `--enforce-scope` gates execution against an explicit allowlist. It is opt-in, but once enabled it is checked at every command execution (not just once at startup) and propagated to targets discovered mid-run (e.g. workflow auto-handoff) — not only the initial `--target`. Matching is still exact-string only (no CIDR/domain-suffix matching yet); see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for that and other tracked gaps.
 - `--dry-run` prints the exact commands ReconForge would execute without running them — use it to review behavior before pointing the tool at anything.
 - Intrusive phases (exploit candidates, brute force) require explicit opt-in flags; they are never run by default.
@@ -63,40 +64,44 @@ pip install -e ".[dev]"
 # Or, without installing, from a repo checkout:
 # python -m reconforge <module> --target ...
 
+# Every active run requires --authorized-target, --lab-mode, or --enforce-scope
+# (see "Safety and Scope" above). Examples below use --authorized-target as a
+# stand-in for "you have confirmed authorization to test this target."
+
 # Network recon
-reconforge network --target 10.10.10.1
+reconforge network --target 10.10.10.1 --authorized-target
 
 # AD recon
-reconforge ad --target 10.10.10.1 --domain corp.local
+reconforge ad --target 10.10.10.1 --domain corp.local --authorized-target
 
 # Web recon
-reconforge web --target https://example.com
+reconforge web --target https://example.com --authorized-target
 
 # API recon with authentication
-reconforge api --target https://api.example.com --auth-token "Bearer eyJ..."
+reconforge api --target https://api.example.com --auth-token "Bearer eyJ..." --authorized-target
 
 # Attack surface mapping
-reconforge surface --target 10.10.10.1
+reconforge surface --target 10.10.10.1 --authorized-target
 
 # Full workflow (conditional: surface → network → ad → web → api)
-reconforge workflow --target 10.10.10.1
+reconforge workflow --target 10.10.10.1 --authorized-target
 
 # Targeted workflow with engagement tracking
 reconforge workflow --target 10.10.10.1 --modules network,ad \
-    --engagement "Q1 Pentest" --client "Acme Corp" --encrypt-loot
+    --engagement "Q1 Pentest" --client "Acme Corp" --encrypt-loot --authorized-target
 
 # Workflow with guardrailed auto-handoff (follow-on module steps inferred from recon)
-reconforge workflow --target 10.10.10.1 --auto-handoff --max-handoff-steps 5
+reconforge workflow --target 10.10.10.1 --auto-handoff --max-handoff-steps 5 --authorized-target
 
 # Stealth mode
-reconforge network --target 10.10.10.1 --opsec stealth
+reconforge network --target 10.10.10.1 --opsec stealth --authorized-target
 
-# Dry run (show commands without executing)
+# Dry run (show commands without executing — no authorization flag needed)
 reconforge network --target 10.10.10.1 --dry-run -v
 
 # Alternative install for operators (isolated CLI, no venv activation needed)
 pipx install .
-reconforge network --target 10.10.10.1
+reconforge network --target 10.10.10.1 --authorized-target
 ```
 
 ## Local Validation Lab (Safe Testing)
@@ -106,7 +111,7 @@ For repeatable testing in isolated environments, run ReconForge against a local 
 Example smoke-test command:
 
 ```bash
-reconforge web --target http://127.0.0.1:8008 --phases surface,content -v
+reconforge web --target http://127.0.0.1:8008 --phases surface,content -v --lab-mode
 ```
 
 Expected artifacts:

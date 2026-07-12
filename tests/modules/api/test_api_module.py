@@ -2,11 +2,22 @@
 
 import pytest
 
+from core.exceptions import ValidationError
 from modules.api.api_module import APIModule
 
 
 def test_module_name():
     assert APIModule.MODULE_NAME == "api"
+
+
+def test_normalise_url_rejects_embedded_credentials():
+    with pytest.raises(ValidationError):
+        APIModule._normalise_url("admin:password@api.example.com")
+
+
+def test_normalise_url_rejects_control_characters():
+    with pytest.raises(ValidationError):
+        APIModule._normalise_url("api.example.com/\napikey=leak")
 
 
 def test_valid_phases():

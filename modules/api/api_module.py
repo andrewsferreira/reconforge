@@ -37,6 +37,7 @@ from core.opsec_checks import OpsecChecker
 from core.profile_loader import ProfileLoader
 from core.telemetry import ModuleTelemetry
 from core.data_contracts import SCHEMA_VERSION, build_contract
+from core.validators import validate_url
 
 # Tool imports
 from modules.api.tools.ffuf_api import FfufApiTool
@@ -353,11 +354,12 @@ class APIModule:
 
     @staticmethod
     def _normalise_url(target: str) -> str:
-        """Ensure target has a URL scheme."""
+        """Ensure target has a URL scheme and passes URL validation."""
         target = target.strip()
         if not target.startswith(("http://", "https://")):
             target = f"http://{target}"
-        return target.rstrip("/")
+        target = target.rstrip("/")
+        return validate_url(target)
 
     def _check_tools(self) -> Dict[str, bool]:
         """Check availability of API reconnaissance tools."""

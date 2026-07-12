@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.0.0] — 2026-07-12
+
+Phase 5 (Target Validation and Safety): closes the gap where ReconForge would run active scans against any target with zero acknowledgement of authorization, and tightens URL/domain validation that previously let malformed or malicious-looking targets reach the CLI's "validated" modules unchecked.
+
+### Security
+
+- `core/validators.py::validate_url()` now rejects embedded credentials (`user:pass@host`), control characters, newlines/null bytes, and excessively long values, instead of only checking scheme and netloc presence.
+- `modules/web/web_module.py` and `modules/api/api_module.py`: `_normalise_url()` was a no-op that just prefixed `http://` onto anything; both now route through `validate_url()` so malformed targets fail fast instead of being silently passed to nikto/ffuf/gobuster/etc.
+- `modules/ad/ad_module.py`: the `--domain` flag now validates through `core/validators.py::validate_domain()` instead of accepting any string unchecked.
+
+### Added
+
+- `--authorized-target` and `--lab-mode` CLI flags on all 6 subcommands (`network`, `ad`, `web`, `api`, `workflow`, `surface`).
+- `reconforge/cli.py::require_authorization()`: refuses to dispatch any active (non-`--dry-run`) run unless the user has passed `--authorized-target`, `--lab-mode`, or a successfully validated `--enforce-scope`. Wired into `main()` immediately after `enforce_scope_gate()`.
+
+### Breaking
+
+- **Existing scripts/automation that invoke ReconForge without `--dry-run` will now fail** with a clear authorization error unless they add `--authorized-target`, `--lab-mode`, or `--enforce-scope` (with `--scope-file`/`--approval-id`). This is a deliberate, security-motivated behavior change — per `docs/VERSIONING.md`, "existing users must modify their workflow to maintain the same behavior" is the definition of breaking, so this is released as a MAJOR version bump rather than folded into a MINOR/PATCH release. Migration: add one of the three flags above to any existing invocation.
+
 ## [1.2.0] — 2026-07-12
 
 Public-release remediation pass: a full architecture/security audit (`docs/ARCHITECTURE_REVIEW.md`) followed by every P0 (release-blocking) and P1 (major quality/security) fix it identified.
