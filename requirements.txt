@@ -2,7 +2,7 @@
 pyyaml>=6.0
 
 # Optional — loot encryption (--encrypt-loot)
-cryptography>=41.0
+cryptography>=49.0.0
 
 # XML-safe nmap/AD output parsing (XXE protection)
 defusedxml>=0.7.1
