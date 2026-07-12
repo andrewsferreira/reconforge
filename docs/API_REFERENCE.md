@@ -399,8 +399,10 @@ class OutputManager:
     def attack_paths_file(self, module: str) -> Path
     def report_file(self, module: str) -> Path
     def loot_file(self, module: str) -> Path
-    def generate_engagement_report(self, findings, loot, workflow,
-                                    modules_run=None, opsec_mode="normal", html=False) -> Path
+    def contract_file(self, module: str, kind: str) -> Path
+    def audit_file(self, module: str) -> Path
+    def evidence_manifest_file(self, module: str) -> Path
+    def write_evidence_manifest(self, module: str, execution_id: str) -> Path
 ```
 
 ---

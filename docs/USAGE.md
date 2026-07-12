@@ -272,10 +272,11 @@ outputs/10.10.10.1/
 │   └── ...
 ├── api/
 │   └── ...
-├── surface/
-│   └── ...
-└── engagement_report.md   # Unified engagement report (workflow mode)
+└── surface/
+    └── ...
 ```
+
+There is no unified cross-module `engagement_report.md` — each module writes its own `quick_report.md`; `reconforge workflow` runs multiple modules but does not currently aggregate their reports into one file (tracked in docs/ARCHITECTURE_REVIEW.md).
 
 ### Loot Encryption
 

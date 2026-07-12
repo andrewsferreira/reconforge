@@ -302,8 +302,6 @@ outputs/<target>/<module>/
 └── quick_report.md       # Quick summary report
 ```
 
-Engagement-level report: `outputs/<target>/engagement_report.md`
-
 ### Validators (`core/validators.py`)
 
 Input validation: `validate_ip()`, `validate_cidr()`, `validate_hostname()`, `validate_target()`, `validate_port()`, `validate_port_range()`, `validate_url()`, `validate_domain()`. All raise typed `ValidationError` subclasses.
