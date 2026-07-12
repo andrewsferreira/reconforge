@@ -79,7 +79,8 @@ class NucleiApiTool:
             cmd += ["-H", headers]
 
         self.logger.info(f"Running Nuclei API scan on {target_url} (rate={rate})")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=jsonl_path)
+        # See modules/web/tools/nuclei.py::scan() — same reasoning.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_jsonl_path(self) -> Path:
         return self.output_dir / "nuclei_api.jsonl"

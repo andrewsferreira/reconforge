@@ -55,7 +55,8 @@ class ADLdapsearchTool:
             "ldapsearch", "-x", "-H", f"ldap://{target}:{port}",
             "-s", "base", "-b", "", "(objectClass=*)", "*", "+",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_naming_contexts(self, target: str, port: int = 389,
                               timeout: int = 30) -> RunResult:
@@ -66,7 +67,8 @@ class ADLdapsearchTool:
             "ldapsearch", "-x", "-H", f"ldap://{target}:{port}",
             "-s", "base", "-b", "", "namingContexts",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_domain_info(self, target: str, base_dn: str,
                           port: int = 389, timeout: int = 60,
@@ -81,7 +83,8 @@ class ADLdapsearchTool:
             "dc", "name", "distinguishedName", "objectSid",
             "msDS-Behavior-Version",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_users(self, target: str, base_dn: str,
                     port: int = 389, timeout: int = 120,
@@ -98,7 +101,8 @@ class ADLdapsearchTool:
             "userAccountControl", "pwdLastSet", "lastLogon",
             "servicePrincipalName", "adminCount",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_groups(self, target: str, base_dn: str,
                      port: int = 389, timeout: int = 120,
@@ -113,7 +117,8 @@ class ADLdapsearchTool:
             "cn", "description", "member", "groupType",
             "distinguishedName", "adminCount",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_computers(self, target: str, base_dn: str,
                         port: int = 389, timeout: int = 120,
@@ -129,7 +134,8 @@ class ADLdapsearchTool:
             "operatingSystemVersion", "operatingSystemServicePack",
             "userAccountControl", "servicePrincipalName", "lastLogon",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_trusts(self, target: str, base_dn: str,
                      port: int = 389, timeout: int = 60,
@@ -144,7 +150,8 @@ class ADLdapsearchTool:
             "cn", "trustPartner", "trustDirection", "trustType",
             "trustAttributes", "flatName",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_gpos(self, target: str, base_dn: str,
                    port: int = 389, timeout: int = 120,
@@ -159,7 +166,8 @@ class ADLdapsearchTool:
             "displayName", "cn", "gPCFileSysPath",
             "gPCFunctionalityVersion", "versionNumber", "flags",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_password_policy(self, target: str, base_dn: str,
                               port: int = 389, timeout: int = 60,
@@ -175,7 +183,8 @@ class ADLdapsearchTool:
             "pwdProperties", "lockoutThreshold", "lockoutDuration",
             "lockOutObservationWindow",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_spn_accounts(self, target: str, base_dn: str,
                            port: int = 389, timeout: int = 120,
@@ -190,7 +199,8 @@ class ADLdapsearchTool:
             "sAMAccountName", "servicePrincipalName", "description",
             "memberOf", "pwdLastSet", "adminCount",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def query_asrep_users(self, target: str, base_dn: str,
                           port: int = 389, timeout: int = 120,
@@ -206,7 +216,8 @@ class ADLdapsearchTool:
             "(userAccountControl:1.2.840.113556.1.4.803:=4194304))",
             "sAMAccountName", "cn", "description", "userAccountControl",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     # ------------------------------------------------------------------
     # Helpers

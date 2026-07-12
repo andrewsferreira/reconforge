@@ -32,8 +32,28 @@ _SANITIZE_PATTERNS = [
     (re.compile(
         r"""(?i)(password|passwd|pass|pwd)\s*[=:]\s*['"]?[^\s'"]{1,}['"]?"""),
      r"\1=***REDACTED***"),
-    # -p <value> (short flag in CLI commands)
+    # -p <value> (short flag in CLI commands). Note: several tool wrappers
+    # (network/tools/nmap.py, ad/tools/nmap.py) also use -p for a port
+    # specification (e.g. "-p 445"), which this pattern redacts too. That
+    # is a deliberate, accepted trade-off — -p is a credential flag for
+    # every tool in modules/*/tools/ that touches authentication (hydra,
+    # bloodhound, netexec, enum4linux_ng), and erring toward redacting a
+    # non-secret port list is safer than ever leaking a real password.
     (re.compile(r"""(?<!\w)-p\s+(?![\-])\S+"""), "-p ***REDACTED***"),
+    # -w <value> (ldapsearch/impacket bind-password short flag). Same
+    # trade-off as -p above: ffuf/gobuster also use -w for a wordlist
+    # path, which gets redacted too rather than risk missing a password.
+    (re.compile(r"""(?<!\w)-w\s+(?![\-])\S+"""), "-w ***REDACTED***"),
+    # smbclient -U user%password — keep the username visible (useful for
+    # audit trails) and redact only the password half.
+    (re.compile(r"""(?<!\w)-U\s+([^%\s]+)%\S+"""), r"-U \1%***REDACTED***"),
+    # impacket "DOMAIN/username:password" bare positional identity string.
+    # Only matched when domain-qualified (one '/' before the ':') — a bare
+    # "username:password" with no domain prefix is indistinguishable from
+    # a "host:port" token that legitimately appears elsewhere in logged
+    # commands, so it is deliberately left unmatched rather than risk
+    # corrupting unrelated log content.
+    (re.compile(r"""(?<!\S)([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+):(\S+)"""), r"\1:***REDACTED***"),
     # Base64 Bearer / SPNEGO-Negotiate tokens (Kerberos-over-HTTP uses
     # "Authorization: Negotiate <base64 ticket>") — must run before the
     # generic api_key/token/secret/authorization pattern (see note above).

@@ -44,7 +44,11 @@ class Wafw00fTool:
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
         cmd: List[str] = ["wafw00f", target_url, "-o", str(out_path)]
         self.logger.info(f"Running wafw00f on {target_url}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=out_path)
+        # wafw00f's own -o already writes out_path; its stdout includes a
+        # banner and live detection progress distinct from the file
+        # content, so output_file= must not also be passed here (same
+        # class of bug fixed in ffuf.py/whatweb.py/arjun_tool.py).
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_output_path(self) -> Path:
         return self.output_dir / "wafw00f.txt"

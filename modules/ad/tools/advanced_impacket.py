@@ -18,7 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult
+from core.runner import Runner, RunResult, RC_TOOL_NOT_FOUND
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -155,7 +155,8 @@ class AdvancedImpacketTool:
             "(objectClass=domain)",
             "ms-DS-MachineAccountQuota",
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self._tool_cfg("ldapsearch").effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -176,7 +177,7 @@ class AdvancedImpacketTool:
         self.logger.warning(f"Advanced impacket tool not found: {name}")
         return RunResult(
             command=name,
-            returncode=-2,
+            returncode=RC_TOOL_NOT_FOUND,
             stdout="",
             stderr=f"Tool not found: {name}",
             duration=0.0,

@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult
+from core.runner import Runner, RunResult, validate_arg
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -76,6 +76,8 @@ class SmbclientTool:
         self.logger.info(f"Listing //{target}/{share}/{path}")
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
 
+        if path:
+            validate_arg(path, label="path")
         ls_cmd = f"ls {path}/*" if path else "ls"
         cmd: List[str] = [
             "smbclient", f"//{target}/{share}",

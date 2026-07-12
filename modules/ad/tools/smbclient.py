@@ -49,27 +49,30 @@ class ADSmbclientTool:
         """List shares via SMB null session (-N -L)."""
         self.logger.info(f"Testing SMB null session share listing on {target}")
         out = self.output_dir / "smb_null_shares.txt"
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
         cmd: List[str] = ["smbclient", "-N", "-L", f"//{target}"]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def authenticated_list(self, target: str, username: str, password: str,
                            domain: str = "", timeout: int = 60) -> RunResult:
         """List shares with credentials."""
         self.logger.info(f"Listing SMB shares on {target} as {username}")
         out = self.output_dir / "smb_auth_shares.txt"
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
         cmd: List[str] = [
             "smbclient", "-L", f"//{target}",
             "-U", f"{username}%{password}",
         ]
         if domain:
             cmd += ["-W", domain]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def test_share_access(self, target: str, share: str,
                           username: str = "", password: str = "",
                           timeout: int = 30) -> RunResult:
         """Test access to a specific share."""
         self.logger.info(f"Testing access to //{target}/{share}")
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
         cmd: List[str] = [
             "smbclient", f"//{target}/{share}",
         ]
@@ -78,17 +81,17 @@ class ADSmbclientTool:
         else:
             cmd.append("-N")
         cmd += ["-c", "dir"]
-        return self.runner.run(cmd, timeout=timeout)
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def test_sysvol_access(self, target: str, timeout: int = 30) -> RunResult:
         """Test anonymous access to SYSVOL share."""
         self.logger.info(f"Testing SYSVOL access on {target}")
-        return self.test_share_access(target, "SYSVOL")
+        return self.test_share_access(target, "SYSVOL", timeout=timeout)
 
     def test_netlogon_access(self, target: str, timeout: int = 30) -> RunResult:
         """Test anonymous access to NETLOGON share."""
         self.logger.info(f"Testing NETLOGON access on {target}")
-        return self.test_share_access(target, "NETLOGON")
+        return self.test_share_access(target, "NETLOGON", timeout=timeout)
 
     def test_admin_shares(self, target: str,
                           username: str = "", password: str = "",

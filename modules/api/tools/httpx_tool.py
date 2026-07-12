@@ -74,7 +74,12 @@ class HttpxTool:
                 cmd += ["-H", h]
 
         self.logger.info(f"Running httpx probe on {target_url}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        # httpx's own -json -o already writes json_path, and with -json
+        # set httpx's stdout mirrors the same JSON format (unlike
+        # ffuf/whatweb where stdout is a different, non-JSON format), so
+        # this is likely already redundant rather than corrupting — still
+        # removed for consistency and defense-in-depth.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def probe_endpoints(self, endpoints_file: str,
                         headers: Optional[List[str]] = None,
@@ -99,7 +104,7 @@ class HttpxTool:
                 cmd += ["-H", h]
 
         self.logger.info(f"Running httpx endpoint probing from {endpoints_file}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_json_path(self, scan_type: str = "probe") -> Path:
         return self.output_dir / f"httpx_{scan_type}.json"

@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult
+from core.runner import Runner, RunResult, RC_PRECONDITION_FAILED
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -64,7 +64,7 @@ class GobusterTool:
         if not wordlist:
             self.logger.warning("No wordlist found for gobuster")
             return RunResult(
-                command="gobuster", returncode=-1, stdout="",
+                command="gobuster", returncode=RC_PRECONDITION_FAILED, stdout="",
                 stderr="No wordlist found", duration=0.0, success=False,
             )
 
@@ -78,7 +78,11 @@ class GobusterTool:
         ]
 
         self.logger.info(f"Running gobuster dir scan on {target_url} (threads={threads})")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=out_path)
+        # gobuster's own -o already writes out_path (a tee of the same
+        # result lines gobuster prints to stdout in -q mode, so this is
+        # likely just redundant rather than corrupting like ffuf/whatweb —
+        # still removed for consistency and defense-in-depth).
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def dns_scan(self, domain: str, wordlist: str = "",
                  timeout: int = 600) -> RunResult:
@@ -86,7 +90,7 @@ class GobusterTool:
         wordlist = self.resolve_wordlist(wordlist)
         if not wordlist:
             return RunResult(
-                command="gobuster", returncode=-1, stdout="",
+                command="gobuster", returncode=RC_PRECONDITION_FAILED, stdout="",
                 stderr="No wordlist found", duration=0.0, success=False,
             )
 
@@ -100,7 +104,7 @@ class GobusterTool:
         ]
 
         self.logger.info(f"Running gobuster DNS scan on {domain}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=out_path)
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_output_path(self, scan_type: str = "dirs") -> Path:
         return self.output_dir / f"gobuster_{scan_type}.txt"

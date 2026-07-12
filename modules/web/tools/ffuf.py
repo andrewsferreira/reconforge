@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult
+from core.runner import Runner, RunResult, RC_PRECONDITION_FAILED
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -72,7 +72,7 @@ class FfufTool:
         if not wordlist:
             self.logger.warning("No wordlist found for ffuf")
             return RunResult(
-                command="ffuf", returncode=-1, stdout="", stderr="No wordlist found",
+                command="ffuf", returncode=RC_PRECONDITION_FAILED, stdout="", stderr="No wordlist found",
                 duration=0.0, success=False,
             )
 
@@ -90,7 +90,13 @@ class FfufTool:
             cmd += ["-rate", str(rate)]
 
         self.logger.info(f"Running ffuf dir scan on {target_url} (threads={threads})")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        # ffuf's own -o/-of json already writes json_path — passing
+        # output_file= too would let Runner.run() overwrite it with ffuf's
+        # non-JSON stdout results table (ffuf isn't run with -s/silent),
+        # which FfufParser.parse_json()'s strict json.loads() then fails
+        # to parse and silently returns zero findings. Same class of bug
+        # fixed in curl_tool.py and whatweb.py.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def vhost_scan(self, target_url: str, wordlist: str = "",
                    timeout: int = 600) -> RunResult:
@@ -98,7 +104,7 @@ class FfufTool:
         wordlist = self.resolve_wordlist(wordlist)
         if not wordlist:
             return RunResult(
-                command="ffuf", returncode=-1, stdout="", stderr="No wordlist",
+                command="ffuf", returncode=RC_PRECONDITION_FAILED, stdout="", stderr="No wordlist",
                 duration=0.0, success=False,
             )
 
@@ -115,7 +121,8 @@ class FfufTool:
         ]
 
         self.logger.info(f"Running ffuf vhost scan on {target_url}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        # See dir_scan() above — output_file= must not be passed here either.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_json_path(self, scan_type: str = "dirs") -> Path:
         return self.output_dir / f"ffuf_{scan_type}.json"

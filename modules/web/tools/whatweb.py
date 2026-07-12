@@ -68,7 +68,13 @@ class WhatwebTool:
         ]
 
         self.logger.info(f"Running WhatWeb (aggression={aggression}) on {target_url}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        # whatweb's own --log-json plugin already writes json_path — do NOT
+        # also pass output_file= here, or Runner.run() overwrites the real
+        # JSON with whatweb's plain-text stdout summary (different format),
+        # which WhatwebParser.parse_json() then silently fails to parse
+        # (json.JSONDecodeError per line -> empty result, no technologies
+        # detected, no error surfaced). Same class of bug as curl_tool.py.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_json_path(self) -> Path:
         return self.output_dir / "whatweb.json"

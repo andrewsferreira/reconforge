@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult
+from core.runner import Runner, RunResult, RC_TOOL_NOT_FOUND
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -91,7 +91,8 @@ class NetexecTool:
         if options:
             cmd.extend(options)
 
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     # ------------------------------------------------------------------
     # LDAP enumeration
@@ -133,7 +134,8 @@ class NetexecTool:
         if options:
             cmd.extend(options)
 
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     # ------------------------------------------------------------------
     # SMB signing check
@@ -153,7 +155,8 @@ class NetexecTool:
             binary, "smb", target,
             "--gen-relay-list", relay_list,
         ]
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     # ------------------------------------------------------------------
     # Bloodhound ingest via netexec
@@ -178,7 +181,8 @@ class NetexecTool:
             cmd += ["-d", domain]
         cmd += ["--bloodhound", "--collection", "All"]
 
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -189,7 +193,7 @@ class NetexecTool:
         self.logger.warning("netexec / nxc / crackmapexec not found")
         return RunResult(
             command="netexec",
-            returncode=-2,
+            returncode=RC_TOOL_NOT_FOUND,
             stdout="",
             stderr="Tool not found: netexec / nxc / crackmapexec",
             duration=0.0,

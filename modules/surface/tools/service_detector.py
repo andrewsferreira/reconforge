@@ -54,7 +54,6 @@ class ServiceDetectorTool:
             "-json", "-o", str(output_path),
             "-title", "-tech-detect", "-status-code", "-follow-redirects",
         ]
-        self.logger.command(" ".join(cmd))
         return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_output_path(self) -> Path:

@@ -20,7 +20,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult
+from core.runner import Runner, RunResult, RC_TOOL_NOT_FOUND
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -201,7 +201,7 @@ class ImpacketTool:
         name = self.TOOLS.get(key, key)
         self.logger.warning(f"Impacket tool not found: {name}")
         return RunResult(
-            command=name, returncode=-2, stdout="",
+            command=name, returncode=RC_TOOL_NOT_FOUND, stdout="",
             stderr=f"Tool not found: {name}",
             duration=0.0, success=False,
         )

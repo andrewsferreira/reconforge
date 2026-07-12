@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 1.2.0 • 499/499 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.0.1 • 578/578 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 

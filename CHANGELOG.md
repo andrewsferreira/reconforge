@@ -6,6 +6,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.0.1] — 2026-07-12
+
+Phase 6 (Tool Adapters): a full audit of all 28 `modules/*/tools/*.py` wrappers, fixing real bugs found in the process. No CLI-facing or config-schema changes — pure correctness/security fixes, released as a PATCH per `docs/VERSIONING.md`.
+
+### Security
+
+- `modules/network/tools/smbclient.py::list_share_contents()`: fixed an unsanitized `path` argument reaching smbclient's `-c` batch-command mini-language, where a `;`-containing `path` could inject additional smbclient commands (batch-language injection, not OS shell injection — `shell=False` throughout). Now validated via `core.runner.validate_arg()`.
+- `core/logger.py`: added redaction patterns for three credential formats that previously reached command logs in plaintext — `-w <password>` (ldapsearch/impacket bind password), `-U user%password` (smbclient), and domain-qualified `DOMAIN/username:password` (impacket's bare positional identity string). The identity-string pattern is deliberately scoped to require a domain prefix to avoid false-positive redaction of unrelated `host:port` tokens.
+
+### Fixed
+
+- `ad/tools/nmap.py::dns_all_srv()`: no longer hardcodes `success=True` regardless of the underlying `dig` calls' actual results.
+- `Runner.run()`'s `output_file=` parameter was unconditionally overwriting a tool's own output file with captured stdout after the subprocess exits, corrupting output already written via the tool's own `-o`/`--log-json`/`-oJ` flag. Confirmed empirically for `curl_tool.py` (traced downstream to false-positive/false-negative header findings in `modules/web/phases/surface_discovery.py`); fixed across 11 wrappers total (`whatweb.py`, `ffuf.py`, `ffuf_api.py`, `arjun_tool.py`, `wpscan.py`, `wafw00f.py`, `gobuster.py`, `nuclei.py`, `nuclei_api.py`, `httpx_tool.py`, plus `curl_tool.py`).
+- Magic returncode literals (`-1`, `-2`) in 8 tool-wrapper files that collided with `core.runner`'s `RC_TIMEOUT`/`RC_TOOL_NOT_FOUND` sentinels — replaced with the correct named constants, adding a new `RC_PRECONDITION_FAILED` for the "no wordlist resolved" case that didn't fit any existing sentinel.
+- `bloodhound.py`, `ad/tools/ldapsearch.py`, `netexec.py`, and one method of `advanced_impacket.py`: `self.tool_cfg`/`self._tool_cfg()` was instantiated but never called, so `tools.yaml` timeout overrides were silently ignored.
+- `ad/tools/smbclient.py::test_sysvol_access()`/`test_netlogon_access()`: the caller's `timeout` argument was silently discarded instead of forwarded.
+- Removed redundant double command-logging in `modules/surface/tools/nmap_stealth.py` and `service_detector.py`.
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- `validate_arg()` is only called in 4 of 28 tool wrappers (all `modules/api/tools/*`); the other 24, including the highest-traffic nmap variants and every AD credential-bearing wrapper, build commands from unvalidated input.
+- `Runner.get_tool_version()` (added in 1.2.0/Phase 4) is still wired into zero of the 28 tool wrapper constructors.
+- `modules/api/tools/httpx_tool.py` and `modules/surface/tools/service_detector.py` independently wrap httpx with near-identical flags — a third instance of the per-module tool duplication already assessed (and deliberately left alone) for nmap/ldapsearch/smbclient in 1.2.0.
+
+37 new tests added (541 → 578); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.0.0] — 2026-07-12
 
 Phase 5 (Target Validation and Safety): closes the gap where ReconForge would run active scans against any target with zero acknowledgement of authorization, and tightens URL/domain validation that previously let malformed or malicious-looking targets reach the CLI's "validated" modules unchecked.

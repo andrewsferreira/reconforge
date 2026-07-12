@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult
+from core.runner import Runner, RunResult, RC_POLICY_BLOCKED
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -119,7 +119,7 @@ class HydraTool:
         """Test common default credentials."""
         if not self._check_authorization():
             return RunResult(
-                command="hydra [blocked]", returncode=-1, stdout="",
+                command="hydra [blocked]", returncode=RC_POLICY_BLOCKED, stdout="",
                 stderr="Not authorized for brute-force testing",
                 duration=0.0, success=False
             )
@@ -150,7 +150,7 @@ class HydraTool:
         """Test credentials from custom wordlists."""
         if not self._check_authorization():
             return RunResult(
-                command="hydra [blocked]", returncode=-1, stdout="",
+                command="hydra [blocked]", returncode=RC_POLICY_BLOCKED, stdout="",
                 stderr="Not authorized for brute-force testing",
                 duration=0.0, success=False
             )
@@ -170,7 +170,7 @@ class HydraTool:
         """Test a single credential pair."""
         if not self._check_authorization():
             return RunResult(
-                command="hydra [blocked]", returncode=-1, stdout="",
+                command="hydra [blocked]", returncode=RC_POLICY_BLOCKED, stdout="",
                 stderr="Not authorized for brute-force testing",
                 duration=0.0, success=False
             )

@@ -85,6 +85,11 @@ RC_UNEXPECTED_ERROR = -3
 RC_INVALID_COMMAND = -4
 RC_KILL_SWITCH_BLOCKED = -5
 RC_POLICY_BLOCKED = -6
+# A tool wrapper refused to build a command because a required input was
+# missing (e.g. no wordlist file could be resolved) — distinct from
+# RC_POLICY_BLOCKED (an authorization/scope gate) and RC_INVALID_COMMAND
+# (a malformed command that did reach validate_arg()).
+RC_PRECONDITION_FAILED = -7
 
 
 @dataclass

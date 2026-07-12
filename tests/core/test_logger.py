@@ -147,6 +147,46 @@ def test_redact_mysql_connection_string():
     assert "toor" not in result
 
 
+# ── Phase 6-B: tool-wrapper credential redaction gaps ──────────────
+
+def test_redact_ldapsearch_bind_password_w_flag():
+    msg = "ldapsearch -H ldap://10.10.10.1 -D admin -w SuperSecret123 -b dc=corp,dc=local"
+    result = sanitize_log(msg)
+    assert "SuperSecret123" not in result
+    assert "REDACTED" in result
+
+
+def test_redact_smbclient_user_percent_password():
+    msg = "smbclient -L //10.10.10.1 -U admin%SuperSecret123"
+    result = sanitize_log(msg)
+    assert "SuperSecret123" not in result
+    assert "admin" in result  # username preserved for audit trail
+
+
+def test_redact_impacket_domain_identity_string():
+    msg = "GetADUsers.py -all -dc-ip 10.10.10.1 CORP.LOCAL/admin:SuperSecret123"
+    result = sanitize_log(msg)
+    assert "SuperSecret123" not in result
+    assert "CORP.LOCAL/admin" in result  # domain/username preserved for audit trail
+
+
+def test_redact_impacket_identity_no_domain_still_redacts_via_w_flag():
+    """Bare 'username:password' (no domain) is not matched by the identity
+    pattern (indistinguishable from host:port), but GetNPUsers-style flows
+    that use -w for the password are still caught by the -w pattern."""
+    msg = "some-tool -w SuperSecret123 -u admin"
+    result = sanitize_log(msg)
+    assert "SuperSecret123" not in result
+
+
+def test_host_port_pair_not_corrupted_by_identity_pattern():
+    """A bare host:port token (no domain-slash prefix) must survive
+    untouched — it must not be mistaken for an impacket identity string."""
+    msg = "Connecting to 10.10.10.1:445 for SMB enumeration"
+    result = sanitize_log(msg)
+    assert "10.10.10.1:445" in result
+
+
 # ── ReconLogger basic ─────────────────────────────────────────────
 
 def test_logger_creates(tmp_path):

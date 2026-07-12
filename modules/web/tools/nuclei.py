@@ -77,7 +77,12 @@ class NucleiTool:
             cmd += ["-tags", tags]
 
         self.logger.info(f"Running Nuclei scan on {target_url} (rate={rate})")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=jsonl_path)
+        # nuclei's own -jsonl -o already writes jsonl_path, and with -jsonl
+        # set nuclei's stdout mirrors the same JSON Lines format (unlike
+        # ffuf/whatweb where stdout is a different, non-JSON format), so
+        # this is likely already redundant rather than corrupting — still
+        # removed for consistency and defense-in-depth.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_jsonl_path(self) -> Path:
         return self.output_dir / "nuclei.jsonl"

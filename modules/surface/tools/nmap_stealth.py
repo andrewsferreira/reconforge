@@ -101,7 +101,6 @@ class NmapStealthTool:
         args += self._extra_timing_args()
         cmd = self._base_cmd(args, target, "stealth_syn")
         effective_timeout = self.tool_cfg.mode_timeout("stealth_syn", timeout)
-        self.logger.command(" ".join(cmd))
         return self.runner.run(cmd, timeout=effective_timeout)
 
     def service_version_scan(self, target: str, ports: str = "",
@@ -115,7 +114,6 @@ class NmapStealthTool:
         args += self._extra_timing_args()
         cmd = self._base_cmd(args, target, "service_version")
         effective_timeout = self.tool_cfg.mode_timeout("service_version", timeout)
-        self.logger.command(" ".join(cmd))
         return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_xml_path(self, prefix: str = "stealth_syn") -> Path:

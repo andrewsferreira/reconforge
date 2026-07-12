@@ -150,32 +150,41 @@ class ADNmapTool:
             f"_kpasswd._tcp.{domain}",
         ]
         combined_stdout = ""
-        last_result = None
+        results: List[RunResult] = []
         for record in records:
             cmd: List[str] = [
                 "dig", f"@{target}", record, "SRV", "+short",
             ]
             result = self.runner.run(cmd, timeout=effective_timeout)
             combined_stdout += f";; {record}\n{result.stdout}\n"
-            last_result = result
+            results.append(result)
 
         # Write combined output
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(combined_stdout)
 
-        if last_result is None:
+        if not results:
             return RunResult(
                 command="dig (dns_all_srv)", returncode=0,
                 stdout=combined_stdout, stderr="", duration=0.0,
                 success=True, output_file=str(out),
             )
+
+        # Overall success reflects whether every dig call actually executed
+        # (an empty SRV answer is still returncode 0 — success is about
+        # command execution, not record presence). A single failed dig
+        # call (server unreachable, binary missing, etc.) must not be
+        # silently reported as an overall success.
+        all_succeeded = all(r.success for r in results)
+        first_failure = next((r for r in results if not r.success), None)
+        last_result = results[-1]
         return RunResult(
             command="dig (dns_all_srv)",
-            returncode=last_result.returncode,
+            returncode=last_result.returncode if all_succeeded else first_failure.returncode,
             stdout=combined_stdout,
-            stderr=last_result.stderr,
-            duration=last_result.duration,
-            success=True,
+            stderr="\n".join(r.stderr for r in results if r.stderr),
+            duration=sum(r.duration for r in results),
+            success=all_succeeded,
             output_file=str(out),
         )
 

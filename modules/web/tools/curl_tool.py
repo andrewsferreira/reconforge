@@ -46,7 +46,11 @@ class CurlTool:
             target_url,
         ]
         self.logger.info(f"Fetching HTTP headers from {target_url}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=out_path)
+        # curl's own -o flag already writes the response to out_path and
+        # redirects it away from stdout — do NOT also pass output_file=
+        # here, or Runner.run() overwrites curl's real output with the
+        # now-empty captured stdout after the process exits.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def fetch_page(self, target_url: str, timeout: int = 30) -> RunResult:
         """Fetch full HTTP response (headers + body)."""
@@ -58,7 +62,9 @@ class CurlTool:
             target_url,
         ]
         self.logger.info(f"Fetching full response from {target_url}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=out_path)
+        # Same reasoning as fetch_headers() above: curl's -o already wrote
+        # the file, so Runner.run()'s output_file= must not be passed.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_headers_path(self) -> Path:
         return self.output_dir / "headers.txt"

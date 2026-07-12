@@ -65,7 +65,13 @@ class ArjunTool:
                 cmd += ["--headers", h]
 
         self.logger.info(f"Running Arjun parameter discovery on {target_url} (method={method})")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        # Arjun's own -oJ already writes json_path — Arjun isn't run with
+        # a quiet/silent flag here, so its stdout is a progress display,
+        # not JSON. Passing output_file= too would let Runner.run()
+        # overwrite the real JSON with that non-JSON stdout, which
+        # ArjunParser.parse_json()'s strict json.loads() then fails to
+        # parse. Same class of bug fixed in ffuf.py/whatweb.py.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def discover_params_json_body(self, target_url: str,
                                    headers: Optional[List[str]] = None,
@@ -88,7 +94,7 @@ class ArjunTool:
                 cmd += ["--headers", h]
 
         self.logger.info(f"Running Arjun JSON parameter discovery on {target_url}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_json_path(self, scan_type: str = "params") -> Path:
         return self.output_dir / f"arjun_{scan_type}.json"

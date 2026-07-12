@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult, validate_arg
+from core.runner import Runner, RunResult, validate_arg, RC_PRECONDITION_FAILED
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -75,7 +75,7 @@ class FfufApiTool:
         if not wordlist:
             self.logger.warning("No wordlist found for ffuf API scan")
             return RunResult(
-                command="ffuf", returncode=-1, stdout="", stderr="No wordlist found",
+                command="ffuf", returncode=RC_PRECONDITION_FAILED, stdout="", stderr="No wordlist found",
                 duration=0.0, success=False,
             )
 
@@ -98,7 +98,10 @@ class FfufApiTool:
                 cmd += ["-H", h]
 
         self.logger.info(f"Running ffuf API endpoint scan on {target_url} (threads={threads})")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        # ffuf's own -o/-of json already writes json_path — see
+        # modules/web/tools/ffuf.py::dir_scan() for the full explanation
+        # of why output_file= must not also be passed here.
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def param_fuzz(self, target_url: str, wordlist: str = "",
                    method: str = "GET",
@@ -111,7 +114,7 @@ class FfufApiTool:
         wordlist = self.resolve_wordlist(wordlist)
         if not wordlist:
             return RunResult(
-                command="ffuf", returncode=-1, stdout="", stderr="No wordlist",
+                command="ffuf", returncode=RC_PRECONDITION_FAILED, stdout="", stderr="No wordlist",
                 duration=0.0, success=False,
             )
 
@@ -135,7 +138,7 @@ class FfufApiTool:
                 cmd += ["-H", h]
 
         self.logger.info(f"Running ffuf parameter fuzzing on {target_url}")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_json_path(self, scan_type: str = "api_endpoints") -> Path:
         return self.output_dir / f"ffuf_{scan_type}.json"

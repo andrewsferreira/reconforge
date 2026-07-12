@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-from core.runner import Runner, RunResult
+from core.runner import Runner, RunResult, RC_TOOL_NOT_FOUND
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -172,15 +172,16 @@ class BloodhoundTool:
             cmd.append("--stealth")
             self.logger.info("OPSEC: Using stealth collection mode")
 
+        effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
         out = self.output_dir / f"{output_prefix}.txt"
-        return self.runner.run(cmd, timeout=timeout, output_file=out)
+        return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def _tool_missing(self) -> RunResult:
         """Return a synthetic RunResult for a missing tool."""
         self.logger.warning("bloodhound-python not found")
         return RunResult(
             command="bloodhound-python",
-            returncode=-2,
+            returncode=RC_TOOL_NOT_FOUND,
             stdout="",
             stderr="Tool not found: bloodhound-python",
             duration=0.0,

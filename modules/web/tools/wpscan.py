@@ -77,7 +77,11 @@ class WpscanTool:
             cmd += ["--api-token", api_token]
 
         self.logger.info(f"Running WPScan on {target_url} (enumerate={enum_flags})")
-        return self.runner.run(cmd, timeout=effective_timeout, output_file=json_path)
+        # WPScan's own --format json -o already writes json_path; WPScan's
+        # stdout during a scan is a live progress/status stream, not the
+        # JSON report, so output_file= must not also be passed here (same
+        # class of bug fixed in ffuf.py/whatweb.py/arjun_tool.py).
+        return self.runner.run(cmd, timeout=effective_timeout)
 
     def get_json_path(self) -> Path:
         return self.output_dir / "wpscan.json"
