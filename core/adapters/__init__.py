@@ -1,14 +1,5 @@
-"""Adapter contracts and provider boundaries."""
+"""Provider adapter implementations.
 
-from core.adapters.base_adapter import ProviderAdapter
-from core.adapters.contracts import AdapterActionRequest, AdapterActionResult
-from core.adapters.mcp_adapter import McpAdapterConfig, McpClientAdapter
-
-
-__all__ = [
-    "ProviderAdapter",
-    "AdapterActionRequest",
-    "AdapterActionResult",
-    "McpAdapterConfig",
-    "McpClientAdapter",
-]
+The only real, wired adapter is core.adapters.burp — import it directly
+(``from core.adapters.burp.provider import BurpMcpProvider``, etc.).
+"""
