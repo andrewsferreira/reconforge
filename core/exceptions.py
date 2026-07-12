@@ -59,6 +59,20 @@ class PortValidationError(ValidationError):
         super().__init__(field="port", value=value, reason=reason)
 
 
+class InvalidToolArgumentError(ValidationError, ValueError):
+    """Raised when an argument destined for an external tool looks unsafe
+    (shell metacharacters, etc.) — see core/runner.py's validate_arg().
+
+    Also a ValueError subclass for backward compatibility: validate_arg()
+    used to raise a bare ValueError, and existing callers/tests that catch
+    ValueError specifically must keep working unchanged.
+    """
+
+    def __init__(self, value: str, reason: str = "", label: str = "argument"):
+        self.label = label
+        super().__init__(field=label, value=value, reason=reason)
+
+
 # ── Execution ───────────────────────────────────────────────────────
 
 class ExecutionError(ReconForgeError):

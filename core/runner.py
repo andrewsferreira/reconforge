@@ -27,6 +27,7 @@ from core.exceptions import (
     KillSwitchBlockedError,
     PolicyBlockedError,
     InvalidCommandError,
+    InvalidToolArgumentError,
 )
 from core.risk_policy import RiskPolicyEngine
 from core.logger import sanitize_log
@@ -55,15 +56,19 @@ def quote_args(*args: str) -> str:
 
 
 def validate_arg(value: str, label: str = "argument") -> str:
-    """Raise :class:`ValueError` if *value* contains shell meta-characters.
+    """Raise :class:`InvalidToolArgumentError` if *value* contains shell
+    meta-characters.
 
     This is an extra safety net on top of :func:`shlex.split`, which
     already avoids shell interpretation.  We reject values that look
     like injection attempts *before* they reach the subprocess layer.
+
+    InvalidToolArgumentError is also a ValueError subclass, so existing
+    ``except ValueError`` callers keep working unchanged.
     """
     if _SHELL_META.search(value):
-        raise ValueError(
-            f"Potentially unsafe characters in {label}: {value!r}"
+        raise InvalidToolArgumentError(
+            value, reason="potentially unsafe characters", label=label
         )
     return value
 

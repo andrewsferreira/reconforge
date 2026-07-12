@@ -30,6 +30,15 @@ def test_validate_arg_rejects_semicolon():
         validate_arg("127.0.0.1; rm -rf /")
 
 
+def test_validate_arg_raises_typed_exception():
+    """InvalidToolArgumentError (also a ValueError, for back-compat) is the
+    real, catchable-by-type exception validate_arg() raises."""
+    from core.exceptions import InvalidToolArgumentError
+
+    with pytest.raises(InvalidToolArgumentError):
+        validate_arg("127.0.0.1; rm -rf /", label="target")
+
+
 def test_validate_arg_rejects_pipe():
     with pytest.raises(ValueError, match="unsafe"):
         validate_arg("foo | bar")
