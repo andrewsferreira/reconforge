@@ -428,3 +428,22 @@ def test_audit_event_emitted_for_command_execution(tmp_path):
     assert event["success"] is True
     assert "duration_seconds" in event
     assert event["message"] == "command_execution"
+
+
+# ── Tool version capture ─────────────────────────────────────────────
+
+def test_get_tool_version_returns_version_string(runner):
+    version = runner.get_tool_version("python3")
+    assert version is not None
+    assert "Python" in version or "python" in version.lower()
+
+
+def test_get_tool_version_returns_none_for_missing_tool(runner):
+    assert runner.get_tool_version("nonexistent_tool_xyz123") is None
+
+
+def test_get_tool_version_never_raises_on_bad_flag(runner):
+    # "echo" doesn't understand --version — it just echoes it back, which
+    # is still a usable (if silly) one-line result, not an exception.
+    result = runner.get_tool_version("echo")
+    assert result is None or isinstance(result, str)

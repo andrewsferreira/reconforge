@@ -173,6 +173,37 @@ class Runner:
         """Check if an external tool is available on PATH."""
         return shutil.which(tool_name) is not None
 
+    def get_tool_version(self, tool_name: str, version_flag: str = "--version",
+                          timeout: int = 10) -> Optional[str]:
+        """Best-effort capture of an external tool's version string.
+
+        Runs ``tool_name version_flag`` through the normal run() path (same
+        scope/policy/redaction/audit handling as any other command) and
+        returns the first non-empty line of output — most CLI tools print
+        a one-line version banner to stdout; a few (e.g. some Java-based
+        tools) use stderr instead, so that's checked as a fallback.
+
+        Returns None if the tool isn't installed, the version flag isn't
+        recognized (non-zero exit with no usable output), or the check
+        times out. Never raises — this is evidence-gathering, not a hard
+        precondition for anything.
+
+        Args:
+            tool_name: Binary name (must already be on PATH).
+            version_flag: Flag to request version output. Most tools use
+                --version; some use -V or -v — pass the right one.
+            timeout: Short timeout, version checks should be near-instant.
+        """
+        if not self.check_tool(tool_name):
+            return None
+        result = self.run([tool_name, version_flag], timeout=timeout)
+        for stream in (result.stdout, result.stderr):
+            for line in stream.splitlines():
+                line = line.strip()
+                if line:
+                    return line
+        return None
+
     def _truncate_output(self, text: str) -> str:
         """Cap *text* at self.max_output_bytes, appending a clear marker.
 
