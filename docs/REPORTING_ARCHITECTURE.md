@@ -1,5 +1,20 @@
 # ReconForge Reporting Architecture (Phase 5)
 
+> **⚠️ Status: implemented and tested in isolation, not yet wired to live data.**
+> Everything described below is real, working code with its own test suite
+> (`tests/reporting/test_reporting_pipeline_phase5.py`) — but that suite
+> constructs a `ReportingBundle` by hand from synthetic `core/schemas/contracts.py`
+> objects. No module, the `reconforge workflow` command, or any other live
+> code path currently builds a `ReportingBundle` from real execution
+> results and calls `ReportingPipeline.generate()`. Until that integration
+> exists, running ReconForge against a real target will **not** produce
+> any of the `outputs/<target>/reporting/` artifacts documented here — you
+> get each module's `quick_report.md` instead (see
+> [ARCHITECTURE.md](ARCHITECTURE.md)). Treat this document as a design
+> spec for a not-yet-connected pipeline, not a description of current CLI
+> output. See [docs/ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) for
+> the tracked decision on whether/how to wire this in.
+
 ## Purpose
 
 Phase 5 introduces an enterprise-oriented reporting pipeline that transforms
@@ -21,8 +36,7 @@ provider execution.
 ## Trust Boundaries
 
 ### Trusted (Core)
-- `core/orchestrator/*`
-- `core/policy/*`
+- `core/policy/target_scope.py`
 - `core/schemas/*`
 - `core/reporting/*`
 
@@ -154,5 +168,10 @@ contains:
 - optional inferred commentary
 - optional LLM narrative
 
-The pipeline is designed for incremental adoption and does not require
-rewriting existing module execution paths.
+The pipeline is designed for incremental adoption and would not require
+rewriting existing module execution paths — but as noted at the top of
+this document, nothing currently calls it with a real `ReportingBundle`.
+Adopting it means writing a mapper from `core/findings_manager.Finding`
+/ `core/runner.RunResult` / `core/attack_workflow` data into
+`core/schemas/contracts.py`'s dataclasses, which is real integration
+work, not a config flag.
