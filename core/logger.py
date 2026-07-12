@@ -11,24 +11,67 @@ from typing import Optional
 
 
 # ── Credential sanitization patterns ────────────────────────────────
-# Order matters: "Bearer <token>" must be redacted *before* the generic
-# "authorization=<value>" pattern below, otherwise the generic pattern's
-# \S+ only consumes the literal word "Bearer" (stopping at the following
-# space) and leaves the actual token in "Authorization: Bearer <token>"
-# unredacted.
+# Order matters throughout this list: specific patterns for a value that
+# would otherwise be a substring of a more generic pattern's match must run
+# first. Example already found and fixed once (see git history): "Bearer
+# <token>" has to be redacted before the generic "authorization=<value>"
+# pattern, otherwise the generic pattern's \S+ only consumes the literal
+# word "Bearer" (stopping at the following space) and leaves the actual
+# token in "Authorization: Bearer <token>" unredacted. The private-key,
+# cloud-credential, and connection-string patterns below are similarly
+# ordered before the generic catch-all for the same reason.
 _SANITIZE_PATTERNS = [
+    # PEM private key blocks (RSA/EC/OPENSSH/DSA/generic). DOTALL so the
+    # block is matched across embedded newlines when logged as one string.
+    (re.compile(
+        r"""-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----"""
+        r""".*?-----END (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----""",
+        re.DOTALL),
+     "***PRIVATE_KEY_REDACTED***"),
     # password=... / -p ... / --password ...  (quoted or unquoted)
     (re.compile(
         r"""(?i)(password|passwd|pass|pwd)\s*[=:]\s*['"]?[^\s'"]{1,}['"]?"""),
      r"\1=***REDACTED***"),
     # -p <value> (short flag in CLI commands)
     (re.compile(r"""(?<!\w)-p\s+(?![\-])\S+"""), "-p ***REDACTED***"),
-    # Base64 Bearer tokens (at least 20 chars) — must run before the
+    # Base64 Bearer / SPNEGO-Negotiate tokens (Kerberos-over-HTTP uses
+    # "Authorization: Negotiate <base64 ticket>") — must run before the
     # generic api_key/token/secret/authorization pattern (see note above).
     (re.compile(r"""(?i)Bearer\s+[A-Za-z0-9+/=]{20,}"""), "Bearer ***REDACTED***"),
-    # API keys / tokens / secrets (common env / header patterns)
+    (re.compile(r"""(?i)Negotiate\s+[A-Za-z0-9+/=]{20,}"""), "Negotiate ***REDACTED***"),
+    # Cookie / Set-Cookie header or cookie=value field — one pattern for
+    # both forms so the generic catch-all below never gets a second,
+    # already-redacted-once value to needlessly re-match.
+    (re.compile(r"""(?i)(Set-Cookie|Cookie)\s*[:=]\s*['"]?\S+['"]?"""), r"\1=***REDACTED***"),
+    # AWS access key ID (AKIA/ASIA + 16 alnum) and secret access key by
+    # field name — distinct patterns, an access key ID alone isn't secret
+    # but is a strong enough indicator of adjacent secret material to
+    # redact defensively.
+    (re.compile(r"""\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"""), "***AWS_KEY_ID_REDACTED***"),
     (re.compile(
-        r"""(?i)(api[_-]?key|token|secret|authorization|bearer)\s*[=:]\s*['"]?\S+['"]?"""),
+        r"""(?i)aws_secret_access_key\s*[=:]\s*['"]?\S+['"]?"""),
+     "aws_secret_access_key=***REDACTED***"),
+    # GCP API key
+    (re.compile(r"""\bAIza[A-Za-z0-9_\-]{35}\b"""), "***GCP_KEY_REDACTED***"),
+    # Azure storage connection-string account key. Connection strings are
+    # ';'-delimited with no internal whitespace, so stop at ';' rather than
+    # \S+ — otherwise this greedily eats the rest of the (non-sensitive)
+    # connection string too (EndpointSuffix, etc.).
+    (re.compile(r"""(?i)AccountKey\s*=\s*[^;\s]+"""), "AccountKey=***REDACTED***"),
+    # Database connection strings with embedded credentials
+    # (postgres://user:pass@host, mysql://..., mongodb://..., redis://...)
+    (re.compile(
+        r"""(?i)\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|mssql)://[^:@/\s]+:[^@/\s]+@"""),
+     r"\1://***REDACTED***@"),
+    # API keys / tokens / secrets (common env / header patterns). Negative
+    # lookahead skips "Bearer"/"Negotiate" as the value — those are auth
+    # scheme names already redacted (with their actual token) by the
+    # dedicated patterns above; without this, "Authorization: Bearer
+    # ***REDACTED***" gets re-matched here too, since \S+ is happy to
+    # consume the literal word "Bearer" and turn it into a second,
+    # redundant "***REDACTED***".
+    (re.compile(
+        r"""(?i)(api[_-]?key|token|secret|authorization|bearer)\s*[=:]\s*(?!(?:Bearer|Negotiate)\b)['"]?\S+['"]?"""),
      r"\1=***REDACTED***"),
     # NTLM hashes  (LM:NT)
     (re.compile(r"""(?i)[a-f0-9]{32}:[a-f0-9]{32}"""), "***HASH_REDACTED***"),
