@@ -371,3 +371,51 @@ def test_output_file_receives_full_untruncated_content(tmp_path):
     result = runner.run(["python3", "-c", "print('C' * 1000)"], output_file=out)
     assert len(out.read_text()) > 1000
     assert len(result.stdout) < 1000
+
+
+# ── Execution ID and structured audit events ─────────────────────────
+
+def test_run_result_has_unique_execution_id_per_call(runner):
+    r1 = runner.run(["echo", "one"])
+    r2 = runner.run(["echo", "two"])
+    assert r1.execution_id
+    assert r2.execution_id
+    assert r1.execution_id != r2.execution_id
+
+
+def test_execution_id_present_on_every_exit_path():
+    """Every one of run()'s 7 exit branches must set execution_id, not
+    just the success path."""
+    logger = MagicMock()
+    runner = Runner(logger=logger, timeout=1, dry_run=False)
+
+    dry = Runner(logger=logger, timeout=1, dry_run=True)
+    assert dry.run(["echo", "x"]).execution_id
+
+    assert runner.run(["nonexistent_tool_xyz123"]).execution_id  # RC_TOOL_NOT_FOUND
+    assert runner.run(["sleep", "5"], timeout=0.1).execution_id  # RC_TIMEOUT
+
+
+def test_audit_event_emitted_for_command_execution(tmp_path):
+    """A real ReconLogger (not a mock) must receive one structured AUDIT
+    JSONL event per command, carrying the same execution_id as the
+    returned RunResult."""
+    import json as json_mod
+
+    from core.logger import ReconLogger
+
+    logger = ReconLogger(name="test-audit", log_dir=tmp_path, verbose=False)
+    runner = Runner(logger=logger, timeout=5, dry_run=False)
+    result = runner.run(["echo", "hello"])
+
+    jsonl_files = list(tmp_path.glob("*.jsonl"))
+    assert len(jsonl_files) == 1
+    events = [json_mod.loads(line) for line in jsonl_files[0].read_text().splitlines() if line.strip()]
+    audit_events = [e for e in events if e.get("level") == "AUDIT"]
+    assert len(audit_events) == 1
+    event = audit_events[0]
+    assert event["command_execution_id"] == result.execution_id
+    assert event["tool"] == "echo"
+    assert event["success"] is True
+    assert "duration_seconds" in event
+    assert event["message"] == "command_execution"

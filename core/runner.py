@@ -13,6 +13,7 @@ import shlex
 import shutil
 import os
 import time
+import uuid
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -91,6 +92,7 @@ class RunResult:
     duration: float
     success: bool
     output_file: Optional[str] = None
+    execution_id: str = ""
 
 
 class Runner:
@@ -228,6 +230,7 @@ class Runner:
                 during a long-running scan).
         """
         self._assert_target_in_scope()
+        command_execution_id = f"cmd_{uuid.uuid4().hex[:12]}"
 
         # Normalise to a display string for logging
         if isinstance(command, (list, tuple)):
@@ -251,25 +254,30 @@ class Runner:
         # stayed clean.
         cmd_display = sanitize_log(cmd_display)
 
+        # Best-effort tool name, available even for the early-exit branches
+        # below (dry-run, kill-switch) that never reach cmd_list parsing.
+        if isinstance(command, (list, tuple)) and command:
+            tool_name = str(command[0])
+        else:
+            tool_name = cmd_display.split()[0] if cmd_display else "unknown"
+
         effective_timeout = timeout or self.timeout
         self.logger.command(cmd_display)
         self._command_log.append(f"[{time.strftime('%H:%M:%S')}] {cmd_display}")
 
         if self.dry_run:
             self.logger.info(f"DRY RUN: {cmd_display}")
-            return RunResult(
-                command=cmd_display, returncode=0, stdout="", stderr="",
-                duration=0.0, success=True
+            return self._finish(
+                command_execution_id, tool_name, cmd_display,
+                returncode=0, stdout="", stderr="", duration=0.0, success=True,
             )
         if self._kill_switch_active():
             self.logger.error("Execution blocked by kill-switch control")
-            return RunResult(
-                command=cmd_display,
-                returncode=RC_KILL_SWITCH_BLOCKED,
-                stdout="",
+            return self._finish(
+                command_execution_id, tool_name, cmd_display,
+                returncode=RC_KILL_SWITCH_BLOCKED, stdout="",
                 stderr="Execution blocked: kill-switch is active",
-                duration=0.0,
-                success=False,
+                duration=0.0, success=False,
             )
 
         # Build argument list safely — never uses shell=True
@@ -283,23 +291,19 @@ class Runner:
                 # malformed string commands. Must be handled here, not left
                 # to the try/except below: it runs before that block starts.
                 self.logger.error(f"Invalid command: {e}")
-                self._record_metrics("unknown", 0.0, success=False)
-                return RunResult(
-                    command=cmd_display, returncode=RC_INVALID_COMMAND, stdout="",
-                    stderr=str(e), duration=0.0, success=False
+                return self._finish(
+                    command_execution_id, tool_name, cmd_display,
+                    returncode=RC_INVALID_COMMAND, stdout="", stderr=str(e),
+                    duration=0.0, success=False,
                 )
         tool_name = cmd_list[0] if cmd_list else "unknown"
         policy_decision = RiskPolicyEngine.check(cmd_list)
         if not policy_decision.allowed:
             self.logger.error(policy_decision.reason)
-            self._record_metrics(tool_name, 0.0, success=False)
-            return RunResult(
-                command=cmd_display,
-                returncode=RC_POLICY_BLOCKED,
-                stdout="",
-                stderr=policy_decision.reason,
-                duration=0.0,
-                success=False,
+            return self._finish(
+                command_execution_id, tool_name, cmd_display,
+                returncode=RC_POLICY_BLOCKED, stdout="",
+                stderr=policy_decision.reason, duration=0.0, success=False,
             )
 
         child_env = self._safe_base_env()
@@ -323,56 +327,81 @@ class Runner:
                 output_file.parent.mkdir(parents=True, exist_ok=True)
                 output_file.write_text(proc.stdout)
 
-            result = RunResult(
-                command=cmd_display,
+            if proc.returncode != 0:
+                self.logger.debug(f"Command exited with code {proc.returncode}: {proc.stderr[:200]}")
+
+            return self._finish(
+                command_execution_id, tool_name, cmd_display,
                 returncode=proc.returncode,
                 stdout=self._truncate_output(proc.stdout),
                 stderr=self._truncate_output(proc.stderr),
-                duration=duration,
-                success=proc.returncode == 0,
+                duration=duration, success=proc.returncode == 0,
                 output_file=str(output_file) if output_file else None,
             )
-
-            if not result.success:
-                self.logger.debug(f"Command exited with code {proc.returncode}: {proc.stderr[:200]}")
-
-            self._record_metrics(tool_name, duration, result.success)
-            return result
 
         except subprocess.TimeoutExpired:
             duration = time.time() - start
             self.logger.error(f"Command timed out after {effective_timeout}s: {cmd_display}")
-            self._record_metrics(tool_name, duration, success=False)
-            return RunResult(
-                command=cmd_display, returncode=RC_TIMEOUT, stdout="",
+            return self._finish(
+                command_execution_id, tool_name, cmd_display,
+                returncode=RC_TIMEOUT, stdout="",
                 stderr=f"Timeout after {effective_timeout}s",
-                duration=duration, success=False
+                duration=duration, success=False,
             )
         except FileNotFoundError:
             tool_name = cmd_list[0] if cmd_list else "unknown"
             self.logger.error(f"Tool not found: {tool_name}")
-            self._record_metrics(tool_name, 0.0, success=False)
-            return RunResult(
-                command=cmd_display, returncode=RC_TOOL_NOT_FOUND, stdout="",
+            return self._finish(
+                command_execution_id, tool_name, cmd_display,
+                returncode=RC_TOOL_NOT_FOUND, stdout="",
                 stderr=f"Tool not found: {tool_name}",
-                duration=0.0, success=False
+                duration=0.0, success=False,
             )
         except ValueError as e:
             # shlex.split can raise on malformed input
             self.logger.error(f"Invalid command: {e}")
-            self._record_metrics(tool_name, 0.0, success=False)
-            return RunResult(
-                command=cmd_display, returncode=RC_INVALID_COMMAND, stdout="",
-                stderr=str(e), duration=0.0, success=False
+            return self._finish(
+                command_execution_id, tool_name, cmd_display,
+                returncode=RC_INVALID_COMMAND, stdout="", stderr=str(e),
+                duration=0.0, success=False,
             )
         except Exception as e:
             duration = time.time() - start
             self.logger.error(f"Command failed: {e}")
-            self._record_metrics(tool_name, duration, success=False)
-            return RunResult(
-                command=cmd_display, returncode=RC_UNEXPECTED_ERROR, stdout="",
-                stderr=str(e), duration=duration, success=False
+            return self._finish(
+                command_execution_id, tool_name, cmd_display,
+                returncode=RC_UNEXPECTED_ERROR, stdout="", stderr=str(e),
+                duration=duration, success=False,
             )
+
+    def _finish(self, command_execution_id: str, tool_name: str, cmd_display: str, *,
+                returncode: int, stdout: str, stderr: str, duration: float,
+                success: bool, output_file: Optional[str] = None) -> RunResult:
+        """Build the RunResult, emit its structured audit event, and record metrics.
+
+        The single point every run() exit path funnels through, so the
+        audit trail and metrics stay consistent across all 7 exit
+        conditions (success, dry-run, kill-switch, policy-blocked,
+        invalid-command, timeout, tool-not-found, unexpected-error)
+        instead of being duplicated at each one.
+        """
+        result = RunResult(
+            command=cmd_display, returncode=returncode, stdout=stdout,
+            stderr=stderr, duration=duration, success=success,
+            output_file=output_file, execution_id=command_execution_id,
+        )
+        self.logger.audit(
+            "command_execution",
+            command_execution_id=command_execution_id,
+            tool=tool_name,
+            command=cmd_display,
+            returncode=returncode,
+            duration_seconds=round(duration, 3),
+            success=success,
+            target=self.target,
+        )
+        self._record_metrics(tool_name, duration, success)
+        return result
 
     @staticmethod
     def _kill_switch_active() -> bool:

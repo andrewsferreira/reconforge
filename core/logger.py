@@ -192,6 +192,20 @@ class ReconLogger:
         """Log a command being executed (credentials are redacted)."""
         self.logger.info(f"EXEC: {sanitize_log(cmd)}")
 
+    def audit(self, event: str, **fields) -> None:
+        """Emit a structured JSONL audit event (Phase 4 execution-layer
+        requirement: every subprocess execution gets one).
+
+        Unlike info()/warning()/etc., this does not also print to the
+        console — it is a machine-readable record only, written to the
+        same *.jsonl file as every other structured event, tagged with
+        this logger's module-level execution_id automatically (see
+        _json_event). Pass a per-call id in **fields (e.g.
+        command_execution_id=...) to distinguish individual events within
+        one module run.
+        """
+        self._json_event("AUDIT", event, **fields)
+
     def finding(self, severity: str, description: str):
         """Log a finding."""
         self.logger.warning(f"FINDING [{severity.upper()}]: {description}")
