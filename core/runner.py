@@ -150,17 +150,43 @@ class Runner:
         """Check if an external tool is available on PATH."""
         return shutil.which(tool_name) is not None
 
+    # Environment variables passed through to every child process by
+    # default. Anything not listed here — including any secret ReconForge
+    # itself reads from its own environment, e.g. RECONFORGE_VAULT_KEY /
+    # RECONFORGE_LOOT_KEY / VAULT_TOKEN — is NOT inherited by external
+    # tools unless a caller explicitly adds it via run()'s env= parameter.
+    # This is an allowlist, not a blocklist, so it stays safe by default as
+    # new secrets are introduced elsewhere in the framework.
+    _ENV_ALLOWLIST = (
+        "PATH", "HOME", "USER", "LOGNAME", "SHELL",
+        "LANG", "LC_ALL", "LC_CTYPE",
+        "TMPDIR", "TMP", "TEMP",
+        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+        "http_proxy", "https_proxy", "no_proxy",
+    )
+
+    @classmethod
+    def _safe_base_env(cls) -> Dict[str, str]:
+        """Build a minimal child-process environment (see _ENV_ALLOWLIST)."""
+        return {k: v for k, v in os.environ.items() if k in cls._ENV_ALLOWLIST}
+
     def run(self, command: Union[str, Sequence[str]], timeout: Optional[int] = None,
             output_file: Optional[Path] = None, env: Optional[dict] = None,
-            stdin_data: Optional[str] = None) -> RunResult:
+            stdin_data: Optional[str] = None, cwd: Optional[Path] = None) -> RunResult:
         """Execute a command and return structured result.
 
         Args:
             command: Command string **or** pre-split argument list.
             timeout: Override the default timeout for this invocation.
             output_file: If given, write stdout to this path.
-            env: Optional environment dict for the child process.
+            env: Extra environment variables to add on top of the safe
+                default environment (see _ENV_ALLOWLIST) — NOT a full
+                replacement. Use this to pass a tool-specific variable
+                (e.g. KRB5CCNAME) without exposing ReconForge's own
+                secrets to the child process.
             stdin_data: Optional string piped to the process stdin.
+            cwd: Working directory for the child process. Defaults to the
+                current process's working directory (subprocess default).
 
         Returns:
             :class:`RunResult` with captured stdout/stderr.
@@ -245,13 +271,17 @@ class Runner:
                 success=False,
             )
 
+        child_env = self._safe_base_env()
+        if env:
+            child_env.update({str(k): str(v) for k, v in env.items()})
+
         start = time.time()
         try:
             proc = subprocess.run(  # nosec B603 - cmd_list is always list[str], shell=False (never shell=True); target/args validated upstream (core/target_parser.py, validate_arg)
                 cmd_list,
                 capture_output=True, text=True,
-                timeout=effective_timeout, env=env,
-                input=stdin_data,
+                timeout=effective_timeout, env=child_env,
+                input=stdin_data, cwd=str(cwd) if cwd else None,
             )
             duration = time.time() - start
 
@@ -330,7 +360,8 @@ class Runner:
                      timeout: Optional[int] = None,
                      output_file: Optional[Path] = None,
                      env: Optional[dict] = None,
-                     stdin_data: Optional[str] = None) -> RunResult:
+                     stdin_data: Optional[str] = None,
+                     cwd: Optional[Path] = None) -> RunResult:
         """Execute a command and raise on failure.
 
         Same interface as :meth:`run`, but raises structured exceptions
@@ -350,7 +381,7 @@ class Runner:
             ExecutionError: If the command exits with any other non-zero code.
         """
         result = self.run(command, timeout=timeout, output_file=output_file,
-                          env=env, stdin_data=stdin_data)
+                          env=env, stdin_data=stdin_data, cwd=cwd)
         if result.success:
             return result
 

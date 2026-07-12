@@ -299,3 +299,38 @@ def test_check_tool_or_raise_raises_for_missing_tool(runner):
 
     with pytest.raises(ToolNotFoundError):
         runner.check_tool_or_raise("nonexistent_tool_xyz123")
+
+
+# ── Environment allowlist ────────────────────────────────────────────
+
+def test_child_process_does_not_inherit_arbitrary_secrets(runner, monkeypatch):
+    """A secret set in ReconForge's own environment (e.g. a vault key) must
+    not be handed to every external tool by default — only an explicit
+    allowlist of safe variables is passed through."""
+    monkeypatch.setenv("RECONFORGE_VAULT_KEY", "super-secret-fernet-key")
+    monkeypatch.setenv("SOME_RANDOM_API_TOKEN", "should-not-leak")
+    result = runner.run(["env"])
+    assert "RECONFORGE_VAULT_KEY" not in result.stdout
+    assert "super-secret-fernet-key" not in result.stdout
+    assert "SOME_RANDOM_API_TOKEN" not in result.stdout
+
+
+def test_child_process_inherits_path(runner):
+    result = runner.run(["env"])
+    assert "PATH=" in result.stdout
+
+
+def test_extra_env_is_additive_not_a_full_replacement(runner):
+    """env= adds a variable on top of the safe default env; it does not
+    replace it (PATH must still be present so the child can find tools)."""
+    result = runner.run(["env"], env={"CUSTOM_VAR": "custom_value"})
+    assert "PATH=" in result.stdout
+    assert "CUSTOM_VAR=custom_value" in result.stdout
+
+
+# ── Working directory control ────────────────────────────────────────
+
+def test_cwd_controls_subprocess_working_directory(runner, tmp_path):
+    (tmp_path / "marker_file.txt").write_text("x")
+    result = runner.run(["ls"], cwd=tmp_path)
+    assert "marker_file.txt" in result.stdout
