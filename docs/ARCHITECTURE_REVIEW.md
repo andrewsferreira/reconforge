@@ -1,6 +1,7 @@
 # ReconForge — Architecture Review
 
 **Date:** 2026-07-11 (P0 remediation pass completed same day — see §11 checklists and the `remediation/p0-release-blockers` branch history for what changed and why)
+**Status of the phased mandate** (see [AGENTS.md](../AGENTS.md) for the full 27-phase plan): Phase 1 (this document) — done. Phase 2 (Scope and Positioning) — done. Phase 3 (Project Consolidation) — done. Phase 4 (Secure Process Execution) — done 2026-07-12: `core/runner.py` now has an environment allowlist (was passing the full parent environment, including ReconForge's own secret env vars, to every child tool), working-directory control, output-size limits (10MB/stream, post-capture — not true streaming enforcement, documented as a gap), per-command execution IDs with a structured `AUDIT` JSONL event, `InvalidToolArgumentError`, a tool-version-capture helper, and secret-redaction coverage expanded to cookies/private keys/Kerberos tickets/cloud credentials/DB connection strings (found and fixed two real double-redaction bugs while verifying the new patterns empirically). Not done in Phase 4: true streaming output caps (would need Popen + incremental reads instead of subprocess.run) and wiring `get_tool_version()` into every tool wrapper's constructor (~30 files) — both noted as follow-ups below rather than silently implied complete. Phases 5+ not started.
 **Scope:** Full repository audit prior to public release, per the ReconForge engineering mandate (see [AGENTS.md](../AGENTS.md)).
 **Method:** Static review of `core/`, `modules/`, `reconforge/`, `mcp_validation/`, `tests/`, `docs/`, `.github/`, and packaging config, cross-checked against actual command execution (`pytest`, `ruff check`, `mypy`, `bandit`) rather than documentation claims alone.
 **Status of this document:** living. Update it as remediation lands; do not delete resolved items — mark them done and keep the history.
@@ -208,10 +209,12 @@ These must be resolved before the repository is made public, in this order (each
 - [ ] `docs/DOCUMENTATION_INDEX.md` is stale (says "20 Markdown documents," last updated 2026-03-21 — many docs added/changed since, including this one, SECURITY.md, LICENSE) — noticed during Phase 3, not fixed; scoped better as Phase 22 (Documentation) work than a quick edit
 
 ### P3 — Optional enhancements
-- [ ] Add framework/tool version + config-hash provenance to reports
+- [ ] Add framework/tool version + config-hash provenance to reports — `Runner.get_tool_version()` now exists (Phase 4) but no report/finding actually calls it yet
 - [ ] Remove the 29 tracked PDF duplicates of Markdown docs from git
 - [ ] Add packaging extras (`reconforge[ad]`, `reconforge[web]`, `reconforge[api]`)
 - [ ] Add a documentation link checker and Docker lint job (once/if a Dockerfile is added)
+- [ ] True streaming output-size enforcement in `core/runner.py` — current truncation is post-capture (subprocess.run already buffered the full output in memory first); real enforcement needs Popen + incremental chunked reads
+- [ ] Wire `Runner.get_tool_version()` into tool wrapper constructors (~30 files) so findings/evidence can record which tool version produced them
 
 ---
 
