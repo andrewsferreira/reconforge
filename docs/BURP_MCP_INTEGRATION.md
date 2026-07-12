@@ -21,11 +21,19 @@ core/adapters/burp/
 ```
 
 This absorbs the previously standalone SSE client behavior into reusable core
-modules while preserving Model 1 architecture:
+modules while preserving a clear separation of responsibilities:
 
-- ReconForge remains orchestrator and policy authority.
+- ReconForge (`reconforge/cli.py`, `WorkflowOrchestrator`) remains orchestrator
+  and policy authority — no execution or scope decision lives in the adapter.
 - Burp is an external provider.
-- Burp adapter/provider contains transport and capability translation only.
+- Burp adapter/provider contains transport and capability translation only,
+  and enforces its own scope check (`core/policy/target_scope.py`'s
+  `DomainScopeValidator`) before every HTTP request it issues.
+
+(An earlier, separate "Model 1" generic orchestrator/policy stack —
+`core/orchestrator/*`, `core/policy/scope_policy.py` — was never wired to
+this or any other live code path and was removed; see
+[docs/ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md).)
 
 ## Migration from standalone logic
 
