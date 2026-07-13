@@ -255,15 +255,18 @@ def test_confidence_scorer():
     assert result.score >= 0.20
     assert result.label in ("medium", "low")
 
-    # Low confidence: no port match, no banner, unknown port
+    # Heuristic confidence: zero signals fired (no port match, no banner,
+    # unknown port, single detection method) — no concrete evidence at
+    # all, matching FindingsManager's "heuristic" tier rather than "low"
+    # (which implies at least one weak signal is present).
     svc_low = CorrelatedService(
         canonical_name="unknown",
         ports=[55555],
         detection_methods={"port_scan"},
     )
     result = scorer.score_service(svc_low)
-    assert result.score < 0.40
-    assert result.label == "low"
+    assert result.score == 0.0
+    assert result.label == "heuristic"
 
     print("✅ Confidence Scorer: ALL PASSED")
 

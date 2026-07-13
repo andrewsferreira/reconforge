@@ -6,6 +6,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.1.0] — 2026-07-13
+
+Phase 8 (Confidence Model): audited `core/findings_manager.py` and ~94 confidence-assignment call sites across all 5 recon modules. Adds a new backward-compatible `confidence_reason` field (MINOR per `docs/VERSIONING.md`'s "new finding fields" rule) alongside several real bug fixes.
+
+### Security / Correctness
+
+- `web/phases/exploit_candidates.py::_run_sqlmap()`: fixed a bare `"injectable" in line_lower` substring match tripping on sqlmap's own NEGATIVE-result phrasing ("does not appear to be injectable"), which fabricated a `severity="critical", confidence="confirmed"` SQL-injection finding for a target sqlmap explicitly reported as not injectable. The most severe bug found in this phase.
+- `web/phases/vulnerability_scanning.py`: fixed nuclei-finding confidence being derived FROM severity (`"high" if sev in ("critical","high") else "medium"`), which inverted `_clamp_severity()`'s intended evidence→confidence→severity-cap flow and let any severe-enough finding always escape its own cap. Confidence is now independent of severity.
+- `ad/phases/bloodhound_collection.py`: relabeled the Domain-Admin attack-path finding from `confidence="confirmed"` to `"high"` — a BloodHound graph-traversal inference is not an exploited/verified fact per this project's own confidence definitions.
+
+### Added
+
+- `Finding.confidence_reason: str` and a matching `confidence_reason=` parameter on `FindingsManager.add()` and all 5 modules' `add_finding()` wrappers, so callers can record *why* a confidence level was chosen. Populated at the 3 fixed call sites above; broader adoption across ~90 other call sites is a tracked follow-up, not attempted in this phase.
+- `FindingsManager.to_markdown()` now includes a "Heuristic Findings" section (previously-dead `get_heuristic_findings()` is now wired in) and shows `confidence_reason` per finding when present.
+- `quick_report.md` (network/web/api/surface modules) now shows a visible warning when findings were severity-clamped due to weak confidence — previously such findings could silently vanish from the "Critical & High Findings" headline section with no operator-facing signal.
+
+### Fixed
+
+- `modules/surface/intelligence/confidence_scorer.py::ConfidenceScorer` never emitted the `"heuristic"` tier (weakest confidence level) — a zero-signal service detection was mislabeled `"low"` instead.
+- `api/phases/discovery.py` marked every ffuf-discovered endpoint `confidence="confirmed"` unconditionally; aligned with `web/phases/content_enumeration.py`'s status-code-based tiering for the same evidence type.
+- Removed dead `core/findings_manager.py::_CONFIDENCE_RANK` constant.
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- The AD module's wholesale `confidence="confirmed"` usage across ~29 remaining phase/analyzer call sites.
+- `confidence_scorer.py`'s surface-module-only scoping, not shared with the other 4 modules.
+- A handful of minor within-file confidence inconsistencies (wpscan version vs. plugin inventory; JWT `alg=none` vs. empty signature).
+- `core/cve_enricher.py::enrich_references()`'s blocking-network-call-in-hot-loop risk when `RECONFORGE_NVD_LOOKUP=1` is set.
+
+57 new tests added (611 → 668), including full confidence×severity clamp-matrix coverage for `core/findings_manager.py` (previously untested); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.0.2] — 2026-07-13
 
 Phase 7 (Parsing/Normalization): a full audit of all 26 `modules/*/parsers/*.py` files, fixing real bugs found in the process. No CLI-facing or config-schema changes — pure correctness/security fixes, released as a PATCH per `docs/VERSIONING.md`.

@@ -353,10 +353,16 @@ class DiscoveryPhase(APIPhaseBase):
             classification = self.ffuf_parser.classify_endpoint(entry.url)
             severity = "medium" if classification == "sensitive" else "info"
 
+            # Same evidence type (an ffuf hit) as modules/web/phases/
+            # content_enumeration.py — tie confidence to the response
+            # status the same way, rather than treating every fuzzed hit
+            # as "confirmed" regardless of how weak the status signal is
+            # (e.g. a redirect or error page ffuf still logged).
             self.add_finding(
                 finding_type="exposure",
                 severity=severity,
-                confidence="confirmed",
+                confidence="high" if entry.status in (200, 301, 302) else "medium",
+                confidence_reason=f"ffuf HTTP {entry.status} response to fuzzed path",
                 target=entry.url,
                 description=f"API endpoint discovered: {entry.url} (HTTP {entry.status})",
                 evidence=f"Status: {entry.status}, Size: {entry.length}",

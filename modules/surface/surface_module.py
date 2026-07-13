@@ -435,6 +435,14 @@ class SurfaceModule:
             }.get(sev, "\u26aa")
             lines.append(f"- {icon} **{sev.upper()}:** {count}")
 
+        if self.findings_mgr.clamped_count:
+            lines.append(
+                f"\n\u26a0\ufe0f **{self.findings_mgr.clamped_count} finding(s) had severity downgraded "
+                "due to weak confidence** \u2014 they may not appear in the Critical & High "
+                "Findings section below even though they started at a higher severity. "
+                "See `findings.md` for the full, unfiltered list."
+            )
+
         lines.append("")
         lines.append("## Loot Summary\n")
         if loot_summary:

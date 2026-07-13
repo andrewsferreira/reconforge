@@ -18,7 +18,7 @@ from modules.surface.intelligence.correlation_engine import CorrelatedService
 class ConfidenceResult:
     """Result of confidence scoring."""
     score: float  # 0.0 - 1.0
-    label: str  # "confirmed", "high", "medium", "low"
+    label: str  # "confirmed", "high", "medium", "low", "heuristic"
     signals: Dict[str, bool]  # Which signals contributed
     explanation: str  # Human-readable explanation
 
@@ -49,11 +49,17 @@ class ConfidenceScorer:
         "http_confirmed": 0.10,
     }
 
+    # A score of exactly 0.0 means none of the 5 signals fired at all —
+    # no concrete evidence backing the detection, matching
+    # core/findings_manager.py's VALID_CONFIDENCES "heuristic" tier
+    # (pattern-based, no concrete evidence) rather than "low" (weak
+    # evidence — at least one real signal present).
     LABELS = [
         (0.80, "confirmed"),
         (0.60, "high"),
         (0.40, "medium"),
-        (0.0, "low"),
+        (0.0001, "low"),
+        (0.0, "heuristic"),
     ]
 
     def __init__(self, port_map: Optional[Dict[int, str]] = None) -> None:
@@ -81,7 +87,7 @@ class ConfidenceScorer:
             self.WEIGHTS[signal] for signal, active in signals.items() if active
         )
 
-        label = "low"
+        label = "heuristic"
         for threshold, lbl in self.LABELS:
             if score >= threshold:
                 label = lbl

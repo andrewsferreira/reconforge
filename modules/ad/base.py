@@ -170,6 +170,7 @@ class ADPhaseBase(ABC):
         evidence: str = "",
         recommendation: str = "",
         references: Optional[List[str]] = None,
+        confidence_reason: str = "",
     ) -> None:
         """Convenience wrapper to add a finding with module/phase pre-filled."""
         self.findings.add(
@@ -183,4 +184,5 @@ class ADPhaseBase(ABC):
             evidence=evidence,
             recommendation=recommendation,
             references=references,
+            confidence_reason=confidence_reason,
         )

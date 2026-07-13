@@ -41,6 +41,7 @@ class Finding:
     finding_type: str = ""  # vulnerability, misconfiguration, exposure, credential, attack_vector, information, assessment, prioritisation
     severity: str = "info"  # critical, high, medium, low, info
     confidence: str = "medium"  # confirmed, high, medium, low, heuristic
+    confidence_reason: str = ""  # why this confidence level was chosen (optional)
     target: str = ""
     module: str = ""
     phase: str = ""
@@ -63,7 +64,6 @@ _CONFIDENCE_SEVERITY_CAP: Dict[str, str] = {
 }
 
 _SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
-_CONFIDENCE_RANK = {"confirmed": 0, "high": 1, "medium": 2, "low": 3, "heuristic": 4}
 
 
 def _clamp_severity(severity: str, confidence: str) -> str:
@@ -108,7 +108,8 @@ class FindingsManager:
     def add(self, finding_type: str, severity: str, confidence: str,
             target: str, module: str, description: str,
             evidence: str = "", recommendation: str = "",
-            phase: str = "", references: Optional[List[str]] = None) -> Finding:
+            phase: str = "", references: Optional[List[str]] = None,
+            confidence_reason: str = "") -> Finding:
         """Add a finding with automatic severity validation.
 
         If ``strict`` mode is enabled (the default), the severity will be
@@ -126,6 +127,12 @@ class FindingsManager:
             recommendation: Remediation recommendation.
             phase: Phase that generated the finding.
             references: External reference URLs.
+            confidence_reason: Optional explanation of why this confidence
+                level was chosen (e.g. "actively exploited via sqlmap" vs
+                "graph-inferred attack path, not verified"). Callers are
+                not required to set this yet — most existing call sites
+                don't — but new/updated call sites should prefer it over
+                a bare confidence literal with no justification.
 
         Returns:
             The created Finding object (severity may have been adjusted).
@@ -153,6 +160,7 @@ class FindingsManager:
 
         f = Finding(
             finding_type=finding_type, severity=severity, confidence=confidence,
+            confidence_reason=confidence_reason,
             target=target, module=module, phase=phase, description=description,
             evidence=evidence, recommendation=recommendation,
             references=enrich_references(description, evidence, references or [])
@@ -221,6 +229,18 @@ class FindingsManager:
                 lines.append(f"- **{conf}:** {conf_counts[conf]}")
         lines.append("")
 
+        heuristic_findings = self.get_heuristic_findings()
+        if heuristic_findings:
+            lines.append(
+                f"### Heuristic Findings ({len(heuristic_findings)}) — pattern-based, no concrete evidence"
+            )
+            lines.append(
+                "These findings are capped at 'low' severity and require manual verification before acting on them.\n"
+            )
+            for f in heuristic_findings:
+                lines.append(f"- **[{f.severity.upper()}]** {f.description} (`{f.id}`)")
+            lines.append("")
+
         for f in self.get_all():
             icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵", "info": "⚪"}.get(f.severity, "⚪")
             lines.append(f"## {icon} [{f.severity.upper()}] {f.description}")
@@ -228,6 +248,8 @@ class FindingsManager:
             lines.append(f"- **Type:** {f.finding_type}")
             lines.append(f"- **Target:** {f.target}")
             lines.append(f"- **Confidence:** {f.confidence}")
+            if f.confidence_reason:
+                lines.append(f"- **Confidence Reason:** {f.confidence_reason}")
             lines.append(f"- **Module:** {f.module} / {f.phase}")
             if f.evidence:
                 lines.append(f"- **Evidence:**\n```\n{f.evidence}\n```")

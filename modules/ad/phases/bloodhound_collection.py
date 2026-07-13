@@ -177,7 +177,17 @@ class BloodhoundCollectionPhase(ADPhaseBase):
             )
             self.add_finding(
                 finding_type="vulnerability", severity="critical",
-                confidence="confirmed", target=target,
+                # "confirmed" means exploited/verified (core/findings_manager.py
+                # docstring); a BloodHound path is a multi-hop ACL/group
+                # graph inference, not a verified fact — "high" honestly
+                # reflects "strong evidence" without overclaiming verification.
+                confidence="high",
+                confidence_reason=(
+                    "BloodHound graph-traversal inference over collected ACL/"
+                    "group-membership data — not an exploited or actively "
+                    "verified attack chain"
+                ),
+                target=target,
                 description=f"{len(critical_paths)} critical attack paths to Domain Admin",
                 evidence=path_desc,
                 recommendation=(

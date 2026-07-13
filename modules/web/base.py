@@ -171,6 +171,7 @@ class WebPhaseBase(ABC):
         evidence: str = "",
         recommendation: str = "",
         references: Optional[List[str]] = None,
+        confidence_reason: str = "",
     ) -> None:
         """Convenience wrapper to add a finding with module/phase pre-filled."""
         self.findings.add(
@@ -184,6 +185,7 @@ class WebPhaseBase(ABC):
             evidence=evidence,
             recommendation=recommendation,
             references=references,
+            confidence_reason=confidence_reason,
         )
 
     def resolve_wordlist(self, tool_name: str, key: str = "common") -> str:
