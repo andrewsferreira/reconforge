@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.3.1] — 2026-07-13
+
+Phase 11 (AD/Web/API Module Quality): audited phase-orchestration logic in all 5 AD, 4 web, and 4 API phase files. Pure bug fixes — no new public fields/methods/capabilities — so PATCH per `docs/VERSIONING.md`.
+
+### Fixed
+
+- `ad/phases/bloodhound_collection.py::_identify_da_paths()`: Kerberoast→DA and AS-REP→DA branches checked group membership by matching readable substrings like `"domain admins"` against `user.member_of`, which holds BloodHound SIDs, never names — the check could never match, so both branches never fired for any target. Now checks membership against `results["da_users"]`, the correctly SID-keyed list `PrivilegeAnalyzer` already builds.
+- `api/phases/fuzzing.py::_classify_error_response()`/`_check_for_info_disclosure()`: searched ffuf's whole-batch stdout (the only body-content text available) but reported a match as evidence for one arbitrarily-chosen fuzzed entry's URL — one entry's error text could get misattributed to a different, unrelated entry. Now classifies the batch once per fuzz run and reports a single finding covering every affected entry, explicit that the specific triggering input can't be isolated with current instrumentation.
+- `ad/collectors/delegation_collector.py::DelegationCollector.collect()`: hardcoded `result.success = True` regardless of whether any of its three LDAP queries (or findDelegation.py) actually completed — a total collection failure was indistinguishable from a genuinely clean environment. Each query now reports whether it actually ran; `delegation_discovery.py` surfaces a finding and returns early on total failure instead of silently continuing on empty data.
+- `web/phases/surface_discovery.py::_run_wafw00f()`: the only tool-invoking method in the file that didn't check `run_result.success` before trusting parsed output — a wafw00f execution failure was indistinguishable from a genuine "no WAF detected" finding.
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- `results["success"]` is decorative (unconditionally `True`) in 12 of 13 phase files; inert today (no caller reads it) but a latent trap for future code.
+- Weak SSRF-confirmation regex signal-to-noise in `web/phases/vulnerability_scanning.py` (already hedged `confidence="low"`).
+
+22 new tests added (726 → 748); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.3.0] — 2026-07-13
 
 Phase 10 (Attack-Path Analysis): audited `reconforge/attack_paths/engine.py`, `modules/ad/attack_paths/*.py`'s 6 builders, and `core/attack_workflow.py`. Adds a new backward-compatible dedup mechanism to `AttackWorkflow` and a new `core/version.py` module (MINOR per `docs/VERSIONING.md`), alongside real bug fixes.

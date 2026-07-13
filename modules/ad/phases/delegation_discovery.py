@@ -109,18 +109,34 @@ class DelegationDiscoveryPhase(ADPhaseBase):
             username=username, password=password,
         )
 
-        if collected.success:
-            results["unconstrained_delegation"] = collected.data.get("unconstrained", [])
-            results["constrained_delegation"] = collected.data.get("constrained", [])
-            results["rbcd"] = collected.data.get("rbcd", [])
-            results["machine_account_quota"] = collected.data.get("machine_account_quota", -1)
-
-            self.logger.info(
-                f"Delegation: UC={len(results['unconstrained_delegation'])}, "
-                f"CD={len(results['constrained_delegation'])}, "
-                f"RBCD={len(results['rbcd'])}, "
-                f"MAQ={results['machine_account_quota']}"
+        if not collected.success:
+            self.logger.warning(
+                f"Delegation collection did not complete: {', '.join(collected.errors)}"
             )
+            self.add_finding(
+                finding_type="exposure", severity="info",
+                confidence="confirmed", target=target,
+                description="Delegation discovery could not run any query — results incomplete",
+                evidence="; ".join(collected.errors) or "No delegation query completed",
+                recommendation=(
+                    "Provide domain credentials and confirm ldapsearch/impacket "
+                    "connectivity, then re-run delegation discovery."
+                ),
+            )
+            self.notes.add_phase_end(self.PHASE_NAME, "Failed: no delegation data collected")
+            return results
+
+        results["unconstrained_delegation"] = collected.data.get("unconstrained", [])
+        results["constrained_delegation"] = collected.data.get("constrained", [])
+        results["rbcd"] = collected.data.get("rbcd", [])
+        results["machine_account_quota"] = collected.data.get("machine_account_quota", -1)
+
+        self.logger.info(
+            f"Delegation: UC={len(results['unconstrained_delegation'])}, "
+            f"CD={len(results['constrained_delegation'])}, "
+            f"RBCD={len(results['rbcd'])}, "
+            f"MAQ={results['machine_account_quota']}"
+        )
 
         # ── Step 2: Loot ─────────────────────────────────────────────
         self._record_delegation_loot(results)

@@ -225,6 +225,12 @@ class SurfaceDiscoveryPhase(WebPhaseBase):
         run_result = self.wafw00f.detect(target_url)
         self.tools_used.append("wafw00f")
 
+        if not run_result.success:
+            self.logger.warning(f"wafw00f failed: {run_result.stderr[:200]}")
+            self.workflow.record_result(f"Failed: {run_result.stderr[:100]}")
+            self.notes.add_command_note(run_result.command, "Failed")
+            return count
+
         # Parse results
         waf_result = self.wafw00f_parser.parse_file(self.wafw00f.get_output_path())
         if not waf_result.raw_output and run_result.stdout:

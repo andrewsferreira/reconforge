@@ -269,42 +269,49 @@ class BloodhoundCollectionPhase(ADPhaseBase):
         paths: List[Dict] = []
         bh_users = collected.get("users", [])
         bh_computers = collected.get("computers", [])
+        # user.member_of holds BloodHound ObjectIdentifier SIDs, not readable
+        # group names — da_users (built by PrivilegeAnalyzer from the same
+        # SID-keyed "Domain Admins" group membership) is the correct set to
+        # test membership against.
+        da_user_ids = set(results.get("da_users", []))
 
         # Kerberoastable → DA
         for user in bh_users:
-            if getattr(user, "has_spn", False) and getattr(user, "enabled", True):
-                for gid in getattr(user, "member_of", []):
-                    if self._is_privileged_group(gid):
-                        paths.append({
-                            "type": "kerberoast_to_da",
-                            "source": getattr(user, "sam_account_name", ""),
-                            "target": "Domain Admin",
-                            "steps": [
-                                f"Kerberoast {getattr(user, 'sam_account_name', '')}",
-                                "Crack TGS hash offline",
-                                "Authenticate and escalate via group membership",
-                            ],
-                            "risk": "critical",
-                        })
-                        break
+            if (
+                getattr(user, "has_spn", False)
+                and getattr(user, "enabled", True)
+                and getattr(user, "object_id", None) in da_user_ids
+            ):
+                paths.append({
+                    "type": "kerberoast_to_da",
+                    "source": getattr(user, "sam_account_name", ""),
+                    "target": "Domain Admin",
+                    "steps": [
+                        f"Kerberoast {getattr(user, 'sam_account_name', '')}",
+                        "Crack TGS hash offline",
+                        "Authenticate and escalate via group membership",
+                    ],
+                    "risk": "critical",
+                })
 
         # AS-REP → DA
         for user in bh_users:
-            if getattr(user, "dont_req_preauth", False) and getattr(user, "enabled", True):
-                for gid in getattr(user, "member_of", []):
-                    if self._is_privileged_group(gid):
-                        paths.append({
-                            "type": "asrep_to_da",
-                            "source": getattr(user, "sam_account_name", ""),
-                            "target": "Domain Admin",
-                            "steps": [
-                                f"AS-REP roast {getattr(user, 'sam_account_name', '')}",
-                                "Crack hash offline",
-                                "Authenticate and escalate",
-                            ],
-                            "risk": "critical",
-                        })
-                        break
+            if (
+                getattr(user, "dont_req_preauth", False)
+                and getattr(user, "enabled", True)
+                and getattr(user, "object_id", None) in da_user_ids
+            ):
+                paths.append({
+                    "type": "asrep_to_da",
+                    "source": getattr(user, "sam_account_name", ""),
+                    "target": "Domain Admin",
+                    "steps": [
+                        f"AS-REP roast {getattr(user, 'sam_account_name', '')}",
+                        "Crack hash offline",
+                        "Authenticate and escalate",
+                    ],
+                    "risk": "critical",
+                })
 
         # Unconstrained delegation → DA via TGT theft
         for comp in bh_computers:
@@ -323,12 +330,3 @@ class BloodhoundCollectionPhase(ADPhaseBase):
 
         self.logger.info(f"Identified {len(paths)} potential DA attack paths")
         return paths
-
-    @staticmethod
-    def _is_privileged_group(group_id: str) -> bool:
-        """Check if group ID matches a known privileged group."""
-        gl = group_id.lower()
-        return any(hvg in gl for hvg in (
-            "domain admins", "enterprise admins", "schema admins",
-            "administrators", "account operators", "backup operators",
-        ))

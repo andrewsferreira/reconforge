@@ -278,56 +278,71 @@ class FuzzingPhase(APIPhaseBase):
             json_path = self.ffuf.get_json_path("api_params")
             parsed = self.ffuf_parser.parse_json(json_path)
 
-            for entry in parsed.entries:
-                # Analyze response content for concrete evidence
-                response_body = entry.content_type or ""  # ffuf may provide body
+            # ffuf's JSON output format (-of json) does not capture a
+            # per-result response body — the only body-content evidence
+            # available anywhere is run_result.stdout, which covers the
+            # WHOLE batch of fuzzed inputs, not any single entry. Searching
+            # it per-entry and reporting a match as "evidence" for that
+            # entry's specific URL misattributes evidence across entries
+            # (e.g. entry A's SQL error text gets reported as evidence for
+            # entry B's unrelated 500). Classify the batch text once and,
+            # if it contains concrete evidence, report a single finding
+            # scoped to the endpoint under test rather than to one
+            # arbitrarily-chosen entry.
+            error_entries = [e for e in parsed.entries if e.status == 500]
+            if error_entries:
+                classification = self._classify_error_response(run_result.stdout)
+                finding_count += self._report_classified_error(
+                    fuzz_url, error_entries, classification, results
+                )
 
-                if entry.status == 500:
-                    # Classify the 500 error based on available evidence
-                    classification = self._classify_error_response(
-                        entry, run_result.stdout
-                    )
-                    finding_count += self._report_classified_error(
-                        entry, classification, results
-                    )
-
-                elif entry.status in (200, 201) and entry.length > 0:
-                    # Check if 200 responses contain error information
-                    # (some frameworks return 200 with error details)
-                    if self._check_for_info_disclosure(entry, run_result.stdout):
-                        self.add_finding(
-                            finding_type="exposure",
-                            severity="low",
-                            confidence="medium",
-                            target=entry.url,
-                            description=(
-                                f"Information disclosure in response to fuzz input: "
-                                f"{entry.url}"
-                            ),
-                            evidence=(
-                                f"Input '{entry.input_word}' triggered a 200 response "
-                                f"with potential debug/config information"
-                            ),
-                            recommendation=(
-                                "Review response content for sensitive information "
-                                "and disable debug mode in production."
-                            ),
-                        )
-                        results["injection_findings"].append({
-                            "url": entry.url,
-                            "input": entry.input_word,
-                            "status": entry.status,
-                            "type": "info_disclosure",
-                        })
-                        finding_count += 1
+            ok_entries = [
+                e for e in parsed.entries
+                if e.status in (200, 201) and e.length > 0
+            ]
+            if ok_entries and self._check_for_info_disclosure(run_result.stdout):
+                inputs = ", ".join(repr(e.input_word) for e in ok_entries[:5] if e.input_word)
+                self.add_finding(
+                    finding_type="exposure",
+                    severity="low",
+                    confidence="medium",
+                    target=fuzz_url,
+                    description=(
+                        f"Possible information disclosure during parameter "
+                        f"fuzzing: {fuzz_url}"
+                    ),
+                    evidence=(
+                        f"The fuzzing run's combined output contains "
+                        f"debug/config-disclosure patterns; {len(ok_entries)} "
+                        f"input(s) returned a 200 response (e.g. {inputs or 'n/a'}), "
+                        "but the specific triggering input could not be "
+                        "isolated from the available instrumentation"
+                    ),
+                    recommendation=(
+                        "Review response content for sensitive information "
+                        "and disable debug mode in production."
+                    ),
+                )
+                for e in ok_entries:
+                    results["injection_findings"].append({
+                        "url": e.url,
+                        "input": e.input_word,
+                        "status": e.status,
+                        "type": "info_disclosure",
+                    })
+                finding_count += 1
 
         self.logger.info(f"ffuf parameter fuzzing: {finding_count} findings")
         return finding_count
 
-    def _classify_error_response(
-        self, entry: Any, full_output: str,
-    ) -> Dict[str, Any]:
-        """Classify a server error response by analyzing available evidence.
+    def _classify_error_response(self, full_output: str) -> Dict[str, Any]:
+        """Classify a batch of 500 responses by analyzing available evidence.
+
+        ffuf's JSON output format captures no per-result response body, so
+        full_output (the tool's combined stdout for every fuzzed input in
+        this run) is the only text that can be searched — a match here is
+        evidence that the pattern appeared SOMEWHERE in this run's output,
+        not proof of which specific input triggered it.
 
         Returns a classification dict with:
         - type: sql_injection, stack_trace, command_injection, template_injection,
@@ -336,8 +351,6 @@ class FuzzingPhase(APIPhaseBase):
         - confidence: confirmed, high, medium, heuristic
         - evidence: Description of what was detected
         """
-        # Try to find response body evidence in ffuf output
-        # (ffuf JSON output may have the input word near the output context)
         search_text = full_output or ""
 
         # Check for SQL injection evidence
@@ -384,32 +397,37 @@ class FuzzingPhase(APIPhaseBase):
                     "evidence": f"Template engine error: {match.group(0)[:100]}",
                 }
 
-        # Generic 500 — no concrete evidence
+        # Generic 500s — no concrete evidence anywhere in the batch output
         return {
             "type": "generic_error",
             "severity": "low",
             "confidence": "heuristic",
             "evidence": (
-                f"HTTP 500 with input '{entry.input_word}' – "
+                "HTTP 500 responses observed during fuzzing – "
                 "no concrete injection evidence in available output"
             ),
         }
 
     def _report_classified_error(
-        self, entry: Any, classification: Dict[str, Any],
-        results: Dict,
+        self, fuzz_url: str, error_entries: List[Any],
+        classification: Dict[str, Any], results: Dict,
     ) -> int:
-        """Report a classified error response with appropriate severity."""
+        """Report a batch-level classification covering every 500 response
+        from this fuzz run. error_entries is the full set of entries that
+        returned 500 — the classification evidence can't be narrowed to
+        one of them (see _classify_error_response), so one finding covers
+        all of them rather than fabricating a specific culprit."""
         error_type = classification["type"]
         severity = classification["severity"]
         confidence = classification["confidence"]
         evidence = classification["evidence"]
+        inputs = [e.input_word for e in error_entries if e.input_word]
 
         # Store fingerprint for reporting
         if error_type != "generic_error":
             results["error_fingerprints"].append({
-                "url": entry.url,
-                "input": entry.input_word,
+                "url": fuzz_url,
+                "inputs": inputs[:10],
                 "type": error_type,
                 "severity": severity,
             })
@@ -418,48 +436,52 @@ class FuzzingPhase(APIPhaseBase):
         descriptions = {
             "sql_injection": (
                 "vulnerability",
-                f"Potential SQL injection: {entry.url}",
+                f"Potential SQL injection during fuzzing: {fuzz_url}",
                 "Sanitise user input with parameterised queries. Never concatenate user input into SQL.",
             ),
             "command_injection": (
                 "vulnerability",
-                f"Potential command injection: {entry.url}",
+                f"Potential command injection during fuzzing: {fuzz_url}",
                 "Never pass user input to shell commands. Use safe APIs and input validation.",
             ),
             "template_injection": (
                 "vulnerability",
-                f"Potential template injection (SSTI): {entry.url}",
+                f"Potential template injection (SSTI) during fuzzing: {fuzz_url}",
                 "Sandbox template rendering and never pass raw user input to template engines.",
             ),
             "stack_trace": (
                 "exposure",
-                f"Stack trace exposed by fuzz input: {entry.url}",
+                f"Stack trace exposed during fuzzing: {fuzz_url}",
                 "Disable verbose error messages in production. Use generic error responses.",
             ),
             "generic_error": (
                 "information",
-                f"Server error triggered by fuzzing (heuristic): {entry.url}",
-                "Manually inspect response body for injection evidence before escalating.",
+                f"Server error(s) triggered by fuzzing (heuristic): {fuzz_url}",
+                "Manually inspect response bodies for injection evidence before escalating.",
             ),
         }
 
         finding_type, description, recommendation = descriptions.get(
             error_type,
-            ("information", f"Server error: {entry.url}", "Review manually."),
+            ("information", f"Server error during fuzzing: {fuzz_url}", "Review manually."),
         )
 
-        # Build rich evidence string
+        # Build rich evidence string — explicit that the pattern match is
+        # batch-wide, not attributed to one specific input.
         full_evidence = (
             f"{evidence}. "
-            f"Status: HTTP {entry.status}, Input: '{entry.input_word}', "
-            f"Response size: {entry.length} bytes"
+            f"{len(error_entries)} of this run's inputs returned HTTP 500 "
+            f"(e.g. {', '.join(repr(i) for i in inputs[:5]) or 'n/a'}); "
+            "the specific triggering input could not be isolated from the "
+            "available instrumentation (ffuf's JSON output does not "
+            "capture per-result response bodies)."
         )
 
         self.add_finding(
             finding_type=finding_type,
             severity=severity,
             confidence=confidence,
-            target=entry.url,
+            target=fuzz_url,
             description=description,
             evidence=full_evidence,
             recommendation=recommendation,
@@ -468,19 +490,21 @@ class FuzzingPhase(APIPhaseBase):
             ],
         )
 
-        results["injection_findings"].append({
-            "url": entry.url,
-            "input": entry.input_word,
-            "status": entry.status,
-            "type": error_type,
-            "severity": severity,
-            "confidence": confidence,
-        })
+        for e in error_entries:
+            results["injection_findings"].append({
+                "url": e.url,
+                "input": e.input_word,
+                "status": e.status,
+                "type": error_type,
+                "severity": severity,
+                "confidence": confidence,
+            })
 
         return 1
 
-    def _check_for_info_disclosure(self, entry: Any, full_output: str) -> bool:
-        """Check if a 200 response contains information disclosure."""
+    def _check_for_info_disclosure(self, full_output: str) -> bool:
+        """Check if this run's combined output contains information
+        disclosure patterns (debug flags, connection strings, etc.)."""
         search_text = full_output or ""
         for pattern in _INFO_DISCLOSURE_PATTERNS:
             if pattern.search(search_text):

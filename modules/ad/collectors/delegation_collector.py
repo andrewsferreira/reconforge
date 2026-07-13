@@ -7,7 +7,7 @@ plus MachineAccountQuota for RBCD feasibility.
 """
 
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from modules.ad.collectors.base import CollectorBase, CollectorResult
 from modules.ad.tools.ldapsearch import ADLdapsearchTool
@@ -47,24 +47,37 @@ class DelegationCollector(CollectorBase):
         password: str = "",
         **kwargs,
     ) -> CollectorResult:
-        """Collect all delegation data."""
+        """Collect all delegation data.
+
+        success reflects whether at least one delegation-gathering query
+        actually completed (LDAP bind + search returned, or findDelegation.py
+        ran) — not merely that this method returned without raising. Each
+        query silently returns [] on tool-unavailable, opsec-block, missing
+        base_dn, or a failed LDAP run alike; without tracking which of
+        those happened, a total collection failure (e.g. every LDAP bind
+        rejected) would be indistinguishable in the output from a genuinely
+        clean environment with zero delegations configured.
+        """
         result = CollectorResult(source=self.COLLECTOR_NAME)
 
         if not base_dn and domain:
             base_dn = ",".join(f"DC={p}" for p in domain.split("."))
 
-        result.data["unconstrained"] = self._query_unconstrained(
+        unconstrained, unconstrained_ok = self._query_unconstrained(
             target, base_dn, username, password
         )
-        result.data["constrained"] = self._query_constrained(
+        constrained, constrained_ok = self._query_constrained(
             target, base_dn, username, password
         )
-        result.data["rbcd"] = self._query_rbcd(
+        rbcd, rbcd_ok = self._query_rbcd(
             target, base_dn, username, password
         )
+        result.data["unconstrained"] = unconstrained
+        result.data["constrained"] = constrained
+        result.data["rbcd"] = rbcd
 
         # Merge with findDelegation.py if available
-        fd = self._run_find_delegation(target, domain, username, password)
+        fd, find_delegation_ok = self._run_find_delegation(target, domain, username, password)
         if fd:
             result.data["unconstrained"] = self._merge_unique(
                 result.data["unconstrained"], fd.get("unconstrained", []),
@@ -83,17 +96,24 @@ class DelegationCollector(CollectorBase):
             target, domain, username, password
         )
 
-        result.success = True
+        result.success = unconstrained_ok or constrained_ok or rbcd_ok or find_delegation_ok
+        if not result.success:
+            result.errors.append(
+                "No delegation query completed — ldapsearch/findDelegation.py "
+                "unavailable, opsec-blocked, missing base DN, or every LDAP "
+                "run failed. Results reflect zero visibility, not a confirmed "
+                "absence of delegation."
+            )
         return result
 
     # ── LDAP queries ───────────────────────────────────────────────
 
     def _query_unconstrained(self, target: str, base_dn: str,
-                             username: str, password: str) -> List:
+                             username: str, password: str) -> Tuple[List, bool]:
         if not self.ldapsearch.is_available() or not base_dn:
-            return []
+            return [], False
         if not self.opsec.check("ldapsearch"):
-            return []
+            return [], False
 
         bind = self.ldapsearch._bind_args(target, 389, username, password)
         cmd = (
@@ -106,15 +126,15 @@ class DelegationCollector(CollectorBase):
             output_file=self.output_dir / "ldap_unconstrained.txt",
         )
         if not run.success:
-            return []
-        return self.delegation_parser.parse_unconstrained(run.stdout)
+            return [], False
+        return self.delegation_parser.parse_unconstrained(run.stdout), True
 
     def _query_constrained(self, target: str, base_dn: str,
-                           username: str, password: str) -> List:
+                           username: str, password: str) -> Tuple[List, bool]:
         if not self.ldapsearch.is_available() or not base_dn:
-            return []
+            return [], False
         if not self.opsec.check("ldapsearch"):
-            return []
+            return [], False
 
         bind = self.ldapsearch._bind_args(target, 389, username, password)
         cmd = (
@@ -128,15 +148,15 @@ class DelegationCollector(CollectorBase):
             output_file=self.output_dir / "ldap_constrained.txt",
         )
         if not run.success:
-            return []
-        return self.delegation_parser.parse_constrained(run.stdout)
+            return [], False
+        return self.delegation_parser.parse_constrained(run.stdout), True
 
     def _query_rbcd(self, target: str, base_dn: str,
-                    username: str, password: str) -> List:
+                    username: str, password: str) -> Tuple[List, bool]:
         if not self.ldapsearch.is_available() or not base_dn:
-            return []
+            return [], False
         if not self.opsec.check("ldapsearch"):
-            return []
+            return [], False
 
         bind = self.ldapsearch._bind_args(target, 389, username, password)
         cmd = (
@@ -150,17 +170,17 @@ class DelegationCollector(CollectorBase):
             output_file=self.output_dir / "ldap_rbcd.txt",
         )
         if not run.success:
-            return []
-        return self.delegation_parser.parse_rbcd(run.stdout)
+            return [], False
+        return self.delegation_parser.parse_rbcd(run.stdout), True
 
     def _run_find_delegation(self, target: str, domain: str,
-                             username: str, password: str) -> Dict:
+                             username: str, password: str) -> Tuple[Dict, bool]:
         if not self.advanced_impacket.is_available("finddelegation"):
-            return {}
+            return {}, False
         if not username or not password:
-            return {}
+            return {}, False
         if not self.opsec.check("impacket_delegation"):
-            return {}
+            return {}, False
 
         run = self.advanced_impacket.find_delegation(
             target=domain, domain=domain,
@@ -168,8 +188,8 @@ class DelegationCollector(CollectorBase):
             dc_ip=target,
         )
         if not run.success:
-            return {}
-        return self.delegation_parser.parse_find_delegation(run.stdout)
+            return {}, False
+        return self.delegation_parser.parse_find_delegation(run.stdout), True
 
     def _check_maq(self, target: str, domain: str,
                    username: str, password: str) -> int:
