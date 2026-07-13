@@ -63,6 +63,17 @@ def test_parse_xml_malformed(parser, tmp_path):
     assert len(result.hosts) == 0
 
 
+def test_parse_xml_directory_path_does_not_crash(parser, tmp_path):
+    """Phase 7-C regression: the exception tuple previously caught
+    FileNotFoundError but not the broader OSError, so IsADirectoryError/
+    PermissionError (both OSError subclasses, neither FileNotFoundError)
+    propagated uncaught out of parse_xml() instead of returning a
+    graceful empty result."""
+    result = parser.parse_xml(tmp_path)  # a directory, not a file
+    assert len(result.hosts) == 0
+    assert "Error" in result.raw_output
+
+
 # ── Text parsing ──────────────────────────────────────────────────
 
 def test_parse_text(parser):

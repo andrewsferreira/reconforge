@@ -60,12 +60,9 @@ class SmbParser:
             return result
 
         # Check for null session success
-        if "NT_STATUS_ACCESS_DENIED" in text:
+        if self._is_access_denied(text):
             result.null_session = False
             result.errors.append("Access denied - null session may not be allowed")
-        elif "NT_STATUS_LOGON_FAILURE" in text:
-            result.null_session = False
-            result.errors.append("Logon failure")
         else:
             result.null_session = True
 
@@ -108,7 +105,7 @@ class SmbParser:
         """
         share = SmbShare(name=share_name)
 
-        if "NT_STATUS_ACCESS_DENIED" in text:
+        if self._is_access_denied(text):
             share.accessible = False
             share.permissions = "denied"
         elif "NT_STATUS_BAD_NETWORK_NAME" in text:
@@ -149,3 +146,26 @@ class SmbParser:
             s for s in result.shares
             if s.name not in self.SYSTEM_SHARES and s.share_type == "Disk"
         ]
+
+    @staticmethod
+    def _is_access_denied(text: str) -> bool:
+        """Check if output indicates access denied.
+
+        Broader than a single NT_STATUS_ACCESS_DENIED check: also
+        catches NT_STATUS_LOGON_FAILURE/NT_STATUS_ACCOUNT_DISABLED and
+        bare ACCESS_DENIED/LOGON_FAILURE strings some smbclient
+        versions/locales emit without the NT_STATUS_ prefix. Deliberately
+        excludes NT_STATUS_BAD_NETWORK_NAME — unlike
+        modules/ad/parsers/smb_parser.py's ADSmbParser._is_access_denied()
+        (which lumps it into "denied"), this module keeps it as a
+        distinct "not_found" classification in parse_share_access().
+        """
+        denied_patterns = [
+            "NT_STATUS_ACCESS_DENIED",
+            "NT_STATUS_LOGON_FAILURE",
+            "NT_STATUS_ACCOUNT_DISABLED",
+            "ACCESS_DENIED",
+            "LOGON_FAILURE",
+        ]
+        text_upper = text.upper()
+        return any(p.upper() in text_upper for p in denied_patterns)

@@ -22,7 +22,12 @@ class WpscanVuln:
     title: str = ""
     component: str = ""  # core, plugin name, theme name
     component_version: str = ""
-    severity: str = "high"
+    # Every construction site in this file passes severity= explicitly
+    # via _classify_severity() (which only ever returns high/medium/low),
+    # so this default is never actually used — "low" matches
+    # _classify_severity()'s own fallback rather than implying "high" is
+    # a safe/neutral default for an uncategorized vulnerability.
+    severity: str = "low"
     references: List[str] = field(default_factory=list)
     fixed_in: str = ""
 

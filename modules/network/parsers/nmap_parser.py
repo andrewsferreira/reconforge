@@ -144,7 +144,7 @@ class NmapParser:
         try:
             tree = DefusedET.parse(xml_path)
             root = tree.getroot()
-        except (ET.ParseError, FileNotFoundError, DefusedXmlException) as e:
+        except (ET.ParseError, FileNotFoundError, OSError, DefusedXmlException) as e:
             result.raw_output = f"Error parsing XML: {e}"
             return result
 

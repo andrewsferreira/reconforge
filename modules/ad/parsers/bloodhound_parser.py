@@ -139,6 +139,8 @@ class BloodhoundParser:
             entries = [entries]
 
         for entry in entries:
+            if not isinstance(entry, dict):
+                continue
             props = entry.get("Properties", entry.get("properties", {}))
             aces = entry.get("Aces", [])
 
@@ -201,6 +203,8 @@ class BloodhoundParser:
             entries = [entries]
 
         for entry in entries:
+            if not isinstance(entry, dict):
+                continue
             props = entry.get("Properties", entry.get("properties", {}))
             members_raw = entry.get("Members",
                                     entry.get("members", []))
@@ -243,6 +247,8 @@ class BloodhoundParser:
             entries = [entries]
 
         for entry in entries:
+            if not isinstance(entry, dict):
+                continue
             props = entry.get("Properties", entry.get("properties", {}))
 
             comp = BloodhoundComputer(
@@ -304,6 +310,8 @@ class BloodhoundParser:
             entries = [entries]
 
         for entry in entries:
+            if not isinstance(entry, dict):
+                continue
             props = entry.get("Properties", entry.get("properties", {}))
 
             domain = BloodhoundDomain(
@@ -356,6 +364,8 @@ class BloodhoundParser:
             entries = [entries]
 
         for entry in entries:
+            if not isinstance(entry, dict):
+                continue
             session = BloodhoundSession(
                 user_sid=entry.get("UserSID",
                                    entry.get("usersid", "")),

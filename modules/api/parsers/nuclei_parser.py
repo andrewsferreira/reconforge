@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
 
+from modules.web.parsers.severity import normalize_severity
+
 
 @dataclass
 class NucleiApiFinding:
@@ -55,12 +57,6 @@ class NucleiApiResult:
         ]
 
 
-SEVERITY_MAP = {
-    "critical": "critical", "high": "high",
-    "medium": "medium", "low": "low", "info": "info",
-}
-
-
 class NucleiApiParser:
     """Parse Nuclei JSONL output for API vulnerability findings."""
 
@@ -88,8 +84,12 @@ class NucleiApiParser:
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if not isinstance(entry, dict):
+                continue
 
             info = entry.get("info", {})
+            if not isinstance(info, dict):
+                info = {}
             template_id = entry.get("template-id",
                                     entry.get("templateID", "unknown"))
 
@@ -101,12 +101,10 @@ class NucleiApiParser:
             if isinstance(tags, str):
                 tags = [t.strip() for t in tags.split(",")]
 
-            nuclei_sev = info.get("severity", "info").lower()
-
             finding = NucleiApiFinding(
                 template_id=template_id,
                 name=info.get("name", template_id),
-                severity=SEVERITY_MAP.get(nuclei_sev, "info"),
+                severity=normalize_severity(info.get("severity")),
                 matched_at=entry.get("matched-at",
                                      entry.get("matched", "")),
                 extracted=entry.get("extracted-results", [])[:10],

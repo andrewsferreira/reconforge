@@ -14,9 +14,10 @@ Parses ldapsearch text output to extract:
 Author: Andrews Ferreira
 """
 
-import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+from modules.ad.parsers.ldif_utils import split_ldif_entries
 
 
 # ---------------------------------------------------------------------------
@@ -159,45 +160,7 @@ class ADLdapParser:
         Each entry is separated by a blank line.  Attributes that appear
         multiple times are collected into lists.
         """
-        entries: List[Dict[str, List[str]]] = []
-        current: Dict[str, List[str]] = {}
-        prev_key = ""
-
-        for raw_line in text.splitlines():
-            line = raw_line.rstrip()
-
-            # Skip comments and search result metadata
-            if line.startswith("#") or line.startswith("search:") or line.startswith("result:"):
-                continue
-
-            # Blank line = end of entry
-            if not line:
-                if current:
-                    entries.append(current)
-                    current = {}
-                    prev_key = ""
-                continue
-
-            # Continuation line (starts with space)
-            if line.startswith(" ") and prev_key:
-                current[prev_key][-1] += line.strip()
-                continue
-
-            # Normal attribute line
-            if ":" in line:
-                key, _, value = line.partition(":")
-                key = key.strip().lower()
-                value = value.strip()
-                # Base64 encoded value
-                if value.startswith(":"):
-                    value = value[1:].strip()
-                current.setdefault(key, []).append(value)
-                prev_key = key
-
-        if current:
-            entries.append(current)
-
-        return entries
+        return split_ldif_entries(text)
 
     @staticmethod
     def _first(d: Dict[str, List[str]], key: str, default: str = "") -> str:

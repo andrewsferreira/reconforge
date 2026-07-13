@@ -12,7 +12,7 @@ import defusedxml.ElementTree as DefusedET
 from defusedxml.common import DefusedXmlException
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List
 
 
 @dataclass

@@ -14,7 +14,9 @@ Author: Andrews Ferreira
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+from modules.ad.parsers.ldif_utils import split_ldif_entries
 
 
 # ---------------------------------------------------------------------------
@@ -348,43 +350,9 @@ class DelegationParser:
     def _split_ldap_entries(text: str) -> List[Dict[str, List[str]]]:
         """Split ldapsearch text output into attribute dicts.
 
-        Replicates the pattern from ADLdapParser._split_entries.
+        Shared with ADLdapParser._split_entries via ldif_utils.split_ldif_entries.
         """
-        entries: List[Dict[str, List[str]]] = []
-        current: Dict[str, List[str]] = {}
-        prev_key = ""
-
-        for raw_line in text.splitlines():
-            line = raw_line.rstrip()
-
-            if line.startswith("#") or line.startswith("search:") \
-                    or line.startswith("result:"):
-                continue
-
-            if not line:
-                if current:
-                    entries.append(current)
-                    current = {}
-                    prev_key = ""
-                continue
-
-            if line.startswith(" ") and prev_key:
-                current[prev_key][-1] += line.strip()
-                continue
-
-            if ":" in line:
-                key, _, value = line.partition(":")
-                key = key.strip().lower()
-                value = value.strip()
-                if value.startswith(":"):
-                    value = value[1:].strip()
-                current.setdefault(key, []).append(value)
-                prev_key = key
-
-        if current:
-            entries.append(current)
-
-        return entries
+        return split_ldif_entries(text)
 
     @staticmethod
     def _first(d: Dict[str, List[str]], key: str,

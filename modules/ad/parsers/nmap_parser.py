@@ -76,11 +76,15 @@ class ADNmapParser:
 
     def parse_xml(self, xml_path: Path) -> ADNmapResult:
         """Parse nmap XML output for AD data."""
-        result = ADNmapResult()
         try:
-            tree = DefusedET.parse(xml_path)
-            root = tree.getroot()
-        except (ET.ParseError, FileNotFoundError, OSError, DefusedXmlException):
+            raw_text = xml_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ADNmapResult()
+
+        result = ADNmapResult(raw=raw_text)
+        try:
+            root = DefusedET.fromstring(raw_text)
+        except (ET.ParseError, DefusedXmlException):
             return result
 
         for host_elem in root.findall(".//host"):
@@ -150,9 +154,15 @@ class ADNmapParser:
             )
             result.services.append(svc)
 
-        # Extract script output blocks
+        # Extract script output blocks. Continuation lines use either
+        # "| " (more lines follow) or "|_" (last line of the block) —
+        # nmap's text-output convention marks the final line of a
+        # multi-line script with "|_", which the old "\|\s+" alternative
+        # never matched, silently dropping that line (often the most
+        # important one, e.g. SMB signing status is commonly the final
+        # "|_" line of smb2-security-mode's output).
         for m in re.finditer(
-            r"\|\s+(\S+):\s*\n((?:\|\s+.*\n)*)",
+            r"\|\s+(\S+):\s*\n((?:\|(?:\s+|_).*\n)*)",
             text
         ):
             script_id = m.group(1)

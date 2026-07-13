@@ -4,7 +4,12 @@ Author: Andrews Ferreira
 
 Extracts:
 - Discovered paths with HTTP status codes and response sizes
-- DNS subdomain results
+
+Note: only ``gobuster dir`` output is supported. PATH_RE requires a
+leading "/", which ``gobuster dns`` output (e.g. "Found: sub.domain.com")
+never has, so DNS-mode output is not parseable by this class — matches
+modules/web/tools/gobuster.py::GobusterTool.dns_scan()'s raw output not
+being routed through a parser at all today.
 """
 
 import re

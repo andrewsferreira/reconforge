@@ -6,6 +6,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.0.2] — 2026-07-13
+
+Phase 7 (Parsing/Normalization): a full audit of all 26 `modules/*/parsers/*.py` files, fixing real bugs found in the process. No CLI-facing or config-schema changes — pure correctness/security fixes, released as a PATCH per `docs/VERSIONING.md`.
+
+### Fixed
+
+- `api/parsers/nuclei_parser.py`: a JSONL line with `"info": null` raised an uncaught `AttributeError` and aborted parsing of the entire scan's results (one malformed record killed the whole batch — same class of bug as Phase 6's `output_file=` clobbering). Ported the guard already present in `web/parsers/nuclei_parser.py`.
+- `ad/parsers/bloodhound_parser.py`: all 5 `parse_*_json()` methods assumed every JSON list entry was a dict; a malformed non-dict entry raised an uncaught `AttributeError` and aborted the whole file's parse. Added `isinstance` guards.
+- `ad/parsers/nmap_parser.py`: the text-mode NSE script-block regex only matched `"| "`-prefixed continuation lines, silently dropping the `"|_"`-prefixed final line — exactly where SMB-signing status commonly appears. Confirmed live-reachable via `ad/collectors/dns_collector.py`'s fallback to text parsing.
+- `network/parsers/nmap_parser.py`: added the missing `OSError` to its caught-exceptions tuple (had `FileNotFoundError` but not the broader `OSError`), matching its `ad/` sibling.
+- `ad/parsers/nmap_parser.py::parse_xml()`: now preserves the raw XML text in the result's `raw` field even when parsing fails, instead of leaving zero postmortem-debugging signal.
+- `api/parsers/nuclei_parser.py`: severity classification now routes through the same shared `normalize_severity()` helper `web/parsers/nuclei_parser.py` already uses for the identical tool, fixing silent fallthrough on `"moderate"`/`"important"`/`"crit"` aliases.
+- `network/parsers/smb_parser.py`: ported `ad/parsers/smb_parser.py`'s broader access-denied pattern coverage (`NT_STATUS_ACCOUNT_DISABLED`, bare `ACCESS_DENIED`/`LOGON_FAILURE`), fixing a risk of misclassifying denied SMB access as successful.
+
+### Changed
+
+- Consolidated the triplicated LDIF entry-splitting algorithm: `ad/parsers/ldap_parser.py` and `ad/parsers/delegation_parser.py` had byte-for-byte identical implementations (self-acknowledged in the latter's docstring); extracted into `modules/ad/parsers/ldif_utils.py::split_ldif_entries()`. `network/parsers/ldap_parser.py`'s independent implementation was deliberately left as-is — it preserves case-sensitive attribute names that ~15 call sites in that file depend on, which the shared function's lowercased-key convention would have silently broken.
+- Removed 16 unused `typing` imports across parser files (`ruff --select F401 --fix`).
+- Corrected `web/parsers/gobuster_parser.py`'s docstring, which claimed DNS-subdomain extraction support its regex can never match.
+- Corrected `web/parsers/wpscan_parser.py`'s unreachable `severity: str = "high"` dataclass default to `"low"` (every construction site passes severity explicitly).
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- Severity/confidence assignment is inconsistent across parsers — no shared evidence-derived-confidence pattern like `reconforge/intelligence/engine.py`'s P1-5 fix.
+- Return-type convention (dataclass-with-errors vs. bare dict/list) is ad hoc across the 26 parsers.
+- `netexec_parser.py`, `delegation_parser.py`, and `impacket_parser.py` still lack raw/error preservation on parse failure.
+- `ad/parsers/impacket_parser.py`'s whitespace-column-splitting heuristic risk on tables with blank optional columns (unconfirmed without a real tool-output sample).
+
+33 new tests added (578 → 611); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.0.1] — 2026-07-12
 
 Phase 6 (Tool Adapters): a full audit of all 28 `modules/*/tools/*.py` wrappers, fixing real bugs found in the process. No CLI-facing or config-schema changes — pure correctness/security fixes, released as a PATCH per `docs/VERSIONING.md`.
