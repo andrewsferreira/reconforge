@@ -187,3 +187,96 @@ def test_failure_analysis_when_no_relationships():
 
     assert report.attack_paths == []
     assert report.failure_analysis
+
+
+def test_path_impact_recognizes_auth_bypass_candidate():
+    """Phase 10-A regression: _path_impact() previously checked the bare
+    string "auth_bypass", but the real finding-type constant is
+    "auth_bypass_candidate" (see _build_primitives' primitive_map and
+    VulnerabilityClassification.type usage throughout). The branch was
+    dead — every auth_bypass_candidate chain fell through to
+    "data exposure" or the "privilege escalation" default instead of
+    "access control bypass"."""
+    engine = AttackPathGenerationEngine(_CollectorStub())
+
+    assert engine._path_impact("auth_bypass_candidate", "IDOR_candidate") == "access control bypass"
+    assert engine._path_impact("reflection_detected", "auth_bypass_candidate") == "access control bypass"
+    assert engine._path_impact("IDOR_candidate", "reflection_detected") == "data exposure"
+
+
+def test_compatible_findings_allows_auth_and_role_clusters():
+    """Phase 10-B regression: the cross-parameter allowlist in
+    _compatible_findings() omitted the "auth" and "role" canonical
+    clusters (see reconforge/intelligence/engine.py::_param_risk, which
+    flags token/auth/role together as "auth_or_role_parameter" — equally
+    high-risk as id/user_identifier). Chains pivoting through an auth or
+    role parameter correlation could never be generated."""
+    engine = AttackPathGenerationEngine(_CollectorStub())
+    left = VulnerabilityClassification(
+        type="IDOR_candidate", confidence=0.8, evidence=[],
+        endpoint="https://target.local/api/a?auth=1", method="GET", parameter="auth",
+    )
+    right = VulnerabilityClassification(
+        type="IDOR_candidate", confidence=0.8, evidence=[],
+        endpoint="https://target.local/api/b?role=1", method="GET", parameter="role",
+    )
+
+    auth_rel = CorrelationRelationship(cluster="auth", endpoints=[left.endpoint, right.endpoint], risk="x")
+    role_rel = CorrelationRelationship(cluster="role", endpoints=[left.endpoint, right.endpoint], risk="x")
+    unrelated_rel = CorrelationRelationship(cluster="standard_parameter", endpoints=[left.endpoint, right.endpoint], risk="x")
+
+    assert engine._compatible_findings(left, right, auth_rel) is True
+    assert engine._compatible_findings(left, right, role_rel) is True
+    assert engine._compatible_findings(left, right, unrelated_rel) is False
+
+
+def test_refine_paths_does_not_duplicate_existing_step():
+    """Phase 10-C regression: _refine_paths() looked up findings at the
+    last step's endpoint without excluding the finding that step itself
+    already chains through, so refinement commonly re-appended a step
+    identical to S3 (same endpoint/parameter/finding_type) — inflating
+    step count (which lowers exploitability) with a padded, effectively
+    cyclic chain."""
+    engine = AttackPathGenerationEngine(_CollectorStub())
+    report = _report()
+
+    initial_paths = engine._generate_candidate_paths(report)
+    assert initial_paths
+    base = initial_paths[0]
+    last_step = base.steps[-1]
+
+    refined = engine._refine_paths(report, [base])
+
+    for path in refined:
+        new_steps = path.steps[len(base.steps):]
+        for step in new_steps:
+            assert (step.endpoint, step.parameter, step.finding_type) != (
+                last_step.endpoint, last_step.parameter, last_step.finding_type,
+            )
+
+
+def test_build_graph_cluster_edge_creates_missing_endpoint_node():
+    """Phase 10-D regression: cluster->endpoint edges were appended without
+    ensuring the endpoint node exists (unlike the parameter-node pattern
+    used elsewhere in _build_graph), relying entirely on an upstream
+    invariant that relationship endpoints are always a subset of
+    report.endpoints. Any direct caller violating that invariant got a
+    dangling edge serialized into the graph. Verify the node is created
+    defensively even when that invariant doesn't hold."""
+    engine = AttackPathGenerationEngine(_CollectorStub())
+    report = _report()
+    report.relationships = [
+        CorrelationRelationship(
+            cluster="user_identifier",
+            endpoints=["https://target.local/api/not-in-endpoints-list?x=1"],
+            risk="x",
+        )
+    ]
+
+    graph = engine._build_graph(report)
+
+    assert "endpoint:https://target.local/api/not-in-endpoints-list?x=1" in graph.nodes
+    assert any(
+        edge["to"] == "endpoint:https://target.local/api/not-in-endpoints-list?x=1"
+        for edge in graph.edges
+    )

@@ -318,23 +318,18 @@ class PassiveReconPhase(ADPhaseBase):
                 prerequisites=["SMB null session allowed"],
             )
 
-        if analysis_data.get("smb_relay_viable"):
+        acl_paths = self.acl_path_builder.build(analysis_data, target=target, domain=domain)
+        for chain in acl_paths.chains:
             self.workflow.add_attack_path(
-                name="SMB Relay Attack",
-                description="SMB signing not required — NTLM relay attacks possible",
-                steps=[
-                    "Set up ntlmrelayx.py listener",
-                    "Trigger authentication (Responder / PetitPotam)",
-                    "Relay credentials to target services",
-                ],
-                risk="high",
-                prerequisites=["SMB signing disabled/not required", "Network MitM position"],
-                references=["https://attack.mitre.org/techniques/T1557/001/"],
+                name=chain.name, description=chain.description,
+                steps=chain.steps, risk=chain.risk,
+                prerequisites=chain.prerequisites,
+                references=chain.references,
             )
+        for s in acl_paths.suggestions:
             self.workflow.suggest_next(
-                command="ntlmrelayx.py -tf targets.txt -smb2support",
-                justification="SMB signing disabled → relay attack vector",
-                priority="high",
+                command=s.command, justification=s.justification,
+                priority=s.priority,
             )
 
         if results["kerberos_detected"] and domain:

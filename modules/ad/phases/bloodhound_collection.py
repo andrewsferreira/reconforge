@@ -24,7 +24,6 @@ from modules.ad.collectors.bloodhound_collector import BloodhoundCollector
 from modules.ad.analyzers.privilege_analyzer import PrivilegeAnalyzer
 from modules.ad.attack_paths.kerberoast_paths import KerberoastPathBuilder
 from modules.ad.attack_paths.asrep_paths import AsrepPathBuilder
-from modules.ad.attack_paths.delegation_paths import DelegationPathBuilder
 from modules.ad.attack_paths.acl_paths import AclPathBuilder
 
 from modules.ad.base import ADPhaseBase
@@ -68,7 +67,6 @@ class BloodhoundCollectionPhase(ADPhaseBase):
         self.privilege_analyzer = PrivilegeAnalyzer()
         self.kerberoast_builder = KerberoastPathBuilder()
         self.asrep_builder = AsrepPathBuilder()
-        self.delegation_builder = DelegationPathBuilder()
         self.acl_builder = AclPathBuilder()
 
     # ------------------------------------------------------------------

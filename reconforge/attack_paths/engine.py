@@ -50,7 +50,7 @@ class AttackPath:
     primitive_types: list[str]
     impact: str
     confidence: float
-    # Three honest tiers, matching docs/ATTACK_PATHS.md terminology:
+    # Three honest tiers, matching docs/attack_path_generation.md terminology:
     #   "unreachable"   — at least one step's request errored/timed out.
     #   "reachable"     — every step got an HTTP response, but at least one
     #                     didn't match its expected success signal (e.g. a
@@ -60,7 +60,7 @@ class AttackPath:
     #                     expected success signal. This is still a
     #                     heuristic replay, NOT confirmed exploitation
     #                     (that requires an actual authorized-lab
-    #                     validation — see docs/CONFIDENCE_MODEL.md) —
+    #                     validation — see docs/FINDINGS.md) —
     #                     it means the hypothesis survived a live retest,
     #                     nothing more.
     status: str
@@ -163,7 +163,9 @@ class AttackPathGenerationEngine:
             cluster_node = f"cluster:{rel.cluster}"
             nodes[cluster_node] = {"type": "cluster", "value": rel.cluster, "risk": rel.risk}
             for endpoint in rel.endpoints:
-                edges.append({"from": cluster_node, "to": f"endpoint:{endpoint}", "type": "cluster_to_endpoint"})
+                endpoint_node = f"endpoint:{endpoint}"
+                nodes.setdefault(endpoint_node, {"type": "endpoint", "value": endpoint})
+                edges.append({"from": cluster_node, "to": endpoint_node, "type": "cluster_to_endpoint"})
 
         return AttackPathGraph(nodes=nodes, edges=edges)
 
@@ -244,7 +246,9 @@ class AttackPathGenerationEngine:
     ) -> bool:
         if left.endpoint == right.endpoint:
             return False
-        if left.parameter != right.parameter and relationship.cluster not in {"id", "user_identifier", "token"}:
+        if left.parameter != right.parameter and relationship.cluster not in {
+            "id", "user_identifier", "token", "auth", "role",
+        }:
             return False
         if left.type == "reflection_detected" and right.type == "reflection_detected":
             return False
@@ -354,7 +358,12 @@ class AttackPathGenerationEngine:
         counter = 1
         for base in paths:
             last_endpoint = base.steps[-1].endpoint
+            existing_steps = {
+                (step.endpoint, step.parameter, step.finding_type) for step in base.steps
+            }
             for next_finding in by_endpoint.get(last_endpoint, []):
+                if (next_finding.endpoint, next_finding.parameter, next_finding.type) in existing_steps:
+                    continue
                 extra_step = AttackPathStep(
                     step_id="S4",
                     endpoint=next_finding.endpoint,
@@ -408,7 +417,7 @@ class AttackPathGenerationEngine:
 
     @staticmethod
     def _path_impact(left_type: str, right_type: str) -> str:
-        if "auth_bypass" in {left_type, right_type}:
+        if "auth_bypass_candidate" in {left_type, right_type}:
             return "access control bypass"
         if "IDOR_candidate" in {left_type, right_type}:
             return "data exposure"

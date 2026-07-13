@@ -111,7 +111,8 @@ if isinstance(cmd, str):
 ## Release Process
 
 1. Update `CHANGELOG.md` — move `[Unreleased]` entries to `[X.Y.Z] — YYYY-MM-DD`.
-2. Update `version` in `pyproject.toml` and the matching docstring comment in `reconforge/cli.py`.
+2. Update `version` in `pyproject.toml`, `__version__` in `core/version.py`, and the matching
+   docstring comment in `reconforge/cli.py`.
 3. Run full test suite: `python -m pytest tests/ -v` (all tests must pass).
 4. Tag: `git tag -a vX.Y.Z -m "Release X.Y.Z"`.
 5. Push tag: `git push origin vX.Y.Z`.
@@ -127,6 +128,12 @@ pyproject.toml  →  [project] → version = "X.Y.Z"
 ```
 
 `reconforge/cli.py`'s module docstring also carries a `Version: X.Y.Z` comment for readers browsing the
-source; it is not read programmatically and must be updated by hand alongside `pyproject.toml`. No
-`__version__` module attribute or `--version` CLI flag exists yet — see
+source; it is not read programmatically and must be updated by hand alongside `pyproject.toml`.
+
+`core/version.py`'s `__version__` is the one runtime-importable copy — report footers (AD/network/
+surface/web/api module reports, engagement summaries) import it instead of hardcoding a version
+string, so those footers can't go stale independently of a release bump. It must still be updated by
+hand alongside `pyproject.toml`; no single `importlib.metadata`-based lookup is used because the
+package isn't guaranteed to be reinstalled after every version bump in this project's actual release
+process. No `--version` CLI flag exists yet — see
 [docs/ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) for related packaging follow-ups.

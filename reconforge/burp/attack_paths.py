@@ -1,4 +1,5 @@
-"""CLI for validated attack path generation."""
+"""CLI for attack path generation with live replay (unreachable/reachable/
+corroborated tiers — see reconforge/entrypoints/attack_paths.py)."""
 
 from __future__ import annotations
 

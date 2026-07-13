@@ -67,10 +67,13 @@ class PrivilegeEscalationPathBuilder(AttackPathBuilderBase):
             ))
             result.suggestions.append(NextStepSuggestion(
                 command=(
-                    f"crackmapexec smb {target} -u users.txt -p 'Spring2026!' "
+                    f"crackmapexec smb {target} -u users.txt -p passwords.txt "
                     f"--continue-on-success"
                 ),
-                justification=f"Weak policy → password spray viable",
+                justification=(
+                    "Weak policy → password spray viable; build passwords.txt "
+                    "from policy-informed guesses (Season+Year, Company+123)"
+                ),
                 priority="high",
             ))
 

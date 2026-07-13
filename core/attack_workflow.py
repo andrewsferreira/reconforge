@@ -39,6 +39,8 @@ class AttackWorkflow:
         self.current_phase: str = "discovery"
         self.rabbit_holes: List[str] = []
         self._next_commands: List[Dict] = []
+        self._seen_attack_paths: Dict[str, AttackPath] = {}
+        self._duplicate_attack_path_count = 0
 
     def add_step(self, phase: str, hypothesis: str, command: str,
                  justification: str, alternatives: Optional[List[str]] = None) -> WorkflowStep:
@@ -61,7 +63,20 @@ class AttackWorkflow:
                         references: Optional[List[str]] = None,
                         tactic: Optional[str] = None,
                         technique_id: Optional[str] = None) -> AttackPath:
-        """Record an identified attack path."""
+        """Record an identified attack path.
+
+        Exact-match dedup by name: independent phases/builders commonly
+        derive the same chain from overlapping enumeration data (e.g. a
+        Kerberoasting chain surfaced by both LDAP-based identity
+        enumeration and BloodHound collection). A second call with a
+        name already seen returns the first-seen path instead of
+        appending a duplicate.
+        """
+        existing = self._seen_attack_paths.get(name)
+        if existing is not None:
+            self._duplicate_attack_path_count += 1
+            return existing
+
         path = AttackPath(
             name=name, description=description, steps=steps,
             risk=risk, prerequisites=prerequisites or [],
@@ -69,6 +84,7 @@ class AttackWorkflow:
             tactic=tactic,
             technique_id=technique_id,
         )
+        self._seen_attack_paths[name] = path
         self.attack_paths.append(path)
         return path
 
@@ -127,6 +143,12 @@ class AttackWorkflow:
 
         if self.attack_paths:
             lines.append("## Attack Paths\n")
+            if self._duplicate_attack_path_count:
+                lines.append(
+                    f"**Duplicates Merged:** {self._duplicate_attack_path_count} "
+                    "exact-name-duplicate add_attack_path() calls were collapsed "
+                    "into their first-seen path\n"
+                )
             for p in self.attack_paths:
                 lines.append(f"### {p.name} [{p.risk.upper()}]")
                 lines.append(f"{p.description}\n")

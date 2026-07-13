@@ -1,4 +1,8 @@
-"""Entrypoint for generating validated attack paths from intelligence output."""
+"""Entrypoint for generating and live-replaying candidate attack paths from
+intelligence output. Each path is tagged unreachable/reachable/corroborated
+based on the replay — see reconforge/attack_paths/engine.py::AttackPath for
+what "corroborated" does and does not claim (a heuristic replay surviving a
+live retest, not confirmed exploitation)."""
 
 from __future__ import annotations
 
