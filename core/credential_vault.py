@@ -388,7 +388,13 @@ class CredentialVault:
 
         if self.encrypt:
             key = self._get_or_create_key()
-            fernet = Fernet(key)
+            try:
+                fernet = Fernet(key)
+            except ValueError as exc:
+                raise CredentialVaultError(
+                    f"Vault encryption key at {self._key_path} is malformed or "
+                    f"corrupted (not a valid Fernet key): {exc}"
+                ) from exc
             enc = fernet.encrypt(plaintext.encode())
             enc_path = path.with_suffix(path.suffix + ".enc")
             enc_path.write_bytes(enc)
@@ -417,7 +423,13 @@ class CredentialVault:
             if not _HAS_CRYPTO:
                 raise CredentialVaultError("cryptography package required to decrypt vault")
             key = self._get_or_create_key()
-            fernet = Fernet(key)
+            try:
+                fernet = Fernet(key)
+            except ValueError as exc:
+                raise CredentialVaultError(
+                    f"Vault encryption key at {self._key_path} is malformed or "
+                    f"corrupted (not a valid Fernet key): {exc}"
+                ) from exc
             try:
                 data_str = fernet.decrypt(path.read_bytes()).decode()
             except InvalidToken as exc:

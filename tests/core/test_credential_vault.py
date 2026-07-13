@@ -315,3 +315,40 @@ def test_export_usernames(tmp_path):
     assert "bob" in names
     assert "charlie" in names
     assert path.read_text().strip().count("\n") >= 2
+
+
+# ── Phase 18-A: malformed encryption key ────────────────────────
+
+def test_save_with_corrupted_key_raises_credential_vault_error(tmp_path):
+    """Phase 18-A regression: Fernet(key) raises a raw ValueError on a
+    corrupted/truncated key file (e.g. disk full mid-write) — save()
+    previously let this propagate uncaught instead of the typed
+    CredentialVaultError every other load/save failure mode raises."""
+    from core.exceptions import CredentialVaultError
+
+    key_path = tmp_path / "vault.key"
+    key_path.write_bytes(b"not-a-valid-fernet-key")
+
+    vault = CredentialVault(encrypt=True, key_path=key_path)
+    vault.add_password("admin", "P@ss123", source="test")
+
+    with pytest.raises(CredentialVaultError):
+        vault.save(tmp_path / "vault.json")
+
+
+def test_load_with_corrupted_key_raises_credential_vault_error(tmp_path):
+    """Same fix as above, on the load() path."""
+    from core.exceptions import CredentialVaultError
+
+    key_path = tmp_path / "vault.key"
+    vault = CredentialVault(encrypt=True, key_path=key_path)
+    vault.add_password("admin", "P@ss123", source="test")
+    path = tmp_path / "vault.json"
+    vault.save(path)
+
+    # Corrupt the key file after a successful save
+    key_path.write_bytes(b"truncated")
+
+    vault2 = CredentialVault(encrypt=True, key_path=key_path)
+    with pytest.raises(CredentialVaultError):
+        vault2.load(path.with_suffix(path.suffix + ".enc"))

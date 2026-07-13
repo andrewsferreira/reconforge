@@ -209,3 +209,31 @@ def test_env_var_key_used_instead_of_file(tmp_path, monkeypatch):
     assert not (key_dir / "loot.key").exists()  # env key used, no file written
     plaintext = LootManager.load_encrypted(out.with_suffix(".json.enc"))
     assert json.loads(plaintext)[0]["value"] == "admin:secret"
+
+
+# ── Phase 18-B: case-insensitive "user" dedup ───────────────────
+
+def test_user_loot_dedup_is_case_insensitive():
+    """Phase 18-B regression: 'Administrator' (RID cycling) and
+    'administrator' (authenticated LDAP query) are the same account,
+    mirroring CredentialVault._fingerprint()'s already-established
+    username case-insensitivity."""
+    lm = LootManager()
+    lm.add("user", "Administrator", "rid_cycling", "ad", confidence="high")
+    lm.add("user", "administrator", "ldap_query", "ad", confidence="confirmed")
+
+    users = lm.get_by_type("user")
+    assert len(users) == 1
+    # Higher-confidence rediscovery still upgrades the existing entry in place
+    assert users[0].confidence == "confirmed"
+    assert users[0].source == "ldap_query"
+
+
+def test_credential_loot_dedup_remains_case_sensitive():
+    """Non-"user" loot types must NOT be case-normalised — a credential's
+    value embeds the password, which is case-meaningful."""
+    lm = LootManager()
+    lm.add("credential", "admin:Password123", "hydra", "network")
+    lm.add("credential", "admin:password123", "hydra", "network")
+
+    assert len(lm.get_by_type("credential")) == 2

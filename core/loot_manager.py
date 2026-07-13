@@ -37,6 +37,24 @@ _KEY_FILE = _KEY_DIR / "loot.key"
 # (never upgrade an existing entry over one with unrecognised confidence).
 _CONFIDENCE_RANK = {"low": 0, "medium": 1, "high": 2, "confirmed": 3}
 
+# loot_types whose `value` is safe to case-normalise for dedup purposes.
+# "user" mirrors CredentialVault._fingerprint()'s already-established
+# precedent (Windows/AD usernames are case-insensitive in practice, so
+# "Administrator" and "administrator" discovered by two different tools
+# are the same account). Deliberately NOT extended to other types
+# (credential/hash/token/api_endpoint/...) — their `value` often embeds
+# case-meaningful secret material (e.g. "user:Password123"), and add()'s
+# generic (loot_type, value) key has no way to separate an identifier
+# prefix from a secret suffix without per-type parsing.
+_CASE_INSENSITIVE_LOOT_TYPES = {"user"}
+
+
+def _dedup_value(loot_type: str, value: str) -> str:
+    """Normalise `value` for dedup comparison based on loot_type."""
+    if loot_type in _CASE_INSENSITIVE_LOOT_TYPES:
+        return value.lower()
+    return value
+
 
 def _get_or_create_key() -> bytes:
     """Resolve the Fernet encryption key.
@@ -101,14 +119,21 @@ class LootManager:
         first seen via unauthenticated RID cycling, later confirmed via
         an authenticated LDAP query), the existing entry is upgraded in
         place instead of silently discarding the stronger evidence.
+        For loot_type == "user", value is compared case-insensitively
+        (see _CASE_INSENSITIVE_LOOT_TYPES) — "Administrator" and
+        "administrator" from two different tools are the same account.
+        Other types compare value case-sensitively since it may embed
+        case-meaningful secret material.
         """
         item = LootItem(
             loot_type=loot_type, value=value, source=source,
             module=module, confidence=confidence, metadata=metadata or {}
         )
         # Avoid duplicates
+        dedup_value = _dedup_value(loot_type, value)
         for existing in self._loot:
-            if existing.loot_type == loot_type and existing.value == value:
+            if (existing.loot_type == loot_type
+                    and _dedup_value(existing.loot_type, existing.value) == dedup_value):
                 if _CONFIDENCE_RANK.get(confidence, -1) > _CONFIDENCE_RANK.get(existing.confidence, -1):
                     existing.confidence = confidence
                     existing.source = source

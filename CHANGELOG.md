@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.2] — 2026-07-13
+
+Phase 18 (Secrets/Credential Hardening): closed three P2 items open since Phases 13-14 around `core/credential_vault.py`/`core/loot_manager.py`/`core/engagement.py`. PATCH per `docs/VERSIONING.md` — pure bug fixes and a re-verification, no new public surface.
+
+### Fixed
+
+- `core/credential_vault.py::CredentialVault.save()`/`load()`: `Fernet(key)` raises a raw `ValueError` (confirmed empirically) on a malformed/truncated key file (e.g. disk full mid-write on `~/.reconforge/vault.key`) — both methods now wrap key construction and raise the typed `CredentialVaultError` instead, consistent with every other failure mode already fixed in Phase 14.
+- `core/loot_manager.py::LootManager.add()`: dedup for `loot_type == "user"` is now case-insensitive (`"Administrator"` from RID cycling and `"administrator"` from an authenticated LDAP query are the same account), mirroring `CredentialVault._fingerprint()`'s established precedent. Other loot types (`credential`, `hash`, `token`, ...) remain case-sensitive since their `value` may embed case-meaningful secret material.
+
+### Verified (no code change)
+
+- `EngagementManager.save()` writing `module_results` unencrypted: a repo-wide grep for literal `results["password"/"secret"/"credential"/"token"]` assignments across all 24 `modules/*/phases/*.py` files found zero matches. Module-level phase results carry only counts/summaries/non-secret recon data; actual credential/hash/token material is routed exclusively through `CredentialVault`/`LootManager`. Closed as verified-not-a-bug.
+
+4 new tests added (841 → 845); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.1] — 2026-07-13
 
 Phase 17 (Result Honesty): `results["success"]` was hardcoded `True` unconditionally at the end of `run()` in 11 of 13 AD/web/API `modules/*/phases/*.py` files, regardless of whether any actual work happened — a violation of this project's own "Evidence over narration" principle, flagged as deferred across Phases 11/13/15. PATCH per `docs/VERSIONING.md` — the `success` field already existed; this fixes its semantics, adding no new public surface.
