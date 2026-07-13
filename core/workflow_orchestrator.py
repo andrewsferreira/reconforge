@@ -678,6 +678,18 @@ class WorkflowOrchestrator:
         if not self.targets:
             raise WorkflowError("No targets defined")
 
+        if self.engagement.status in ("completed", "cancelled"):
+            # Fail fast, before running any (possibly noisy) step against
+            # the target. Without this check, resuming a finished
+            # engagement via --resume ran the entire workflow only to
+            # crash at self.engagement.complete() below (status guard),
+            # losing the run's results since _save_workflow_report() never
+            # executed after that crash.
+            raise WorkflowError(
+                f"Cannot run a workflow on an engagement in "
+                f"'{self.engagement.status}' state — start a new engagement"
+            )
+
         self.logger.info(f"{'=' * 60}")
         self.logger.info("ReconForge Workflow Orchestrator")
         self.logger.info(f"Targets: {', '.join(self.targets)}")

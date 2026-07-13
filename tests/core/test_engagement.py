@@ -46,6 +46,29 @@ def test_cancel():
     assert em.status == "cancelled"
 
 
+def test_cannot_cancel_a_completed_engagement():
+    """Phase 13-B regression: cancel() was the only lifecycle method with
+    no state guard — calling it on a completed engagement silently
+    overwrote end_time and appended a duplicate cancellation entry."""
+    em = EngagementManager(client="Acme", operator="alice")
+    em.start()
+    em.complete()
+
+    with pytest.raises(EngagementError):
+        em.cancel()
+
+    assert em.status == "completed"
+
+
+def test_cannot_cancel_an_already_cancelled_engagement():
+    em = EngagementManager(client="Acme", operator="alice")
+    em.start()
+    em.cancel()
+
+    with pytest.raises(EngagementError):
+        em.cancel()
+
+
 def test_invalid_transition():
     em = EngagementManager(client="Acme", operator="alice")
     # Cannot complete from planning (must start first)
@@ -123,6 +146,44 @@ def test_save_and_load(tmp_path):
     em2 = EngagementManager.load(path)
     assert em2.status == "active"
     assert em2.meta.client == "Acme"
+
+
+def test_load_malformed_json_raises_engagement_error(tmp_path):
+    """Phase 13-A regression: load() previously let json.JSONDecodeError
+    propagate raw instead of a typed EngagementError -- reachable via the
+    CLI's --resume flag pointed at a corrupted/hand-edited file."""
+    path = tmp_path / "corrupt.json"
+    path.write_text("{not valid json")
+
+    with pytest.raises(EngagementError):
+        EngagementManager.load(path)
+
+
+def test_load_non_dict_json_raises_engagement_error(tmp_path):
+    path = tmp_path / "list.json"
+    path.write_text("[1, 2, 3]")
+
+    with pytest.raises(EngagementError):
+        EngagementManager.load(path)
+
+
+def test_load_invalid_status_raises_engagement_error(tmp_path):
+    path = tmp_path / "bad_status.json"
+    path.write_text(json.dumps({"meta": {"client": "Acme", "status": "not_a_real_status"}}))
+
+    with pytest.raises(EngagementError):
+        EngagementManager.load(path)
+
+
+def test_load_malformed_timeline_entry_raises_engagement_error(tmp_path):
+    path = tmp_path / "bad_timeline.json"
+    path.write_text(json.dumps({
+        "meta": {"client": "Acme", "status": "planning"},
+        "timeline": [{"unexpected_field": "x"}],
+    }))
+
+    with pytest.raises(EngagementError):
+        EngagementManager.load(path)
 
 
 # ── report ──────────────────────────────────────────────────────

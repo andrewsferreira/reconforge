@@ -158,6 +158,10 @@ class EngagementManager:
 
     def cancel(self):
         """Cancel the engagement."""
+        if self.meta.status in ("completed", "cancelled"):
+            raise EngagementError(
+                f"Cannot cancel engagement in '{self.meta.status}' state"
+            )
         self.meta.status = "cancelled"
         self.meta.end_time = datetime.now().isoformat()
         self._timeline.append(TimelineEntry(
@@ -241,12 +245,22 @@ class EngagementManager:
 
         Raises:
             EngagementNotFoundError: If the file does not exist.
+            EngagementError: If the file exists but isn't a valid,
+                parseable engagement session (corrupted, hand-edited,
+                or partially written).
         """
         path = Path(path)
         if not path.exists():
             raise EngagementNotFoundError(f"Engagement file not found: {path}")
 
-        data = json.loads(path.read_text())
+        try:
+            data = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+            raise EngagementError(f"Engagement file is not valid JSON: {path} ({exc})") from exc
+
+        if not isinstance(data, dict):
+            raise EngagementError(f"Engagement file has an unexpected structure: {path}")
+
         meta_dict = data.get("meta", {})
 
         eng = cls(
@@ -259,14 +273,26 @@ class EngagementManager:
         )
         # Restore meta fields
         eng.meta.id = meta_dict.get("id", eng.meta.id)
-        eng.meta.status = meta_dict.get("status", "planning")
+        status = meta_dict.get("status", "planning")
+        if status not in ENGAGEMENT_STATUSES:
+            raise EngagementError(
+                f"Engagement file has an invalid status {status!r}: {path}"
+            )
+        eng.meta.status = status
         eng.meta.start_time = meta_dict.get("start_time", "")
         eng.meta.end_time = meta_dict.get("end_time", "")
         eng.meta.pause_time = meta_dict.get("pause_time", "")
 
         # Restore timeline
         for entry_dict in data.get("timeline", []):
-            eng._timeline.append(TimelineEntry(**entry_dict))
+            if not isinstance(entry_dict, dict):
+                raise EngagementError(f"Engagement file has a malformed timeline entry: {path}")
+            try:
+                eng._timeline.append(TimelineEntry(**entry_dict))
+            except TypeError as exc:
+                raise EngagementError(
+                    f"Engagement file has a malformed timeline entry: {path} ({exc})"
+                ) from exc
 
         # Restore results
         eng._module_results = data.get("module_results", {})

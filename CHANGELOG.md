@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.4.1] — 2026-07-13
+
+Phase 13 (Engagement Management): audited `core/engagement.py::EngagementManager` and its interaction with `WorkflowOrchestrator.run()`. Pure bug fixes — no new public fields/methods/capabilities — so PATCH per `docs/VERSIONING.md`.
+
+### Fixed
+
+- `WorkflowOrchestrator.run()`: called `self.engagement.complete()` unconditionally at the end of a successful step loop, but `complete()` only accepts `"active"`/`"paused"` source states. Resuming an already-completed or cancelled engagement via `--resume` (pointed at a file this tool itself writes after every run) meant the entire workflow ran against the live target before crashing at that call — and since `_save_workflow_report()` runs immediately after and never executed, the whole run's results were never persisted. Now fails fast with `WorkflowError` before any step executes.
+- `EngagementManager.cancel()`: the only lifecycle transition method with no state guard — could be called from any state including `"completed"`, silently overwriting `end_time` and duplicating the cancellation timeline entry. Now raises `EngagementError` from `"completed"`/`"cancelled"` like every sibling method.
+- `EngagementManager.load()`: had no exception handling around `json.loads()` or `TimelineEntry(**entry_dict)` reconstruction — a corrupted/hand-edited/partially-written engagement file (reachable via `--resume`) crashed with a raw `JSONDecodeError`/`TypeError` instead of the typed `EngagementError` the method's own docstring already claimed. Also added `status` validation against `ENGAGEMENT_STATUSES` and a non-dict-payload guard.
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- `EngagementManager.save()` writes `module_results` to disk unencrypted, unlike `CredentialVault`/`LootManager` (default-on encryption since P1-2) — not fixed speculatively without exhaustive verification of what module result dicts actually contain across all 5 modules.
+
+8 new tests added (788 → 796); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.4.0] — 2026-07-13
 
 Phase 12 (OPSEC Model): audited `core/opsec_checks.py`/`core/detection_map.py` and all 31 `opsec.check()` call sites against each module's actual tool-invocation surface. Adds new backward-compatible `DETECTION_LEVELS` entries and wires previously-dead `OpsecChecker.warn()` into `check()` (MINOR per `docs/VERSIONING.md`), alongside real gating fixes.

@@ -173,6 +173,41 @@ def test_custom_engagement():
     assert wo.engagement.meta.client == "Acme"
 
 
+def test_run_fails_fast_on_completed_engagement():
+    """Phase 13-C regression: run() previously called
+    self.engagement.complete() unconditionally at the end of the step
+    loop. Resuming an already-completed engagement (via CLI --resume)
+    meant the whole workflow ran against the target before crashing at
+    that unconditional complete() call — losing the entire run's results,
+    since _save_workflow_report() never executed after the crash. Must
+    fail fast before any step runs instead."""
+    from core.engagement import EngagementManager
+    eng = EngagementManager(client="Acme", operator="alice")
+    eng.start()
+    eng.complete()
+
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], engagement=eng)
+    wo.add_step("network")
+
+    with patch("core.workflow_orchestrator._run_module") as mock_run_module:
+        with pytest.raises(WorkflowError):
+            wo.run()
+        mock_run_module.assert_not_called()
+
+
+def test_run_fails_fast_on_cancelled_engagement():
+    from core.engagement import EngagementManager
+    eng = EngagementManager(client="Acme", operator="alice")
+    eng.start()
+    eng.cancel()
+
+    wo = WorkflowOrchestrator(targets=["10.0.0.1"], engagement=eng)
+    wo.add_step("network")
+
+    with pytest.raises(WorkflowError):
+        wo.run()
+
+
 def test_repr():
     wo = WorkflowOrchestrator(targets=["10.0.0.1"], opsec_mode="stealth")
     r = repr(wo)
