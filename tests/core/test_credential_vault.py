@@ -69,6 +69,35 @@ def test_different_passwords_accepted():
     assert vault.count() == 2
 
 
+def test_duplicate_username_different_case_is_deduplicated():
+    """Phase 14-A regression: _fingerprint() previously matched username/
+    domain case-sensitively, so "Administrator" and "administrator"
+    discovered by two different tools were treated as distinct
+    credentials instead of the same account."""
+    vault = CredentialVault()
+    vault.add_password("Administrator", "P@ss123", domain="CORP")
+    dup = vault.add_password("administrator", "P@ss123", domain="corp")
+    assert dup is None
+    assert vault.count() == 1
+
+
+def test_duplicate_service_different_case_is_deduplicated():
+    vault = CredentialVault()
+    vault.add_password("admin", "pass", service="SMB")
+    dup = vault.add_password("admin", "pass", service="smb")
+    assert dup is None
+    assert vault.count() == 1
+
+
+def test_secret_case_is_preserved_for_dedup():
+    """Passwords/hashes themselves must stay case-sensitive — "Pass123"
+    and "pass123" are genuinely different secrets, not the same one."""
+    vault = CredentialVault()
+    vault.add_password("admin", "Pass123")
+    vault.add_password("admin", "pass123")
+    assert vault.count() == 2
+
+
 # ── queries ─────────────────────────────────────────────────────
 
 def test_get_by_type():
@@ -187,6 +216,62 @@ def test_save_plaintext_warns():
     with pytest.warns(UserWarning, match="PLAINTEXT"):
         vault.save(Path("/tmp/_reconforge_test_vault_warn.json"))
     Path("/tmp/_reconforge_test_vault_warn.json").unlink(missing_ok=True)
+
+
+def test_load_malformed_json_raises_credential_vault_error(tmp_path):
+    """Phase 14-B regression: load() previously let json.JSONDecodeError
+    propagate raw instead of the typed CredentialVaultError its own
+    docstring now promises."""
+    from core.exceptions import CredentialVaultError
+
+    path = tmp_path / "corrupt.json"
+    path.write_text("{not valid json")
+
+    vault = CredentialVault()
+    with pytest.raises(CredentialVaultError):
+        vault.load(path)
+
+
+def test_load_non_list_json_raises_credential_vault_error(tmp_path):
+    from core.exceptions import CredentialVaultError
+
+    path = tmp_path / "dict.json"
+    path.write_text(json.dumps({"not": "a list"}))
+
+    vault = CredentialVault()
+    with pytest.raises(CredentialVaultError):
+        vault.load(path)
+
+
+def test_load_malformed_credential_entry_raises_credential_vault_error(tmp_path):
+    from core.exceptions import CredentialVaultError
+
+    path = tmp_path / "bad_entry.json"
+    path.write_text(json.dumps([{"unexpected_field": "x"}]))
+
+    vault = CredentialVault()
+    with pytest.raises(CredentialVaultError):
+        vault.load(path)
+
+
+def test_load_wrong_encryption_key_raises_credential_vault_error(tmp_path):
+    """A vault decrypted with the wrong key must raise a typed error,
+    not let cryptography.fernet.InvalidToken propagate raw."""
+    from cryptography.fernet import Fernet
+    from core.exceptions import CredentialVaultError
+
+    key_path = tmp_path / "vault.key"
+    vault = CredentialVault(encrypt=True, key_path=key_path)
+    vault.add_password("admin", "P@ss123", source="test")
+    path = tmp_path / "vault.json"
+    vault.save(path)
+
+    # Overwrite the key with a different one so decryption fails
+    key_path.write_bytes(Fernet.generate_key())
+
+    vault2 = CredentialVault(encrypt=True, key_path=key_path)
+    with pytest.raises(CredentialVaultError):
+        vault2.load(path.with_suffix(path.suffix + ".enc"))
 
 
 def test_env_var_key_used_instead_of_file(tmp_path, monkeypatch):

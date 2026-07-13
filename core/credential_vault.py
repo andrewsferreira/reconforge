@@ -53,7 +53,7 @@ from typing import Any, Dict, List, Optional, Set
 from core.exceptions import CredentialVaultError
 
 try:
-    from cryptography.fernet import Fernet
+    from cryptography.fernet import Fernet, InvalidToken
     _HAS_CRYPTO = True
 except ImportError:
     _HAS_CRYPTO = False
@@ -124,8 +124,19 @@ class CredentialVault:
     @staticmethod
     def _fingerprint(cred_type: str, username: str, secret: str,
                      domain: str, service: str) -> str:
-        """Unique fingerprint for deduplication."""
-        return f"{cred_type}|{username}|{secret}|{domain}|{service}"
+        """Unique fingerprint for deduplication.
+
+        username/domain/service are case-normalized before fingerprinting
+        (Windows/AD identifiers and service names are case-insensitive in
+        practice — "Administrator" and "administrator" discovered by two
+        different tools are the same account, not two distinct
+        credentials). secret is left untouched: password/hash/token
+        material is case-meaningful.
+        """
+        return (
+            f"{cred_type}|{username.lower()}|{secret}|"
+            f"{domain.lower()}|{service.lower()}"
+        )
 
     # ── Add methods ──────────────────────────────────────────────────
 
@@ -395,6 +406,11 @@ class CredentialVault:
         """Load credentials from a JSON (or encrypted) file.
 
         Deduplication is applied against the current vault contents.
+
+        Raises:
+            CredentialVaultError: If the file can't be decrypted or
+                doesn't contain a valid, parseable vault (corrupted,
+                hand-edited, or partially written).
         """
         path = Path(path)
         if path.suffix == ".enc":
@@ -402,15 +418,34 @@ class CredentialVault:
                 raise CredentialVaultError("cryptography package required to decrypt vault")
             key = self._get_or_create_key()
             fernet = Fernet(key)
-            data_str = fernet.decrypt(path.read_bytes()).decode()
+            try:
+                data_str = fernet.decrypt(path.read_bytes()).decode()
+            except InvalidToken as exc:
+                raise CredentialVaultError(
+                    f"Could not decrypt vault file (wrong key or corrupted): {path}"
+                ) from exc
         else:
             data_str = path.read_text()
 
-        items = json.loads(data_str)
+        try:
+            items = json.loads(data_str)
+        except json.JSONDecodeError as exc:
+            raise CredentialVaultError(f"Vault file is not valid JSON: {path} ({exc})") from exc
+
+        if not isinstance(items, list):
+            raise CredentialVaultError(f"Vault file has an unexpected structure: {path}")
+
         for item in items:
+            if not isinstance(item, dict):
+                raise CredentialVaultError(f"Vault file has a malformed credential entry: {path}")
             item.pop("id", None)
             item.pop("timestamp", None)
-            cred = Credential(**item)
+            try:
+                cred = Credential(**item)
+            except TypeError as exc:
+                raise CredentialVaultError(
+                    f"Vault file has a malformed credential entry: {path} ({exc})"
+                ) from exc
             self._add(cred)
 
     def _get_or_create_key(self) -> bytes:

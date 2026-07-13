@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.4.2] — 2026-07-13
+
+Phase 14 (Credential/Loot Handling): audited `core/credential_vault.py::CredentialVault` and `core/loot_manager.py::LootManager`, closing two P2 items Phase 9 had flagged. Pure bug fixes — no new public fields/methods/capabilities — so PATCH per `docs/VERSIONING.md`.
+
+### Fixed
+
+- `CredentialVault._fingerprint()`: case-sensitive `username`/`domain`/`service` matching meant "Administrator" and "administrator" discovered by two different tools were treated as distinct credentials instead of the same account. Now normalized to lowercase before fingerprinting; `secret` (password/hash/token material) is deliberately left case-sensitive.
+- `LootManager.add()`: always kept the first-seen entry on an exact `(loot_type, value)` duplicate regardless of the rediscovery's confidence — a username first seen via unauthenticated RID cycling ("high") later reconfirmed via authenticated LDAP ("confirmed", richer metadata) silently lost the stronger evidence. Now upgrades the existing entry in place when the new discovery has strictly higher confidence.
+- `CredentialVault.load()`: had no exception handling around `json.loads()`, `Fernet.decrypt()`, or `Credential(**item)` reconstruction — a corrupted/hand-edited vault file, or one decrypted with the wrong key, crashed with a raw exception instead of the typed `CredentialVaultError` the method's own docstring already claimed. Same shape as Phase 13's `EngagementManager.load()` fix.
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- `LootManager.add()`'s O(n) linear-scan dedup vs. `CredentialVault`'s O(1) set-based approach (performance, not correctness).
+- `LootManager`'s own case-sensitive value matching (needs per-`loot_type` handling to avoid lower-casing password/hash material).
+- `LootManager` has no `load()` that reconstructs `LootItem` objects — confirmed not currently a practical gap since `--resume` doesn't wire vault/loot state back in either.
+- `CredentialVault._get_or_create_key()`'s fragility if the on-disk key file itself is corrupted/truncated.
+
+10 new tests added (796 → 806); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.4.1] — 2026-07-13
 
 Phase 13 (Engagement Management): audited `core/engagement.py::EngagementManager` and its interaction with `WorkflowOrchestrator.run()`. Pure bug fixes — no new public fields/methods/capabilities — so PATCH per `docs/VERSIONING.md`.

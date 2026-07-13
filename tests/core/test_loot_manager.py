@@ -22,6 +22,47 @@ def test_duplicate_prevention():
     assert len(lm.get_all()) == 1
 
 
+def test_duplicate_with_higher_confidence_upgrades_existing_entry():
+    """Phase 14-C regression: add()'s dedup previously always kept the
+    first-seen entry, silently discarding a rediscovery even when it
+    carried stronger evidence — e.g. a username first seen via
+    unauthenticated RID cycling ("high"), later confirmed via an
+    authenticated LDAP query ("confirmed")."""
+    lm = LootManager()
+    lm.add("user", "jsmith", "netexec_rid", "network", confidence="high",
+            metadata={"domain": ""})
+    lm.add("user", "jsmith", "ldap_query", "ad", confidence="confirmed",
+            metadata={"domain": "corp.local"})
+
+    users = lm.get_by_type("user")
+    assert len(users) == 1
+    assert users[0].confidence == "confirmed"
+    assert users[0].source == "ldap_query"
+    assert users[0].module == "ad"
+    assert users[0].metadata["domain"] == "corp.local"
+
+
+def test_duplicate_with_lower_confidence_does_not_downgrade_existing_entry():
+    lm = LootManager()
+    lm.add("user", "jsmith", "ldap_query", "ad", confidence="confirmed")
+    lm.add("user", "jsmith", "netexec_rid", "network", confidence="high")
+
+    users = lm.get_by_type("user")
+    assert len(users) == 1
+    assert users[0].confidence == "confirmed"
+    assert users[0].source == "ldap_query"
+
+
+def test_duplicate_with_equal_confidence_does_not_change_existing_entry():
+    lm = LootManager()
+    lm.add("user", "jsmith", "first_tool", "network", confidence="high")
+    lm.add("user", "jsmith", "second_tool", "network", confidence="high")
+
+    users = lm.get_by_type("user")
+    assert len(users) == 1
+    assert users[0].source == "first_tool"
+
+
 def test_add_credential():
     lm = LootManager()
     item = lm.add_credential("user", "pass123", "hydra", "network", service="ssh")

@@ -32,6 +32,11 @@ except ImportError:  # pragma: no cover – optional dependency
 _KEY_DIR = Path.home() / ".reconforge"
 _KEY_FILE = _KEY_DIR / "loot.key"
 
+# Ordinal ranking for comparing confidence on a duplicate rediscovery —
+# see LootManager.add()'s dedup logic. Unrecognised values rank lowest
+# (never upgrade an existing entry over one with unrecognised confidence).
+_CONFIDENCE_RANK = {"low": 0, "medium": 1, "high": 2, "confirmed": 3}
+
 
 def _get_or_create_key() -> bytes:
     """Resolve the Fernet encryption key.
@@ -88,7 +93,15 @@ class LootManager:
 
     def add(self, loot_type: str, value: str, source: str, module: str,
             confidence: str = "medium", metadata: Optional[Dict] = None) -> LootItem:
-        """Add a loot item."""
+        """Add a loot item.
+
+        A rediscovery of the same (loot_type, value) is deduplicated
+        against the first-seen entry rather than appended — but if the
+        rediscovery carries strictly higher confidence (e.g. a username
+        first seen via unauthenticated RID cycling, later confirmed via
+        an authenticated LDAP query), the existing entry is upgraded in
+        place instead of silently discarding the stronger evidence.
+        """
         item = LootItem(
             loot_type=loot_type, value=value, source=source,
             module=module, confidence=confidence, metadata=metadata or {}
@@ -96,6 +109,11 @@ class LootManager:
         # Avoid duplicates
         for existing in self._loot:
             if existing.loot_type == loot_type and existing.value == value:
+                if _CONFIDENCE_RANK.get(confidence, -1) > _CONFIDENCE_RANK.get(existing.confidence, -1):
+                    existing.confidence = confidence
+                    existing.source = source
+                    existing.module = module
+                    existing.metadata = metadata or {}
                 return existing
         self._loot.append(item)
         return item
