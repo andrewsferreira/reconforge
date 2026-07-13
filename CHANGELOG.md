@@ -6,6 +6,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.1] — 2026-07-13
+
+Phase 17 (Result Honesty): `results["success"]` was hardcoded `True` unconditionally at the end of `run()` in 11 of 13 AD/web/API `modules/*/phases/*.py` files, regardless of whether any actual work happened — a violation of this project's own "Evidence over narration" principle, flagged as deferred across Phases 11/13/15. PATCH per `docs/VERSIONING.md` — the `success` field already existed; this fixes its semantics, adding no new public surface.
+
+### Fixed
+
+- `modules/ad/phases/{identity_enumeration,configuration_enumeration,passive_recon}.py`: `success` now requires at least one collection path (LDAP, RID cycling, AS-REP roasting, null session, anonymous LDAP) to have actually yielded data, rather than merely "the method returned without raising."
+- `modules/web/phases/{surface_discovery,content_enumeration,exploit_candidates,vulnerability_scanning}.py` and `modules/api/phases/{discovery,authentication,authorization,fuzzing}.py`: `success` now requires `self.tools_used` to be non-empty (only appended to once a tool actually executes past its availability/OPSEC gates). Four of these phases had a "no findings" filler finding that always fires when `finding_count == 0`, specifically masking the "every tool unavailable/blocked, nothing ran at all" case. `authentication.py`/`authorization.py` additionally count pure structural analysis on already-available input (`spec_data`/`auth_token`, `endpoints`/`discovered_params`) that needs no tool call.
+- `exploit_candidates.py`'s deliberate `opt_in=False` skip path is unchanged and correctly stays `success=True` — a deliberate skip-by-design is not a failure.
+
+`network`/`surface` modules' phase files were re-audited and confirmed already correct — not part of this fix set. `bloodhound_collection.py`/`delegation_discovery.py` were already fixed in Phase 11.
+
+23 new tests added (818 → 841); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.0] — 2026-07-13
 
 Phase 16 (Reproducible Lab): README's "Local Validation Lab" section referenced `http://127.0.0.1:8008` with nothing anywhere in the repo that actually defined or served that target — the reproducibility claim was aspirational. MINOR per `docs/VERSIONING.md` — adds a new first-party capability (`lab/`), not a bug fix.

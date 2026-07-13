@@ -78,7 +78,23 @@ class ContentEnumerationPhase(WebPhaseBase):
             finding_count = 1
 
         results["finding_count"] = finding_count
-        results["success"] = True
+
+        # Honest success signal: ffuf/gobuster are each independently gated
+        # on tool availability/OPSEC/wordlist resolution and can legitimately
+        # be skipped. "success" previously meant only "the method returned
+        # without raising" — always True — even when both tools were
+        # unavailable/blocked/missing a wordlist and nothing actually ran
+        # (the "no notable paths discovered" filler finding above masked
+        # this, since it always fires when finding_count==0). self.tools_used
+        # is only appended to once a tool actually executes past those
+        # gates, so it's a real "did anything run" signal.
+        if self.tools_used:
+            results["success"] = True
+        else:
+            self.logger.warning(
+                "Content enumeration ran no checks — ffuf/gobuster both "
+                "unavailable, blocked by OPSEC policy, or missing a wordlist"
+            )
 
         # Save parsed results
         parsed_file = self.phase_output("content_enum_results.json")

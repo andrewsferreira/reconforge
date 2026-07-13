@@ -295,7 +295,32 @@ class IdentityEnumerationPhase(ADPhaseBase):
         results["total_users"] = len(results["users"])
         results["total_groups"] = len(results["groups"])
         results["total_computers"] = len(results["computers"])
-        results["success"] = True
+
+        # Honest success signal: this phase has several independent,
+        # best-effort collection paths (LDAP, RID cycling, AS-REP roasting,
+        # enum4linux-ng) that can each legitimately return nothing (e.g. no
+        # creds, stealth mode, hardened target) without any single call
+        # actually failing. "success" previously meant only "the method
+        # returned without raising" — always True — masking the case where
+        # every path came back empty and the phase collected zero identity
+        # data. Report that honestly instead.
+        if (results["users"] or results["computers"]
+                or results["service_accounts"] or results["asrep_users"]):
+            results["success"] = True
+        else:
+            self.logger.warning(
+                "Identity enumeration collected no data — no usable "
+                "credentials/null-session/anonymous access"
+            )
+            self.add_finding(
+                finding_type="exposure", severity="info",
+                confidence="confirmed", target=target,
+                description="Identity enumeration collected no users, computers, or service accounts",
+                recommendation=(
+                    "Provide domain credentials, or confirm null-session/anonymous "
+                    "LDAP access, then re-run identity enumeration."
+                ),
+            )
 
         self.notes.add_phase_end(
             self.PHASE_NAME,

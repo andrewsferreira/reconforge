@@ -141,7 +141,23 @@ class AuthorizationPhase(APIPhaseBase):
         finding_count += self._check_rate_limiting(target_url, headers, results)
 
         results["finding_count"] = finding_count
-        results["success"] = True
+
+        # Honest success signal: this phase has two kinds of work — tool
+        # invocation (nuclei/httpx, tracked via self.tools_used) and pure
+        # structural analysis of already-available input (endpoints from
+        # Phase 1, discovered_params from Phase 3), which needs no tool
+        # call at all. "success" previously meant only "the method
+        # returned without raising" — always True — even when no tool ran
+        # AND no endpoints/params were available to analyze, i.e. the
+        # phase did nothing whatsoever.
+        if self.tools_used or endpoints or discovered_params:
+            results["success"] = True
+        else:
+            self.logger.warning(
+                "Authorization testing did nothing — no endpoints or "
+                "discovered_params provided, and nuclei/httpx both "
+                "unavailable or blocked by OPSEC policy"
+            )
         return results
 
     # ── Scoring-Based IDOR Detection ────────────────────────────────

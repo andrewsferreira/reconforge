@@ -179,7 +179,31 @@ class PassiveReconPhase(ADPhaseBase):
         # ── Step 7: Attack path suggestions ──────────────────────────
         self._generate_workflow(target, results, perm_result.data)
 
-        results["success"] = True
+        # Honest success signal: every probe in this phase is opportunistic
+        # (no credentials required by design) and a negative result (e.g.
+        # "anonymous LDAP denied") is a legitimate, successful check outcome
+        # — not a failure. "success" previously meant only "the method
+        # returned without raising" — always True — even when nothing
+        # confirmed this target is even a working AD environment. Report
+        # that honestly: success requires at least one positive signal.
+        if (results["domain"] or results["kerberos_detected"]
+                or results["anonymous_ldap"] or results["null_session"]):
+            results["success"] = True
+        else:
+            self.logger.warning(
+                "Passive reconnaissance found no positive AD signal — "
+                "no domain/forest info, Kerberos, anonymous LDAP, or null session"
+            )
+            self.add_finding(
+                finding_type="exposure", severity="info",
+                confidence="confirmed", target=target,
+                description="Passive reconnaissance found no confirmed Active Directory signal",
+                recommendation=(
+                    "Verify the target is a domain controller and reachable; "
+                    "confirm ports 53/88/389 are open."
+                ),
+            )
+
         self.notes.add_phase_end(
             self.PHASE_NAME,
             f"Domain: {results['domain'] or 'unknown'}, "

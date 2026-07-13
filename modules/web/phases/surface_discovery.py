@@ -84,7 +84,21 @@ class SurfaceDiscoveryPhase(WebPhaseBase):
         finding_count += self._analyse_headers(target_url, results)
 
         results["finding_count"] = finding_count
-        results["success"] = True
+
+        # Honest success signal: each sub-check is independently gated on
+        # tool availability/OPSEC and can legitimately be skipped.
+        # "success" previously meant only "the method returned without
+        # raising" — always True — even when whatweb/wafw00f/curl were all
+        # unavailable or blocked and literally nothing ran. self.tools_used
+        # is only appended to once a tool actually executes past those
+        # gates, so it's a real "did any check run" signal.
+        if self.tools_used:
+            results["success"] = True
+        else:
+            self.logger.warning(
+                "Surface discovery ran no checks — whatweb/wafw00f/curl all "
+                "unavailable or blocked by OPSEC policy"
+            )
 
         # Save parsed results
         parsed_file = self.phase_output("surface_discovery_results.json")

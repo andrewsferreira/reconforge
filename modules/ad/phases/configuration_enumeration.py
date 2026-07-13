@@ -255,7 +255,29 @@ class ConfigurationEnumerationPhase(ADPhaseBase):
                 priority=s.priority,
             )
 
-        results["success"] = True
+        # Honest success signal: each collection step below is independently
+        # gated on can_ldap/null_session and can legitimately come back
+        # empty (no creds, hardened target). "success" previously meant
+        # only "the method returned without raising" — always True — even
+        # when every step yielded nothing. Report that honestly instead.
+        if (results["password_policy"] or results["trusts"] or results["gpos"]
+                or results["shares"] or results["domain_controllers"]):
+            results["success"] = True
+        else:
+            self.logger.warning(
+                "Configuration enumeration collected no data — no usable "
+                "credentials/null-session access"
+            )
+            self.add_finding(
+                finding_type="exposure", severity="info",
+                confidence="confirmed", target=target,
+                description="Configuration enumeration collected no policy, trust, GPO, or share data",
+                recommendation=(
+                    "Provide domain credentials, or confirm null-session access, "
+                    "then re-run configuration enumeration."
+                ),
+            )
+
         self.notes.add_phase_end(
             self.PHASE_NAME,
             f"Policy: {'extracted' if results['password_policy'] else 'N/A'}, "

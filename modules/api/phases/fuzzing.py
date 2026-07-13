@@ -156,7 +156,21 @@ class FuzzingPhase(APIPhaseBase):
                                                     wordlist, headers, results)
 
         results["finding_count"] = finding_count
-        results["success"] = True
+
+        # Honest success signal: arjun/ffuf are each independently gated on
+        # tool availability/OPSEC and can legitimately be skipped.
+        # "success" previously meant only "the method returned without
+        # raising" — always True — even when both tools were unavailable
+        # or blocked and nothing actually ran. self.tools_used is only
+        # appended to once a tool actually executes past those gates, so
+        # it's a real "did anything run" signal.
+        if self.tools_used:
+            results["success"] = True
+        else:
+            self.logger.warning(
+                "API fuzzing ran no checks — arjun/ffuf both unavailable "
+                "or blocked by OPSEC policy"
+            )
         return results
 
     def _run_arjun(self, target_url: str, endpoints: List[Dict],

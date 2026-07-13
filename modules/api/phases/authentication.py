@@ -113,7 +113,22 @@ class AuthenticationPhase(APIPhaseBase):
         finding_count += self._run_nuclei_auth_scan(target_url, headers, results)
 
         results["finding_count"] = finding_count
-        results["success"] = True
+
+        # Honest success signal: this phase has two kinds of work — tool
+        # invocation (httpx/nuclei, tracked via self.tools_used) and pure
+        # analysis of already-available input (spec_data from Phase 1,
+        # auth_token supplied by the operator), which needs no tool call at
+        # all. "success" previously meant only "the method returned without
+        # raising" — always True — even when no tool ran AND no input data
+        # was available to analyze, i.e. the phase did nothing whatsoever.
+        if self.tools_used or spec_data or auth_token:
+            results["success"] = True
+        else:
+            self.logger.warning(
+                "Authentication analysis did nothing — no spec_data or "
+                "auth_token provided, and httpx/nuclei both unavailable "
+                "or blocked by OPSEC policy"
+            )
         return results
 
     # ── OpenAPI Spec Auth Analysis ──────────────────────────────────
