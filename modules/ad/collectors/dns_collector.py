@@ -46,6 +46,8 @@ class DnsCollector(CollectorBase):
         """Scan AD ports and extract domain intelligence."""
         if not self.nmap.is_available():
             return {}
+        if not self.opsec.check("nmap_ad_service_scan"):
+            return {}
 
         run = self.nmap.ad_service_scan(target)
         if not run.success:
@@ -79,6 +81,8 @@ class DnsCollector(CollectorBase):
     def collect_srv_records(self, target: str, domain: str) -> str:
         """Query DNS SRV records for DC locations."""
         if not self.nmap.is_available():
+            return ""
+        if not self.opsec.check("nmap_dns_srv"):
             return ""
         run = self.nmap.dns_srv_lookup(domain, target)
         if run.success and run.stdout.strip():

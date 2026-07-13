@@ -6,6 +6,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.4.0] — 2026-07-13
+
+Phase 12 (OPSEC Model): audited `core/opsec_checks.py`/`core/detection_map.py` and all 31 `opsec.check()` call sites against each module's actual tool-invocation surface. Adds new backward-compatible `DETECTION_LEVELS` entries and wires previously-dead `OpsecChecker.warn()` into `check()` (MINOR per `docs/VERSIONING.md`), alongside real gating fixes.
+
+### Fixed
+
+- `core/detection_map.py::is_allowed()`: returned `True` unconditionally for any `opsec_mode` not in `{"stealth","normal","aggressive"}` — every module's `opsec_mode` constructor parameter accepts an unvalidated string (only the CLI's own `argparse choices=` guards the direct CLI path), so a typo'd or programmatic mode silently disabled all noise gating. Now fails closed.
+- `modules/ad/collectors/delegation_collector.py`: checked opsec technique `"impacket_delegation"`, which doesn't exist in `DETECTION_LEVELS` (real key: `"impacket_finddelegation"`) — an unknown-technique check always fails closed, so findDelegation.py collection was permanently disabled regardless of `--opsec` mode.
+- `modules/ad/collectors/{ldap,smb,dns,kerberos}_collector.py`: had zero `opsec.check()` calls despite `DETECTION_LEVELS` defining specific entries for exactly these operations — every LDAP/SMB/DNS/Kerberos enumeration query ran unconditionally regardless of `--opsec` mode. `--opsec stealth` provided no real protection for the AD module's core enumeration surface. Wired checks into all query methods across the 4 files.
+- `kerberos_collector.py::collect_rid_cycling()`: only scaled `max_rid` by `opsec_mode=="aggressive"` but ran the `high`-noise RID cycling technique unconditionally in every mode; now actually blocked outside aggressive mode.
+
+### Added
+
+- Two new `DETECTION_LEVELS` entries: `ldap_password_policy` (low noise) and `nmap_kerberos_detect` (low noise, distinct from the existing high-noise NSE-script `nmap_ad_kerberos` entry).
+- `OpsecChecker.warn()` — previously dead code, never called — is now wired into `OpsecChecker.check()` itself, so every existing call site automatically surfaces a heads-up warning when a high/very_high-noise technique is allowed to proceed.
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- A full correctness audit of the ~25 remaining `opsec.check()` call sites across network/web/api/surface modules, cross-verified against their tool-invocation surface the way AD's collector layer was in this phase.
+- No test coverage asserting `OpsecChecker.check()`'s block/allow gate stays consistent with tool wrappers' separate `opsec_mode`-based intensity scaling (a second, independent mechanism).
+- Pre-existing "Enable risk policy enforcement by default" P2 item — a related but distinct mechanism, unchanged.
+
+40 new tests added (748 → 788); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.3.1] — 2026-07-13
 
 Phase 11 (AD/Web/API Module Quality): audited phase-orchestration logic in all 5 AD, 4 web, and 4 API phase files. Pure bug fixes — no new public fields/methods/capabilities — so PATCH per `docs/VERSIONING.md`.

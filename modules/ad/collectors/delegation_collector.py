@@ -179,7 +179,7 @@ class DelegationCollector(CollectorBase):
             return {}, False
         if not username or not password:
             return {}, False
-        if not self.opsec.check("impacket_delegation"):
+        if not self.opsec.check("impacket_finddelegation"):
             return {}, False
 
         run = self.advanced_impacket.find_delegation(

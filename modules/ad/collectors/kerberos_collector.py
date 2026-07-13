@@ -53,6 +53,8 @@ class KerberosCollector(CollectorBase):
         """Check if Kerberos service is running on port 88."""
         if not self.nmap.is_available():
             return False
+        if not self.opsec.check("nmap_kerberos_detect"):
+            return False
         run = self.nmap.kerberos_scan(target)
         return (
             run.success
@@ -66,6 +68,8 @@ class KerberosCollector(CollectorBase):
     ) -> List[Dict]:
         """Collect AS-REP hashes via GetNPUsers.py."""
         if not domain or not self.impacket.is_available("getnpusers"):
+            return []
+        if not self.opsec.check("impacket_getnpusers"):
             return []
 
         run = self.impacket.get_np_users(
@@ -88,6 +92,8 @@ class KerberosCollector(CollectorBase):
     ) -> Dict[str, List[str]]:
         """Enumerate users and groups via RID cycling."""
         if not self.impacket.is_available("lookupsid"):
+            return {"users": [], "groups": []}
+        if not self.opsec.check("impacket_lookupsid"):
             return {"users": [], "groups": []}
 
         max_rid = 4000 if self.opsec_mode == "aggressive" else 2000

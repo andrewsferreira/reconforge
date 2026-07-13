@@ -92,6 +92,29 @@ def test_opsec_block_yields_success_false():
     assert result.success is False
 
 
+def test_find_delegation_checks_the_correctly_named_opsec_technique():
+    """Phase 12-B regression: _run_find_delegation() checked the opsec
+    technique name "impacket_delegation", which has no entry in
+    core/detection_map.py (the real key is "impacket_finddelegation") —
+    an unknown-technique check always fails closed, so findDelegation.py
+    collection was permanently blocked regardless of opsec mode."""
+    checked_names = []
+    collector = _make_collector(
+        opsec=SimpleNamespace(check=lambda name: checked_names.append(name) or True),
+        advanced_impacket=SimpleNamespace(
+            is_available=lambda *a, **k: True,
+            find_delegation=lambda **k: SimpleNamespace(success=True, stdout=""),
+            get_machine_account_quota=lambda **k: SimpleNamespace(success=False, stdout=""),
+        ),
+    )
+
+    collector.collect(target="10.10.10.1", domain="corp.local",
+                       username="alice", password="pass")
+
+    assert "impacket_finddelegation" in checked_names
+    assert "impacket_delegation" not in checked_names
+
+
 def test_find_delegation_alone_can_satisfy_success():
     """If the LDAP queries are blocked but findDelegation.py runs fine,
     that's still real data collection, not a total failure."""

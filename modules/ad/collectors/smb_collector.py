@@ -59,6 +59,8 @@ class SmbCollector(CollectorBase):
         """Test SMB null session and return share list."""
         if not self.smbclient.is_available():
             return {"allowed": False, "shares": []}
+        if not self.opsec.check("smb_null_session"):
+            return {"allowed": False, "shares": []}
 
         run = self.smbclient.null_session_list(target)
         parsed = self.smb_parser.parse_share_list(
@@ -80,6 +82,8 @@ class SmbCollector(CollectorBase):
         """Enumerate and test access to SMB shares."""
         if not self.smbclient.is_available():
             return []
+        if not self.opsec.check("smb_share_access"):
+            return []
 
         shares: List[Dict] = []
 
@@ -99,20 +103,22 @@ class SmbCollector(CollectorBase):
             run.stdout + run.stderr, anonymous=anonymous
         )
 
-        # Test important AD shares
-        for share_name in ["SYSVOL", "NETLOGON"]:
-            access = self.smbclient.test_share_access(
-                target, share_name, username=username, password=password
-            )
-            share_parsed = self.smb_parser.parse_share_access(
-                access.stdout + access.stderr, share_name
-            )
-            shares.append({
-                "name": share_name,
-                "accessible": share_parsed.accessible,
-                "permissions": share_parsed.permissions,
-                "anonymous": anonymous and not username,
-            })
+        # Test important AD shares (admin-share access probing is noisier
+        # than the base share listing above — gated separately)
+        if self.opsec.check("smb_admin_shares"):
+            for share_name in ["SYSVOL", "NETLOGON"]:
+                access = self.smbclient.test_share_access(
+                    target, share_name, username=username, password=password
+                )
+                share_parsed = self.smb_parser.parse_share_access(
+                    access.stdout + access.stderr, share_name
+                )
+                shares.append({
+                    "name": share_name,
+                    "accessible": share_parsed.accessible,
+                    "permissions": share_parsed.permissions,
+                    "anonymous": anonymous and not username,
+                })
 
         # Other discovered shares
         for share in parsed.shares:
@@ -131,6 +137,8 @@ class SmbCollector(CollectorBase):
     ) -> Dict[str, Any]:
         """Run enum4linux-ng full enum and return structured data."""
         if not self.enum4linux_ng.is_available():
+            return {}
+        if not self.opsec.check("enum4linux_ng_full"):
             return {}
 
         run = self.enum4linux_ng.full_enum(

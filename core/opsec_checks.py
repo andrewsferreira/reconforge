@@ -21,6 +21,10 @@ class OpsecChecker:
                 f"OPSEC BLOCKED: '{desc}' not allowed in {self.mode} mode "
                 f"(noise: {level.get('noise', 'unknown') if level else 'unknown'})"
             )
+        elif allowed and self.logger:
+            warning = self.warn(technique)
+            if warning:
+                self.logger.warning(warning)
         return allowed
 
     def warn(self, technique: str) -> Optional[str]:

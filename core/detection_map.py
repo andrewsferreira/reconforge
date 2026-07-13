@@ -31,6 +31,7 @@ DETECTION_LEVELS = {
     "ldap_gpo_enum": {"noise": "medium", "description": "LDAP GPO enumeration queries"},
     "ldap_spn_query": {"noise": "medium", "description": "LDAP SPN account query (Kerberoast recon)"},
     "ldap_asrep_query": {"noise": "medium", "description": "LDAP AS-REP roastable user query"},
+    "ldap_password_policy": {"noise": "low", "description": "LDAP password policy query"},
     "smb_null_session": {"noise": "low", "description": "SMB null session test"},
     "smb_share_access": {"noise": "medium", "description": "SMB share access testing"},
     "smb_admin_shares": {"noise": "high", "description": "SMB administrative share access test"},
@@ -38,6 +39,7 @@ DETECTION_LEVELS = {
     "nmap_ad_ldap_scripts": {"noise": "medium", "description": "Nmap LDAP NSE scripts"},
     "nmap_ad_smb_scripts": {"noise": "high", "description": "Nmap SMB NSE scripts (AD)"},
     "nmap_ad_kerberos": {"noise": "high", "description": "Nmap Kerberos enumeration scripts"},
+    "nmap_kerberos_detect": {"noise": "low", "description": "Nmap Kerberos port/version probe (no NSE scripts)"},
     "nmap_ad_full_scripts": {"noise": "high", "description": "Nmap full AD NSE script suite"},
     "nmap_dns_srv": {"noise": "low", "description": "DNS SRV record enumeration"},
     "rid_cycling": {"noise": "high", "description": "RID cycling for user/group enumeration"},
@@ -101,7 +103,15 @@ def get_detection_level(technique: str) -> Optional[Dict]:
 
 
 def is_allowed(technique: str, opsec_mode: str) -> bool:
-    """Check if a technique is allowed under the current OPSEC mode."""
+    """Check if a technique is allowed under the current OPSEC mode.
+
+    Fails closed: an unrecognized opsec_mode (a typo, or a programmatic
+    caller that bypasses the CLI's argparse `choices=` validation — every
+    module's `opsec_mode` constructor parameter accepts an unvalidated
+    string) denies the action rather than allowing it. The previous
+    `return True` fallback meant any unrecognized mode string silently
+    disabled all noise gating, including very_high-noise techniques.
+    """
     level = DETECTION_LEVELS.get(technique, {}).get("noise", "unknown")
     if opsec_mode == "stealth":
         return level in ("low",)
@@ -109,4 +119,4 @@ def is_allowed(technique: str, opsec_mode: str) -> bool:
         return level in ("low", "medium")
     elif opsec_mode == "aggressive":
         return level in ("low", "medium", "high", "very_high")
-    return True
+    return False

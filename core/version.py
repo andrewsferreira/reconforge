@@ -2,4 +2,4 @@
 (report footers, etc). Kept in sync with `pyproject.toml`'s `[project] →
 version` by hand — see docs/VERSIONING.md's Release Process."""
 
-__version__ = "2.3.1"
+__version__ = "2.4.0"

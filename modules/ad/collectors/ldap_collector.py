@@ -63,6 +63,8 @@ class LdapCollector(CollectorBase):
 
     def collect_rootdse(self, target: str) -> Dict[str, Any]:
         """Test anonymous bind and extract RootDSE."""
+        if not self.opsec.check("ldap_anonymous_bind"):
+            return {"anonymous": False}
         run = self.ldapsearch.anonymous_bind_test(target)
         if not run.success:
             return {"anonymous": False}
@@ -83,6 +85,8 @@ class LdapCollector(CollectorBase):
     def collect_users(self, target: str, base_dn: str,
                       username: str = "", password: str = "") -> List[Dict]:
         """Return list of user dicts."""
+        if not self.opsec.check("ldap_user_enum"):
+            return []
         run = self.ldapsearch.query_users(target, base_dn, username=username, password=password)
         if not run.success:
             return []
@@ -107,6 +111,8 @@ class LdapCollector(CollectorBase):
     def collect_groups(self, target: str, base_dn: str,
                        username: str = "", password: str = "") -> List[Dict]:
         """Return list of group dicts."""
+        if not self.opsec.check("ldap_group_enum"):
+            return []
         run = self.ldapsearch.query_groups(target, base_dn, username=username, password=password)
         if not run.success:
             return []
@@ -125,6 +131,8 @@ class LdapCollector(CollectorBase):
     def collect_computers(self, target: str, base_dn: str,
                           username: str = "", password: str = "") -> List[Dict]:
         """Return list of computer dicts."""
+        if not self.opsec.check("ldap_computer_enum"):
+            return []
         run = self.ldapsearch.query_computers(target, base_dn, username=username, password=password)
         if not run.success:
             return []
@@ -143,6 +151,8 @@ class LdapCollector(CollectorBase):
     def collect_spn_accounts(self, target: str, base_dn: str,
                              username: str = "", password: str = "") -> List[Dict]:
         """Return list of SPN account dicts (Kerberoasting targets)."""
+        if not self.opsec.check("ldap_spn_query"):
+            return []
         run = self.ldapsearch.query_spn_accounts(target, base_dn, username=username, password=password)
         if not run.success:
             return []
@@ -161,6 +171,8 @@ class LdapCollector(CollectorBase):
     def collect_asrep_users(self, target: str, base_dn: str,
                             username: str = "", password: str = "") -> List[Dict]:
         """Return list of users with pre-auth disabled."""
+        if not self.opsec.check("ldap_asrep_query"):
+            return []
         run = self.ldapsearch.query_asrep_users(target, base_dn, username=username, password=password)
         if not run.success:
             return []
@@ -173,6 +185,8 @@ class LdapCollector(CollectorBase):
     def collect_trusts(self, target: str, base_dn: str,
                        username: str = "", password: str = "") -> List[Dict]:
         """Return list of trust relationship dicts."""
+        if not self.opsec.check("ldap_trust_enum"):
+            return []
         run = self.ldapsearch.query_trusts(target, base_dn, username=username, password=password)
         if not run.success:
             return []
@@ -190,6 +204,8 @@ class LdapCollector(CollectorBase):
     def collect_gpos(self, target: str, base_dn: str,
                      username: str = "", password: str = "") -> List[Dict]:
         """Return list of GPO dicts."""
+        if not self.opsec.check("ldap_gpo_enum"):
+            return []
         run = self.ldapsearch.query_gpos(target, base_dn, username=username, password=password)
         if not run.success:
             return []
@@ -207,6 +223,8 @@ class LdapCollector(CollectorBase):
     def collect_password_policy(self, target: str, base_dn: str,
                                 username: str = "", password: str = "") -> Dict:
         """Return password policy dict."""
+        if not self.opsec.check("ldap_password_policy"):
+            return {}
         run = self.ldapsearch.query_password_policy(target, base_dn, username=username, password=password)
         if not run.success:
             return {}
