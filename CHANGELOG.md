@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.3] — 2026-07-13
+
+Phase 19 (Correctness & Consistency Cleanup): three small, bounded items batched together. PATCH per `docs/VERSIONING.md` — pure bug fixes and a docs correction, no new public surface.
+
+### Fixed
+
+- `network/phases/port_scanning.py::_scan_host()`: the host-matching loop's `if host.ip == target or not host_result["open_ports"]:` condition meant "no ports found yet" rather than "no matching host found" — if nmap's XML listed the target's own zero-open-port entry first, the loop kept going and processed a second, unrelated host's ports into the same result, misattributing them to the scanned target. Now matches by IP first, falling back to nmap's sole reported host only when there is exactly one.
+- `web/phases/exploit_candidates.py`: wpscan-parsed plugin/theme inventory confidence raised from `high` to `confirmed`, matching the WordPress-version finding from the same tool and evidence class two blocks above.
+- `api/phases/authentication.py`: JWT empty/trivial-signature check confidence raised from `high` to `confirmed`, matching the `alg=="none"` check just above it — both are deterministic structural checks on the operator-supplied token.
+
+### Documented
+
+- `docs/DOCUMENTATION_INDEX.md`: removed 4 dead links to files deleted at an earlier, undocumented cleanup point; corrected the file-count header and format-summary table (47 Markdown / 29 PDF, was claiming "20 Markdown"); added an explicit "known gap" note for the ~20 real files still missing per-file entries; fixed the false "auto-maintained" footer claim.
+
+3 new tests added (845 → 848); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.2] — 2026-07-13
 
 Phase 18 (Secrets/Credential Hardening): closed three P2 items open since Phases 13-14 around `core/credential_vault.py`/`core/loot_manager.py`/`core/engagement.py`. PATCH per `docs/VERSIONING.md` — pure bug fixes and a re-verification, no new public surface.

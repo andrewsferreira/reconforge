@@ -468,11 +468,16 @@ class AuthenticationPhase(APIPhaseBase):
             finding_count += 1
 
         # ── Signature structure ─────────────────────────────────────
+        # Same evidence class as the alg=="none" check above: a direct,
+        # deterministic structural check on the token the operator
+        # supplied (not an inference), so confidence="confirmed" to match
+        # rather than the previously inconsistent "high" for equally
+        # certain evidence.
         if not signature_b64 or signature_b64 in ("", ".", "AA"):
             self.add_finding(
                 finding_type="vulnerability",
                 severity="high",
-                confidence="high",
+                confidence="confirmed",
                 target=target_url,
                 description="JWT has empty or trivial signature",
                 evidence=f"Signature segment: '{signature_b64[:20]}' (alg: {alg})",

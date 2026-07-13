@@ -1,7 +1,17 @@
 # ReconForge — Documentation Index
 
 > **Navigation guide for all project documentation**
-> Last updated: 2026-03-21 · 20 Markdown documents · 16 PDF exports
+> Last updated: 2026-07-13 · 47 Markdown documents (42 in `docs/`, 5 at project root) · 29 PDF exports
+>
+> **Known gap:** this index does not yet describe every Markdown file in the
+> repository — ~20 files added since the last full pass (e.g.
+> `ARCHITECTURE_REVIEW.md`, `LIMITATIONS.md`, `VERSIONING.md`,
+> `BURP_MCP_INTEGRATION.md`, `attack_path_generation.md`,
+> `AI_ORCHESTRATION_ARCHITECTURE.md`, `RUNBOOKS.md`, `FAQ.md`, and others —
+> see `docs/` directly for the full current listing) have no entry below
+> yet. A full re-accounting with per-file descriptions is tracked as a
+> dedicated documentation pass rather than folded into this fix, to avoid
+> writing descriptions for files not actually reviewed here.
 
 ---
 
@@ -160,11 +170,9 @@ Documents the Priority-1 refactoring of all 27 tool wrappers from `f"tool ..."` 
 
 ---
 
-### STABILIZATION_CHECK_P9.md
-📍 **Location:** [`docs/STABILIZATION_CHECK_P9.md`](STABILIZATION_CHECK_P9.md) · [PDF](STABILIZATION_CHECK_P9.pdf)
-**Status:** ✅ Complete (158 lines)
+### ~~STABILIZATION_CHECK_P9.md~~ (removed)
 
-Priority-9 stabilization pass: `tools.yaml` consumption audit. 33 files modified, new `core/tool_config.py` (typed accessor), 78 new tests. Confirms all tool wrappers now read config from `tools.yaml` via `ToolConfig`.
+This file no longer exists in the repository (confirmed absent as of 2026-07-13) but was still listed here as if current. Entry kept, struck through, so the historical Priority-9 `tools.yaml` consumption audit it described isn't silently erased from this index's record.
 
 ---
 
@@ -204,13 +212,10 @@ Official internal validator runbook for Burp MCP integration. Covers CLI/module/
 
 ## 6. Root-Level Stabilization Checks (outside `docs/`)
 
-These files live in the project root, not in `docs/`:
-
-| File | Lines | Description |
-|------|-------|-------------|
-| [`STABILIZATION_CHECK_P6.md`](../STABILIZATION_CHECK_P6.md) | 275 | Priority 6 — Base class standardization |
-| [`STABILIZATION_CHECK_P7.md`](../STABILIZATION_CHECK_P7.md) | 225 | Priority 7 — Profile system wiring |
-| [`STABILIZATION_CHECK_P8.md`](../STABILIZATION_CHECK_P8.md) | 245 | Priority 8 — Loot pipeline consolidation |
+`STABILIZATION_CHECK_P6.md`/`P7.md`/`P8.md` (project root) and
+`STABILIZATION_CHECK_P9.md` (`docs/`) were previously listed here but no
+longer exist in the repository — removed at some earlier cleanup point
+without this index being updated. Confirmed absent as of 2026-07-13.
 
 ---
 
@@ -218,8 +223,8 @@ These files live in the project root, not in `docs/`:
 
 | Format | Count | Purpose |
 |--------|------:|---------|
-| Markdown (`.md`) | 23 | Primary documentation (version-controlled) |
-| PDF (`.pdf`) | 16 | Exported snapshots for offline/client distribution |
+| Markdown (`.md`) | 47 (42 in `docs/`, 5 at project root) | Primary documentation (version-controlled). ~20 of these are not yet described in this index — see the "Known gap" note at the top |
+| PDF (`.pdf`) | 29 (27 in `docs/`/root, 2 nested under `modules/`) | Exported snapshots for offline/client distribution |
 
 ---
 
@@ -265,4 +270,4 @@ Summary of the Phase 6 documentation quality pass: files audited, issues found a
 
 ---
 
-*This index is auto-maintained. When adding new documentation, add an entry here.*
+*This index is manually maintained, not auto-generated — it previously claimed otherwise while carrying a 4-month-old snapshot with dead links to deleted files (fixed 2026-07-13). When adding new documentation, add an entry here.*

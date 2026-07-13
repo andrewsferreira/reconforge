@@ -161,10 +161,25 @@ class PortScanningPhase(NetworkPhaseBase):
         else:
             nmap_result = self.parser.parse_text(run_result.stdout)
 
-        # Process discovered hosts
-        for host in nmap_result.live_hosts:
-            if host.ip == target or not host_result["open_ports"]:
-                self._process_host(host, host_result, target)
+        # Process the discovered host matching this scan's target. The old
+        # `host.ip == target or not host_result["open_ports"]` condition
+        # meant "no ports found yet" (true for every host until the first
+        # match) rather than "no matching host found" — if nmap's XML
+        # happened to list target's own (fully-filtered, zero-open-port)
+        # entry first, the loop kept going and processed a second,
+        # unrelated host entry into the same host_result, misattributing
+        # its ports/services/findings to target. Now matches by IP first,
+        # falling back to nmap's sole reported host only when there is
+        # exactly one (nmap may report a genuine single-target scan under
+        # a different identifier, e.g. hostname vs IP) — never guessing
+        # when multiple unmatched entries are present.
+        matched_host = next(
+            (h for h in nmap_result.live_hosts if h.ip == target), None
+        )
+        if matched_host is None and len(nmap_result.live_hosts) == 1:
+            matched_host = nmap_result.live_hosts[0]
+        if matched_host is not None:
+            self._process_host(matched_host, host_result, target)
 
         # Run version scan on open ports if any found
         if host_result["open_ports"] and opsec_mode != "stealth":
