@@ -2,7 +2,7 @@
 """ReconForge - Modular Pentest Reconnaissance Framework.
 
 Author: Andrews Ferreira
-Version: 2.4.3
+Version: 2.5.0
 
 Usage (after `pip install -e .` or `pipx install .`):
     reconforge network --target <target> [options]

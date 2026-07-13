@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.0] — 2026-07-13
+
+Phase 16 (Reproducible Lab): README's "Local Validation Lab" section referenced `http://127.0.0.1:8008` with nothing anywhere in the repo that actually defined or served that target — the reproducibility claim was aspirational. MINOR per `docs/VERSIONING.md` — adds a new first-party capability (`lab/`), not a bug fix.
+
+### Added
+
+- `lab/vulnerable_app.py`: a pure-stdlib, loopback-only HTTP test target (`http.server.BaseHTTPRequestHandler`/`ThreadingHTTPServer`, no third-party dependencies, no external downloads). Refuses to bind to anything but `127.0.0.1`/`localhost`/`::1` via a `_validate_loopback_host()` argparse validator. Serves deliberately weak endpoints aligned with what ReconForge's own `web`/`api` modules check: `/` omits all security headers, `/search?q=` reflects the query parameter unescaped, `/admin` and `/robots.txt` provide predictable/enumerable paths, `/api/status` returns a JSON fingerprint, and `/login` (GET+POST) is a fake login form that never actually authenticates.
+- `tests/lab/test_vulnerable_app.py`: 11 tests exercising the lab server's real HTTP responses (via a background-thread `ThreadingHTTPServer` on an ephemeral loopback port) and the loopback-only guard's accept/reject behavior.
+
+### Documented
+
+- README's "Local Validation Lab" section now instructs starting `lab/vulnerable_app.py` before the existing `reconforge web` smoke-test command, and describes the weaknesses it actually serves instead of assuming a pre-existing target.
+- `docs/ARCHITECTURE_REVIEW.md`: marked the "No reproducible local lab exists yet" §9 item resolved.
+
+Net +11 tests (807 → 818); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.4.3] — 2026-07-13
 
 Phase 15 (Reporting): re-verified the standing decision to keep `core/reporting/` (dead code since Phase 1) against 14 phases of evidence, and audited the live reporting paths. PATCH per `docs/VERSIONING.md` — the deleted code had zero external callers/documented interface (never wired into the CLI), so this isn't a breaking module removal in the sense the policy protects against; the manifest-ordering fix is a pure bug fix.

@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.4.3 • 807/807 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.5.0 • 818/818 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -106,13 +106,15 @@ reconforge network --target 10.10.10.1 --authorized-target
 
 ## Local Validation Lab (Safe Testing)
 
-For repeatable testing in isolated environments, run ReconForge against a local target you own (for example, an intentionally vulnerable HTTP service bound to `127.0.0.1`).
-
-Example smoke-test command:
+For repeatable testing in isolated environments, ReconForge ships a first-party, pure-stdlib lab target at [`lab/vulnerable_app.py`](lab/vulnerable_app.py) — no third-party dependencies, no external downloads, and it refuses to bind to anything but loopback. Start it, then run ReconForge against it:
 
 ```bash
+python3 lab/vulnerable_app.py
+# listening on http://127.0.0.1:8008 — in another terminal:
 reconforge web --target http://127.0.0.1:8008 --phases surface,content -v --lab-mode
 ```
+
+The lab target intentionally serves a few weaknesses for the `web`/`api` modules to detect: `/` omits all security headers, `/search?q=` reflects the query parameter unescaped, `/admin` and `/robots.txt` provide predictable/enumerable paths, and `/api/status` returns a small JSON fingerprint.
 
 Expected artifacts:
 
@@ -122,7 +124,7 @@ Expected artifacts:
 - `outputs/<target>/web/audit.json`
 - `outputs/<target>/web/results.contract.json`
 
-> Note: deep classes such as SQLi/XSS/SSRF depend on optional tools (for example `sqlmap`, `nuclei`, and `ffuf`) being installed and enabled in your OPSEC profile.
+> Note: deep classes such as SQLi/XSS/SSRF depend on optional tools (for example `sqlmap`, `nuclei`, and `ffuf`) being installed and enabled in your OPSEC profile. The bundled lab target does not implement these deeper vulnerability classes.
 
 ## OPSEC Modes
 
