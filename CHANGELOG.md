@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.4.3] — 2026-07-13
+
+Phase 15 (Reporting): re-verified the standing decision to keep `core/reporting/` (dead code since Phase 1) against 14 phases of evidence, and audited the live reporting paths. PATCH per `docs/VERSIONING.md` — the deleted code had zero external callers/documented interface (never wired into the CLI), so this isn't a breaking module removal in the sense the policy protects against; the manifest-ordering fix is a pure bug fix.
+
+### Removed
+
+- `core/reporting/` (`pipeline.py`, `models.py`, `exporters/`, `renderers/`, `serializers/`) and its exclusive dependency `core/schemas/` (`contracts.py`) — confirmed 100% orphaned (only reachable from their own dedicated test file). Their one claimed unique asset, a SHA-256 hash-chain integrity manifest, was already duplicated and live in `core/output_manager.py::write_evidence_manifest()`, actively used by all 5 real modules. Wiring the dead pipeline in for real would require a substantial new adapter layer, not a config flag — a multi-day effort disproportionate to a bug-fix phase. Also removed the now-inaccurate `docs/REPORTING_ARCHITECTURE.md` and the dead pipeline's dedicated test file.
+
+### Fixed
+
+- `network_module.py`/`web_module.py`/`api_module.py`/`surface_module.py`: `write_evidence_manifest()` — which hashes every artifact in the module output directory into a tamper-evidence chain — was called *before* `quick_report.md` was written, so the primary human-facing report was silently excluded from its own integrity chain in every real run (`ad_module.py` already had the correct order). Fixed by moving the manifest write to genuinely be the last artifact written.
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- All 5 modules' `_generate_reports()` wrap 9-10 independent file writes in a single bare `except Exception: log and continue`, with no re-raise and no typed exception — a partial failure leaves later artifacts unwritten while `run()` still reports overall success. Deferred pending the larger `results["success"]`-honesty redesign already scoped out in Phase 11.
+
+Net +1 test (806 → 807 — 6 dead-pipeline tests removed, 7 new tests added); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.4.2] — 2026-07-13
 
 Phase 14 (Credential/Loot Handling): audited `core/credential_vault.py::CredentialVault` and `core/loot_manager.py::LootManager`, closing two P2 items Phase 9 had flagged. Pure bug fixes — no new public fields/methods/capabilities — so PATCH per `docs/VERSIONING.md`.
