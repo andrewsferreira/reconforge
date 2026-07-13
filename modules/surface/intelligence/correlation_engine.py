@@ -9,6 +9,7 @@ to share enumeration, LDAP to AD enumeration, etc.
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
+from urllib.parse import urlparse
 
 from modules.surface.intelligence.service_intelligence import (
     ServiceIntelligenceDB,
@@ -209,7 +210,22 @@ class CorrelationEngine:
             svc.products.append(norm.product)
         if product and product not in svc.products:
             svc.products.append(product)
-        svc.detection_methods.add(detection_method)
+
+        # ServiceDeduplicator.deduplicate_ports() pre-merges port_scan and
+        # version_scan entries for the same port and tags the merged entry
+        # with the real union of detection methods in "_detection_methods"
+        # (see modules/surface/intelligence/deduplicator.py). Callers that
+        # pre-dedupe (modules/surface/phases/vector_correlation.py) then
+        # call correlate(ports=deduped_services, ...) with a single hardcoded
+        # detection_method="port_scan" — using that alone would discard the
+        # richer tagging and mean ConfidenceScorer's multi_detection signal
+        # (len(detection_methods) >= 2) could never fire for TCP/UDP
+        # services, only HTTP. Prefer the entry's own tagging when present.
+        entry_detection_methods = entry.get("_detection_methods")
+        if entry_detection_methods:
+            svc.detection_methods.update(entry_detection_methods)
+        else:
+            svc.detection_methods.add(detection_method)
         svc.raw_entries.append(entry)
 
     def _ingest_http(self, correlated: Dict[str, CorrelatedService],
@@ -219,14 +235,35 @@ class CorrelationEngine:
         if not url:
             return
 
-        # Determine if http or https
-        is_https = url.startswith("https://")
+        # Group by scheme AND port, not scheme alone — two HTTP services on
+        # different ports of the same host (e.g. :80 and :8080) are not
+        # necessarily the same logical service and must not be merged
+        # (previously both fell into a single "http" bucket, conflating
+        # their urls/technologies/products). canonical_name stays the bare
+        # scheme ("http"/"https") since that's the key
+        # ServiceIntelligenceDB.get_profile() expects in _enrich_service().
+        parsed = urlparse(url)
+        is_https = parsed.scheme == "https"
+        port = parsed.port or (443 if is_https else 80)
         canonical = "https" if is_https else "http"
 
-        if canonical not in correlated:
-            correlated[canonical] = CorrelatedService(canonical_name=canonical)
+        # Reuse an existing entry the port/version-scan phase already
+        # correlated for this exact port (links the URL probe to the same
+        # logical service) rather than always minting a new bucket — only
+        # fall back to a fresh scheme:port key when no such entry exists,
+        # which is what actually fixes the distinct-ports-getting-merged bug.
+        dict_key = next(
+            (key for key, svc in correlated.items()
+             if svc.canonical_name == canonical and port in svc.ports),
+            f"{canonical}:{port}",
+        )
 
-        svc = correlated[canonical]
+        if dict_key not in correlated:
+            correlated[dict_key] = CorrelatedService(canonical_name=canonical)
+
+        svc = correlated[dict_key]
+        if port not in svc.ports:
+            svc.ports.append(port)
         if url not in svc.urls:
             svc.urls.append(url)
 

@@ -280,3 +280,165 @@ def test_save_json_and_markdown(tmp_path):
     assert json_path.is_file()
     assert md_path.is_file()
     assert "Heuristic Findings" in md_path.read_text()
+
+
+# ── Phase 9-C: exact-duplicate deduplication ─────────────────────────
+
+def test_add_exact_duplicate_is_collapsed():
+    mgr = FindingsManager()
+    mgr.add(finding_type="misconfiguration", severity="medium", confidence="confirmed",
+             target="10.10.10.1", module="network", description="SMB null session allows anonymous access")
+    mgr.add(finding_type="misconfiguration", severity="medium", confidence="confirmed",
+             target="10.10.10.1", module="network", description="SMB null session allows anonymous access")
+
+    assert len(mgr.get_all()) == 1
+    assert mgr.duplicate_count == 1
+
+
+def test_add_duplicate_returns_first_seen_finding():
+    mgr = FindingsManager()
+    first = mgr.add(finding_type="a", severity="high", confidence="confirmed",
+                     target="t", module="m", description="d")
+    second = mgr.add(finding_type="a", severity="high", confidence="confirmed",
+                      target="t", module="m", description="d")
+
+    assert second is first
+    assert second.id == first.id
+
+
+def test_add_different_target_is_not_a_duplicate():
+    mgr = FindingsManager()
+    mgr.add(finding_type="a", severity="high", confidence="confirmed",
+             target="host1", module="m", description="d")
+    mgr.add(finding_type="a", severity="high", confidence="confirmed",
+             target="host2", module="m", description="d")
+
+    assert len(mgr.get_all()) == 2
+    assert mgr.duplicate_count == 0
+
+
+def test_add_different_description_is_not_a_duplicate():
+    mgr = FindingsManager()
+    mgr.add(finding_type="a", severity="high", confidence="confirmed",
+             target="t", module="m", description="first observation")
+    mgr.add(finding_type="a", severity="high", confidence="confirmed",
+             target="t", module="m", description="second observation")
+
+    assert len(mgr.get_all()) == 2
+    assert mgr.duplicate_count == 0
+
+
+def test_add_different_severity_is_not_a_duplicate():
+    """Two tools disagreeing on severity for what reads as the same
+    description is informative, not noise — not collapsed."""
+    mgr = FindingsManager()
+    mgr.add(finding_type="a", severity="high", confidence="confirmed",
+             target="t", module="m", description="d")
+    mgr.add(finding_type="a", severity="medium", confidence="confirmed",
+             target="t", module="m", description="d")
+
+    assert len(mgr.get_all()) == 2
+    assert mgr.duplicate_count == 0
+
+
+def test_duplicate_check_happens_after_clamping():
+    """Two calls that clamp to the same final severity via different
+    confidence-driven paths, but end up with identical post-clamp
+    description prefixes, are still correctly deduped (or not) based on
+    final state, not raw input."""
+    mgr = FindingsManager()
+    mgr.add(finding_type="a", severity="critical", confidence="heuristic",
+             target="t", module="m", description="d")
+    mgr.add(finding_type="a", severity="critical", confidence="heuristic",
+             target="t", module="m", description="d")
+
+    assert len(mgr.get_all()) == 1
+    assert mgr.duplicate_count == 1
+
+
+def test_to_markdown_shows_duplicate_count_note():
+    mgr = FindingsManager()
+    mgr.add(finding_type="a", severity="high", confidence="confirmed",
+             target="t", module="m", description="d")
+    mgr.add(finding_type="a", severity="high", confidence="confirmed",
+             target="t", module="m", description="d")
+
+    md = mgr.to_markdown()
+    assert "Duplicates Merged" in md
+    assert "1 exact-duplicate" in md
+
+
+def test_to_markdown_omits_duplicate_note_when_none_present():
+    mgr = FindingsManager()
+    mgr.add(finding_type="a", severity="high", confidence="confirmed",
+             target="t", module="m", description="d")
+
+    md = mgr.to_markdown()
+    assert "Duplicates Merged" not in md
+
+
+# ── Phase 9-F: cross-module aggregation via ingest() ─────────────────
+
+def test_ingest_merges_findings_from_another_manager():
+    source = FindingsManager()
+    source.add(finding_type="a", severity="high", confidence="confirmed",
+                target="host1", module="network", description="d1")
+    source.add(finding_type="b", severity="medium", confidence="medium",
+                target="host2", module="network", description="d2")
+
+    dest = FindingsManager()
+    added = dest.ingest(source)
+
+    assert added == 2
+    assert len(dest.get_all()) == 2
+    assert {f.description for f in dest.get_all()} == {"d1", "d2"}
+
+
+def test_ingest_dedupes_exact_duplicate_from_another_module():
+    """The concrete cross-module scenario this exists for: network and ad
+    modules each independently derive and report the identical SMB-signing
+    misconfiguration for the same target during workflow auto-handoff."""
+    network_findings = FindingsManager()
+    network_findings.add(
+        finding_type="misconfiguration", severity="medium", confidence="confirmed",
+        target="10.10.10.1", module="network",
+        description="SMB message signing is disabled",
+    )
+
+    combined = FindingsManager()
+    combined.add(
+        finding_type="misconfiguration", severity="medium", confidence="confirmed",
+        target="10.10.10.1", module="network",
+        description="SMB message signing is disabled",
+    )
+    added = combined.ingest(network_findings)
+
+    assert added == 0
+    assert len(combined.get_all()) == 1
+    assert combined.duplicate_count == 1
+
+
+def test_ingest_preserves_module_and_confidence_reason():
+    source = FindingsManager()
+    source.add(finding_type="a", severity="high", confidence="high",
+                target="t", module="ad", description="d",
+                confidence_reason="graph-inferred, not verified")
+
+    dest = FindingsManager()
+    dest.ingest(source)
+
+    merged = dest.get_all()[0]
+    assert merged.module == "ad"
+    assert merged.confidence_reason == "graph-inferred, not verified"
+
+
+def test_ingest_from_empty_manager_is_a_noop():
+    source = FindingsManager()
+    dest = FindingsManager()
+    dest.add(finding_type="a", severity="high", confidence="confirmed",
+              target="t", module="m", description="d")
+
+    added = dest.ingest(source)
+
+    assert added == 0
+    assert len(dest.get_all()) == 1

@@ -377,6 +377,7 @@ def _run_module(module_name: str, target: str, *,
                 timeout: int = 600,
                 encrypt_loot: bool = False,
                 credential_vault: Optional[CredentialVault] = None,
+                findings_manager: Optional[FindingsManager] = None,
                 extra_config: Optional[Dict[str, Any]] = None,
                 scope: Optional["ScopeAuthorization"] = None,
                 approval_id: Optional[str] = None,
@@ -387,6 +388,15 @@ def _run_module(module_name: str, target: str, *,
     so a target discovered mid-workflow (e.g. via auto-handoff) is
     re-validated against the same engagement scope as the initial target,
     rather than only being checked once at CLI start.
+
+    *findings_manager*, when provided, receives every finding the spawned
+    module recorded via ``findings_manager.ingest(mod.findings_mgr)`` —
+    mirroring the existing ``credential_vault.ingest_from_loot(mod.loot)``
+    pattern below. Each module still writes its own findings.json/.md to
+    its own output directory; this additionally aggregates everything
+    into one cross-module FindingsManager (deduping exact repeats, e.g.
+    network and ad modules each independently reporting the identical
+    SMB-signing misconfiguration for the same target during auto-handoff).
 
     Returns the module result dict.
     """
@@ -409,6 +419,8 @@ def _run_module(module_name: str, target: str, *,
         )
         if credential_vault:
             credential_vault.ingest_from_loot(mod.loot)
+        if findings_manager:
+            findings_manager.ingest(mod.findings_mgr)
         return result
 
     elif module_name == "ad":
@@ -429,6 +441,8 @@ def _run_module(module_name: str, target: str, *,
         result = mod.run(phases=extra.get("phases"))
         if credential_vault:
             credential_vault.ingest_from_loot(mod.loot)
+        if findings_manager:
+            findings_manager.ingest(mod.findings_mgr)
         return result
 
     elif module_name == "web":
@@ -449,6 +463,8 @@ def _run_module(module_name: str, target: str, *,
         )
         if credential_vault:
             credential_vault.ingest_from_loot(mod.loot)
+        if findings_manager:
+            findings_manager.ingest(mod.findings_mgr)
         return result
 
     elif module_name == "api":
@@ -471,6 +487,8 @@ def _run_module(module_name: str, target: str, *,
         )
         if credential_vault:
             credential_vault.ingest_from_loot(mod.loot)
+        if findings_manager:
+            findings_manager.ingest(mod.findings_mgr)
         return result
 
     elif module_name == "surface":
@@ -484,6 +502,8 @@ def _run_module(module_name: str, target: str, *,
         result = mod.run(phases=extra.get("phases"))
         if credential_vault:
             credential_vault.ingest_from_loot(mod.loot)
+        if findings_manager:
+            findings_manager.ingest(mod.findings_mgr)
         return result
 
     else:
@@ -720,6 +740,7 @@ class WorkflowOrchestrator:
                     timeout=self.timeout,
                     encrypt_loot=self.encrypt_loot,
                     credential_vault=self.vault,
+                    findings_manager=self.findings,
                     extra_config=step.config,
                     scope=self.scope,
                     approval_id=self.approval_id,
@@ -959,6 +980,14 @@ class WorkflowOrchestrator:
         # Save credential vault
         vault_path = out_dir / f"vault_{ts}.json"
         self.vault.save(vault_path)
+
+        # Save cross-module aggregated findings (deduped via
+        # self.findings.ingest() as each module completed — see
+        # _run_module()). Each module also writes its own findings.json/.md
+        # to its own output directory; this is the combined view across
+        # every module the workflow ran.
+        self.findings.save_json(out_dir / f"findings_{ts}.json")
+        self.findings.save_markdown(out_dir / f"findings_{ts}.md")
 
         # Optional external integrations (SIEM/ticketing/approval webhooks)
         sent = dispatch_workflow_event(summary)

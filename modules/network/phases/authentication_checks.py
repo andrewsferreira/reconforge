@@ -107,6 +107,14 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
         """Check for anonymous/unauthenticated access on services."""
         self.logger.info("Checking for anonymous/unauthenticated access...")
 
+        # SMB null-session testing is host-level (smbclient.null_session_test()
+        # takes no port argument), but ANON_TEST_SERVICES maps BOTH 139 and 445
+        # to the same "null_session" test. Running it once per matching port
+        # produced two near-identical findings for any dual-port SMB host
+        # (the overwhelming majority of Windows/Samba targets) — track
+        # whether it's already run this call and test at most once.
+        null_session_tested = False
+
         for port_num in port_numbers:
             if port_num not in self.ANON_TEST_SERVICES:
                 continue
@@ -123,10 +131,15 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
             )
 
             if test_type == "null_session" and self.smbclient.is_available():
+                if null_session_tested:
+                    continue
+                null_session_tested = True
+                smb_ports = [p for p in port_numbers if self.ANON_TEST_SERVICES.get(p, {}).get("test") == "null_session"]
+
                 result = self.smbclient.null_session_test(target)
                 if result.success and "NT_STATUS_ACCESS_DENIED" not in result.stdout:
                     results["anonymous_access"].append({
-                        "port": port_num,
+                        "port": smb_ports,
                         "service": svc_name,
                         "type": "null_session",
                         "evidence": result.stdout[:300],
@@ -135,10 +148,13 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
                         finding_type="misconfiguration",
                         severity="medium",
                         confidence="confirmed",
-                        target=f"{target}:{port_num}",
+                        target=target,
                         module="network",
                         phase=self.PHASE_NAME,
-                        description=f"SMB null session allows anonymous access",
+                        description=(
+                            "SMB null session allows anonymous access "
+                            f"(ports {', '.join(str(p) for p in smb_ports)})"
+                        ),
                         evidence=result.stdout[:300],
                         recommendation="Disable SMB null sessions",
                     )

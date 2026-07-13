@@ -104,6 +104,8 @@ class FindingsManager:
         self._findings: List[Finding] = []
         self._strict = strict
         self._clamped_count = 0
+        self._duplicate_count = 0
+        self._seen: Dict[str, Finding] = {}  # fingerprint -> first-seen Finding
 
     def add(self, finding_type: str, severity: str, confidence: str,
             target: str, module: str, description: str,
@@ -135,7 +137,9 @@ class FindingsManager:
                 a bare confidence literal with no justification.
 
         Returns:
-            The created Finding object (severity may have been adjusted).
+            The created Finding object (severity may have been adjusted),
+            or the first-seen Finding if this call is an exact duplicate
+            of one already recorded (see ``duplicate_count``).
         """
         # Normalise inputs
         severity = severity.lower().strip()
@@ -158,6 +162,22 @@ class FindingsManager:
                 # Append note to description so the operator knows
                 description = f"[severity clamped: {original}→{severity}] {description}"
 
+        # Exact-duplicate check, before enrich_references() (which can hit
+        # the network) so a repeated call does no wasted work. Modeled on
+        # core/credential_vault.py::CredentialVault._fingerprint()'s
+        # proven O(1) set-based pattern. Deliberately narrow (exact-match
+        # on finding_type/severity/confidence/target/description) — it
+        # catches the same call being made twice (the class of bug found
+        # in modules/network/phases/authentication_checks.py and
+        # modules/network/parsers/nmap_parser.py), not semantically-similar
+        # findings worded differently by different tools, which is a
+        # separate, harder problem left for a future correlation pass.
+        fp = self._fingerprint(finding_type, severity, confidence, target, description)
+        existing = self._seen.get(fp)
+        if existing is not None:
+            self._duplicate_count += 1
+            return existing
+
         f = Finding(
             finding_type=finding_type, severity=severity, confidence=confidence,
             confidence_reason=confidence_reason,
@@ -165,13 +185,58 @@ class FindingsManager:
             evidence=evidence, recommendation=recommendation,
             references=enrich_references(description, evidence, references or [])
         )
+        self._seen[fp] = f
         self._findings.append(f)
         return f
+
+    @staticmethod
+    def _fingerprint(finding_type: str, severity: str, confidence: str,
+                     target: str, description: str) -> str:
+        """Unique fingerprint for exact-duplicate detection."""
+        return f"{finding_type}|{severity}|{confidence}|{target}|{description}"
+
+    def ingest(self, other: "FindingsManager") -> int:
+        """Merge another FindingsManager's findings into this one.
+
+        Re-runs each finding through ``add()`` (not a raw list extend),
+        so this instance's own exact-duplicate dedup applies — e.g. two
+        modules independently reporting the identical SMB-signing
+        misconfiguration for the same target during a workflow's
+        auto-handoff collapse into one entry here, the same as if a
+        single module had called ``add()`` twice. Severity re-clamping
+        is a no-op for already-valid values, so this is safe to call
+        even when ``other`` was itself built in non-strict mode.
+
+        Args:
+            other: The FindingsManager to merge from (unmodified).
+
+        Returns:
+            The number of findings actually added (excludes duplicates
+            that were already present in this manager).
+        """
+        added = 0
+        for f in other.get_all():
+            before = len(self._findings)
+            self.add(
+                finding_type=f.finding_type, severity=f.severity,
+                confidence=f.confidence, confidence_reason=f.confidence_reason,
+                target=f.target, module=f.module, phase=f.phase,
+                description=f.description, evidence=f.evidence,
+                recommendation=f.recommendation, references=list(f.references),
+            )
+            if len(self._findings) > before:
+                added += 1
+        return added
 
     @property
     def clamped_count(self) -> int:
         """Number of findings whose severity was clamped by validation."""
         return self._clamped_count
+
+    @property
+    def duplicate_count(self) -> int:
+        """Number of add() calls that matched an already-recorded finding."""
+        return self._duplicate_count
 
     def get_all(self) -> List[Finding]:
         """Get all findings sorted by severity."""
@@ -215,6 +280,8 @@ class FindingsManager:
 
         if self._clamped_count:
             lines.append(f"**Severity Clamped:** {self._clamped_count} findings had severity reduced due to low confidence")
+        if self._duplicate_count:
+            lines.append(f"**Duplicates Merged:** {self._duplicate_count} exact-duplicate add() calls were collapsed into their first-seen finding")
         lines.append("")
 
         for sev in ["critical", "high", "medium", "low", "info"]:

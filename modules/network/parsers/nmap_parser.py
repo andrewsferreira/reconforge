@@ -333,31 +333,48 @@ class NmapParser:
     def check_anonymous_access(self, host: NmapHost) -> List[Dict]:
         """Check for services that may allow anonymous access.
 
+        A port is reported at most once, even when both the service-name
+        heuristic and an NSE script both indicate anonymous access — these
+        two signals used to be appended independently, producing two
+        separate findings describing the same underlying condition for
+        one port. NSE script evidence (a concrete indicator string) takes
+        priority over the bare service-name heuristic when both fire.
+
         Args:
             host: NmapHost to check.
 
         Returns:
-            List of anonymous access findings.
+            List of anonymous access findings, at most one per port.
         """
         findings = []
         for port in host.open_ports:
-            if port.service in self.ANON_SERVICES:
+            service_name_match = port.service in self.ANON_SERVICES
+            script_evidence = None
+            script_id_matched = ""
+
+            for script_id, output in port.scripts.items():
+                if any(indicator in output.lower() for indicator in
+                       ["anonymous", "anonymous login", "ftp-anon", "null session"]):
+                    script_evidence = output[:500]
+                    script_id_matched = script_id
+                    break
+
+            if not service_name_match and script_evidence is None:
+                continue
+
+            if script_evidence is not None:
+                findings.append({
+                    "port": port.port,
+                    "service": port.service,
+                    "description": f"Anonymous access detected via {script_id_matched}",
+                    "evidence": script_evidence,
+                })
+            else:
                 findings.append({
                     "port": port.port,
                     "service": port.service,
                     "description": f"{port.service} on port {port.port} may allow anonymous access",
                 })
-
-            # Check script output for anonymous access indicators
-            for script_id, output in port.scripts.items():
-                if any(indicator in output.lower() for indicator in
-                       ["anonymous", "anonymous login", "ftp-anon", "null session"]):
-                    findings.append({
-                        "port": port.port,
-                        "service": port.service,
-                        "description": f"Anonymous access detected via {script_id}",
-                        "evidence": output[:500],
-                    })
         return findings
 
     def check_weak_configs(self, host: NmapHost) -> List[Dict]:

@@ -120,6 +120,40 @@ def test_check_anon_access(parser):
     assert len(findings) >= 1
 
 
+def test_check_anon_access_no_duplicate_when_both_signals_fire(parser):
+    """Phase 9-B regression: a port matching both the service-name
+    heuristic AND an NSE script anonymous-access indicator must produce
+    exactly one finding, not two describing the same condition."""
+    host = NmapHost(ip="10.0.0.1", ports=[
+        NmapPort(port=21, service="ftp",
+                 scripts={"ftp-anon": "Anonymous FTP login allowed"}),
+    ])
+    findings = parser.check_anonymous_access(host)
+    assert len(findings) == 1
+    # NSE script evidence takes priority over the bare heuristic
+    assert "ftp-anon" in findings[0]["description"]
+    assert findings[0]["evidence"]
+
+
+def test_check_anon_access_heuristic_only(parser):
+    host = NmapHost(ip="10.0.0.1", ports=[
+        NmapPort(port=21, service="ftp"),
+    ])
+    findings = parser.check_anonymous_access(host)
+    assert len(findings) == 1
+    assert "may allow anonymous access" in findings[0]["description"]
+
+
+def test_check_anon_access_script_only(parser):
+    host = NmapHost(ip="10.0.0.1", ports=[
+        NmapPort(port=445, service="microsoft-ds",
+                 scripts={"smb-enum-shares": "null session access allowed"}),
+    ])
+    findings = parser.check_anonymous_access(host)
+    assert len(findings) == 1
+    assert "smb-enum-shares" in findings[0]["description"]
+
+
 def test_check_weak_configs_unencrypted(parser):
     host = NmapHost(ip="10.0.0.1", ports=[
         NmapPort(port=23, service="telnet"),

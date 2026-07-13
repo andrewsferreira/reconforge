@@ -73,6 +73,47 @@ def test_run_module_propagates_scope_to_spawned_module():
     assert ctor.call_args.kwargs["approval_id"] == "APPROVAL-1"
 
 
+def test_run_module_aggregates_findings_into_provided_manager():
+    """Phase 9-F: core.workflow_orchestrator._run_module must ingest the
+    spawned module's findings into the caller-provided FindingsManager —
+    previously WorkflowOrchestrator.findings existed but nothing ever
+    wrote to it, so no cross-module aggregation happened at all."""
+    from core.workflow_orchestrator import _run_module
+    from core.findings_manager import FindingsManager
+
+    fake_module = MagicMock()
+    fake_module.run.return_value = {"phases": {}}
+    fake_module.loot = MagicMock()
+    source_findings = FindingsManager()
+    source_findings.add(
+        finding_type="misconfiguration", severity="medium", confidence="confirmed",
+        target="10.10.10.1", module="network", description="SMB signing disabled",
+    )
+    fake_module.findings_mgr = source_findings
+
+    aggregate = FindingsManager()
+    with patch("modules.network.network_module.NetworkModule", return_value=fake_module):
+        _run_module("network", "10.10.10.1", findings_manager=aggregate)
+
+    assert len(aggregate.get_all()) == 1
+    assert aggregate.get_all()[0].description == "SMB signing disabled"
+
+
+def test_run_module_without_findings_manager_does_not_error():
+    """findings_manager is optional — omitting it (the pre-Phase-9-F
+    default) must not raise."""
+    from core.workflow_orchestrator import _run_module
+
+    fake_module = MagicMock()
+    fake_module.run.return_value = {"phases": {}}
+    fake_module.loot = MagicMock()
+
+    with patch("modules.network.network_module.NetworkModule", return_value=fake_module):
+        result = _run_module("network", "10.10.10.1")
+
+    assert result == {"phases": {}}
+
+
 @patch("modules.network.network_module.OutputManager")
 def test_workflow_orchestrator_handoff_to_out_of_scope_target_fails_step_not_workflow(mock_om):
     """A workflow-level scope should cause an out-of-scope auto-handoff step

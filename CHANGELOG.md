@@ -6,6 +6,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.2.0] — 2026-07-13
+
+Phase 9 (Deduplication/Correlation): `core/findings_manager.py::FindingsManager.add()` had zero identity/dedup check — every call unconditionally appended. Adds a new backward-compatible dedup mechanism and cross-module aggregation (MINOR per `docs/VERSIONING.md`'s "new finding fields"/"new core features" rules), alongside real duplicate-finding bug fixes.
+
+### Fixed
+
+- `network/phases/authentication_checks.py`: SMB null-session testing is host-level, but `ANON_TEST_SERVICES` mapped both port 139 and 445 to the same test — any dual-port SMB host (the overwhelming majority of Windows/Samba targets) got the test run, and a finding recorded, twice.
+- `network/parsers/nmap_parser.py::check_anonymous_access()`: a service-name heuristic and NSE script output were checked independently, producing two findings describing the same anonymous-access condition for one port.
+- `modules/surface/intelligence/correlation_engine.py::_ingest_http()`: HTTP services were grouped by scheme alone, ignoring port — two distinct HTTP services on different ports of the same host were conflated into one `CorrelatedService`, misattributing their technologies/products/urls to each other.
+- `CorrelationEngine._ingest_entry()`: hardcoded `detection_method="port_scan"` for every entry, discarding `ServiceDeduplicator`'s real multi-method tagging — `ConfidenceScorer`'s `multi_detection` signal could never fire for TCP/UDP services, only HTTP.
+
+### Added
+
+- `FindingsManager.add()` now does exact-match fingerprint deduplication (modeled on `core/credential_vault.py::CredentialVault._fingerprint()`'s proven pattern) — a duplicate call returns the first-seen `Finding` instead of creating a second entry. New `duplicate_count` property, surfaced in `to_markdown()`.
+- `FindingsManager.ingest(other)` merges another manager's findings through `add()`, so the new dedup applies automatically.
+- `WorkflowOrchestrator.findings` — previously instantiated but never used anywhere (dead code) — is now wired into `_run_module()` (mirroring the existing `credential_vault.ingest_from_loot()` pattern) and saved as `findings_<timestamp>.{json,md}` in the workflow's final report output, giving a real cross-module aggregated view for the first time.
+
+### Documented (not yet fixed — tracked as follow-ups)
+
+- Cross-module semantically-similar-but-differently-worded duplicates (e.g. network and ad modules independently reporting SMB-signing status with different description text) aren't caught by the new exact-match dedup.
+- `CredentialVault._fingerprint()`'s case-sensitive username/domain matching.
+- `LootManager`'s O(n) linear-scan dedup vs. `CredentialVault`'s O(1) approach.
+- A `network/phases/port_scanning.py` live-hosts loop edge case.
+
+25 new tests added (668 → 693); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.1.0] — 2026-07-13
 
 Phase 8 (Confidence Model): audited `core/findings_manager.py` and ~94 confidence-assignment call sites across all 5 recon modules. Adds a new backward-compatible `confidence_reason` field (MINOR per `docs/VERSIONING.md`'s "new finding fields" rule) alongside several real bug fixes.
