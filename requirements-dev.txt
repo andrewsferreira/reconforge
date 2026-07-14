@@ -7,6 +7,14 @@ bandit>=1.8.0
 pip-audit>=2.8.0
 types-PyYAML>=6.0.12
 
+# CI runner images pre-install setuptools independently of this project's
+# own [build-system] requires floor (pyproject.toml) — that floor only
+# governs PEP 517 build isolation, not what's importable in the target
+# environment pip-audit actually scans. Pinned explicitly here so
+# pip-audit sees the patched version regardless: PYSEC-2026-3447 affects
+# <83.0.0 (found 2026-07-14).
+setuptools>=83.0.0
+
 # reconforge/mcp/ — first-party code under active development, so unlike the
 # reconforge[ad]/[web]/[api] extras (third-party recon tools, not installed
 # in CI), this one IS a dev/test dependency: CI needs it to import and test

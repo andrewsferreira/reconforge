@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.11.4] — 2026-07-14
+
+CI recovery: dependency vulnerability. PATCH per `docs/VERSIONING.md` — no code capability change.
+
+### Fixed
+
+- CI's `pip-audit` step started failing on the push after v2.11.3, unrelated to that commit's actual content: `setuptools` 79.0.1 (PYSEC-2026-3447, fixed in 83.0.0) was disclosed between that push and the next, and `pyproject.toml`'s `[build-system] requires` pulled it in unconstrained. `[build-system] requires` alone only governs PEP 517 build-isolation environments, not necessarily what ends up importable in the persistent environment `pip-audit` scans — so `setuptools>=83.0.0` was pinned in both places: `pyproject.toml`'s `[build-system] requires` (build-time floor) and `requirements-dev.txt` (installed directly into the target environment, guaranteeing pip-audit sees the patched version regardless of build-isolation nuances). Verified by reproducing the exact vulnerable state in a fresh venv matching CI's install order before applying the fix, then confirming `pip-audit` reports clean after.
+
+1045/1045 tests passing; ruff/mypy/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.11.3] — 2026-07-14
 
 Claude MCP Integration — Phase 8 (structured error codes). PATCH per `docs/VERSIONING.md` — richer detail on existing tool error responses, no new tool.
