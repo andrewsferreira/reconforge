@@ -94,7 +94,11 @@ class PortScanningPhase(NetworkPhaseBase):
                 results["total_open_ports"] += len(host_result["open_ports"])
                 results["services_found"].extend(host_result.get("services", []))
 
-        results["success"] = True
+        # Honest success signal: _scan_host() can no-op per target
+        # (opsec-blocked, no targets at all) without ever invoking nmap —
+        # success reflects whether the scan actually ran for at least one
+        # target, tracked via the existing tools_used list.
+        results["success"] = bool(self.tools_used)
 
         # Save parsed results
         parsed_file = self.output_dir / "port_scan_results.json"
@@ -146,6 +150,7 @@ class PortScanningPhase(NetworkPhaseBase):
 
         # Run the scan
         run_result = scan_func(target, ports=ports)
+        self.tools_used.append("nmap")
 
         if not run_result.success:
             self.logger.error(f"Port scan failed for {target}: {run_result.stderr}")

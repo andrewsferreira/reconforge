@@ -91,7 +91,12 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
             if self.opsec.check("nmap_script_scan"):
                 results["nse_scripts"] = self._run_nse_scripts(target, port_numbers)
 
-        results["success"] = True
+        # Honest success signal: SMB/LDAP/NSE enumeration are each gated
+        # on matching open ports being present — a target with none of
+        # 139/445/389/636 open genuinely has nothing for this phase to
+        # enumerate. success reflects whether a tool actually ran,
+        # tracked via the existing tools_used list.
+        results["success"] = bool(self.tools_used)
 
         # Save parsed results
         parsed_file = self.output_dir / "service_enum_results.json"
@@ -129,6 +134,7 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
 
         if self.smbclient.is_available():
             smb_result = self.smbclient.list_shares(target)
+            self.tools_used.append("smbclient")
             if smb_result.success:
                 parsed = self.smb_parser.parse_share_list(smb_result.stdout, target)
                 smb_results["null_session"] = parsed.null_session
@@ -212,6 +218,7 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
             )
 
             enum_result = self.enum4linux.full_enum(target)
+            self.tools_used.append("enum4linux")
             if enum_result.success or enum_result.stdout:
                 parsed_enum = self.enum4linux_parser.parse(enum_result.stdout)
 
@@ -329,6 +336,7 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
         )
 
         rootdse_result = self.ldapsearch.get_base_dn(target)
+        self.tools_used.append("ldapsearch")
         if not rootdse_result.success and not rootdse_result.stdout:
             self.logger.warning(f"LDAP rootDSE query failed on {target}")
             self.workflow.record_result("LDAP rootDSE query failed")
@@ -473,6 +481,7 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
             )
 
             result = self.nmap.smb_scripts(target)
+            self.tools_used.append("nmap")
             if result.success:
                 xml_path = self.nmap.get_xml_path("smb_scripts")
                 if xml_path.exists():

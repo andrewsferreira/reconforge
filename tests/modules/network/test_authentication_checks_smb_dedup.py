@@ -22,6 +22,7 @@ def _make_phase() -> AuthenticationChecksPhase:
         is_available=lambda: True,
         null_session_test=lambda target: SimpleNamespace(success=True, stdout="Sharename Type Comment"),
     )
+    phase.tools_used = []
     return phase
 
 

@@ -30,6 +30,7 @@ def _make_phase(opsec_mode: str, nmap_result: NmapResult) -> PortScanningPhase:
                                       suggest_next=lambda **k: None,
                                       add_attack_path=lambda **k: None)
     phase.opsec = OpsecChecker(mode=opsec_mode)
+    phase.tools_used = []
     phase.nmap = SimpleNamespace(
         syn_scan=lambda target, ports: SimpleNamespace(
             success=True, stdout="", stderr="", command="nmap"

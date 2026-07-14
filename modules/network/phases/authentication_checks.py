@@ -87,7 +87,12 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
                 "phase"
             )
 
-        results["success"] = True
+        # Honest success signal: anonymous-access checks are gated on
+        # matching open ports being present, and brute-force is opt-in —
+        # a run where nothing applicable was found and brute-force wasn't
+        # requested genuinely checked nothing. success reflects whether a
+        # real check actually ran, tracked via the existing tools_used list.
+        results["success"] = bool(self.tools_used)
 
         # Save results
         parsed_file = self.output_dir / "auth_check_results.json"
@@ -137,6 +142,7 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
                 smb_ports = [p for p in port_numbers if self.ANON_TEST_SERVICES.get(p, {}).get("test") == "null_session"]
 
                 result = self.smbclient.null_session_test(target)
+                self.tools_used.append("smbclient")
                 if result.success and "NT_STATUS_ACCESS_DENIED" not in result.stdout:
                     results["anonymous_access"].append({
                         "port": smb_ports,
@@ -232,6 +238,7 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
             hydra_result = self.hydra.test_default_creds(
                 target, svc["service"], port=svc["port"]
             )
+            self.tools_used.append("hydra")
 
             if hydra_result.success:
                 # Check for found credentials

@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.11] — 2026-07-14
+
+Phase 27 (Network Module Success-Honesty Sweep): closed the remainder of the gap Phase 17 believed was already covered for the network module. PATCH per `docs/VERSIONING.md` — bug fix, no new public surface.
+
+### Fixed
+
+- `modules/network/phases/port_scanning.py`, `authentication_checks.py`, `service_enumeration.py`: each `run()` set `results["success"] = True` unconditionally regardless of whether any tool actually executed — the same "decorative success" class fixed in Phase 17/26. Fixed to `results["success"] = bool(self.tools_used)`.
+- `modules/network/base.py`'s `self.tools_used` list had never been populated by any of the module's 4 phase files since the network module's creation (permanently empty), also making its own `"Tools: none"` summary log line always wrong. Now wired at each real tool-invocation point (nmap, smbclient, hydra, enum4linux, ldapsearch).
+
+6 new tests added (872 → 878) — one false-case/true-case pair per file, with all 3 false-case tests confirmed to fail against the pre-fix code; full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.10] — 2026-07-14
 
 Phase 26 (Surface Module Success-Honesty Correction): closed a gap Phase 17 incorrectly believed was already covered. PATCH per `docs/VERSIONING.md` — bug fix, no new public surface.

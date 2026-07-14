@@ -25,6 +25,7 @@ def _make_phase(nmap_result: NmapResult) -> PortScanningPhase:
     phase.workflow = SimpleNamespace(add_step=lambda **k: None, record_result=lambda *a, **k: None,
                                       suggest_next=lambda **k: None)
     phase.opsec = SimpleNamespace(check=lambda *a, **k: True)
+    phase.tools_used = []
     phase.nmap = SimpleNamespace(
         syn_scan=lambda target, ports: SimpleNamespace(
             success=True, stdout="", stderr="", command="nmap"
