@@ -1,8 +1,11 @@
-"""AI orchestration layer for adaptive offensive security workflows.
+"""Rule-based correlation and prioritization layer for adaptive workflows.
 
-This module upgrades ReconForge from static phase orchestration to an
-intelligence-driven decision engine that correlates findings across modules,
-constructs an attack graph, scores exploitability, and recommends next actions.
+This module upgrades ReconForge from static phase orchestration to a
+deterministic decision engine (fixed keyword rules, hand-written confidence
+literals, a linear weighted score — no ML/LLM, see
+docs/AI_ORCHESTRATION_ARCHITECTURE.md's status note) that correlates
+findings across modules, constructs an attack graph, scores exploitability,
+and recommends next actions.
 """
 
 from __future__ import annotations

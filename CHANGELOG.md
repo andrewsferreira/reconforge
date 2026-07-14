@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.6.2] — 2026-07-14
+
+Phase 30 (AI Orchestration Honesty Pass): triggered by a direct question about whether the project's "AI orchestration" claims reflect real integration or aspirational branding. PATCH per `docs/VERSIONING.md` — documentation correction and test coverage, no behavior change.
+
+### Fixed
+
+- `docs/DOCUMENTATION_INDEX.md`: the Phase-22-written entry for `docs/AI_ORCHESTRATION_ARCHITECTURE.md` incorrectly called the AI orchestration layer "proposed" and pointed to the wrong files as its implementation. Corrected: `core/ai_orchestration.py::AIOrchestrationLayer` is real and wired into `core/workflow_orchestrator.py` — confirmed via direct investigation, not dead code.
+- `docs/AI_ORCHESTRATION_ARCHITECTURE.md`: added a status note clarifying the layer is genuinely implemented and integrated, but is a deterministic rule-based correlation/scoring engine (fixed keyword sets, hardcoded confidence literals, a linear weighted formula) — no machine-learning model or LLM call exists anywhere in this codebase, confirmed via repo-wide search.
+- `core/ai_orchestration.py`: lightly softened the module docstring's "intelligence-driven" framing, no public API changes.
+
+### Added
+
+- `tests/core/test_ai_orchestration.py`: 11 new tests with exact value assertions (weighted risk-score formula, per-port exploit-likelihood rules, CVE-hint banner matching, per-module signal ingestion, score-cutoff filtering, service-based recommendations) — only 2 tests existed for 431 lines of code prior to this phase.
+
+11 new tests added (881 → 892); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.6.1] — 2026-07-14
 
 Phase 29 (Risk Policy Documentation + False-Claim Fix): closed the pre-existing P2 item on the risk policy engine's off-by-default status, via the "document why" branch rather than "enable by default" (which would silently block core AD-module functionality). PATCH per `docs/VERSIONING.md` — documentation and test coverage only, no behavior change.
