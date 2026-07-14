@@ -132,6 +132,21 @@ instead of asking a question through a tool call. Every URI comes from a hardcod
 | `reconforge://docs/limitations` | `docs/LIMITATIONS.md` — documented gaps and non-goals. |
 | `reconforge://modules` | Live JSON module catalog — the same data `reconforge_list_modules` returns, computed from the same code path so the two can't drift. |
 
+## Safe demonstration
+
+For the safest possible end-to-end look at this integration — no Claude client, no third-party
+tooling, no real network access — run `examples/claude_mcp/dry_run_against_lab.py`. It starts
+`lab/vulnerable_app.py` (the first-party, stdlib-only local target, see README.md's "Local
+Validation Lab" section) on loopback, then calls `reconforge_dry_run` against it through a real
+MCP client/server session and prints the JSON result. Nothing is ever actually sent to the lab
+server — `dry_run` only constructs the command ReconForge *would* run — but the target is
+concretely real and reachable rather than a synthetic placeholder IP.
+
+```bash
+pip install -e ".[mcp]"
+python examples/claude_mcp/dry_run_against_lab.py
+```
+
 ## Walkthrough: read-only exploration
 
 Once connected, a typical read-only session looks like asking Claude:

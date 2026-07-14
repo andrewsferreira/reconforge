@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.14.2 • 1104/1104 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.14.3 • 1104/1104 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -194,8 +194,10 @@ reconforge mcp serve   # blocks, waiting for an MCP client over stdio
 
 See [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md) for the Claude Desktop/Code setup
 steps, the full security model, and the tool reference. [`examples/claude_mcp/`](examples/claude_mcp/)
-has two runnable scripts (`query_status.py`, `plan_workflow.py`) showing how to talk to the server
-directly with the `mcp` Python SDK, outside of any Claude client.
+has three runnable scripts (`query_status.py`, `plan_workflow.py`, and `dry_run_against_lab.py` — a
+fully self-contained, safe end-to-end demo that spins up `lab/vulnerable_app.py` on loopback and
+dry-runs a real scan against it) showing how to talk to the server directly with the `mcp` Python
+SDK, outside of any Claude client.
 
 ## Testing
 

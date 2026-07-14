@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.14.3] — 2026-07-14
+
+Claude MCP Integration — Phase 15 (safe demonstration), the final phase of the 15-phase plan. PATCH per `docs/VERSIONING.md` — a new runnable example plus documentation, no code capability change.
+
+### Added
+
+- `examples/claude_mcp/dry_run_against_lab.py`: a fully self-contained, safe end-to-end demonstration. Starts `lab/vulnerable_app.py` (the project's own stdlib-only, loopback-only local validation target) on an ephemeral port, then calls `reconforge_dry_run` against it through a real MCP client/server session and prints the JSON result. No third-party tooling, no real network access — `dry_run` only constructs the command that would run — but the target is concretely real and reachable rather than a synthetic placeholder IP, unlike Phase 14's two existing examples. Manually run end-to-end and its output inspected before being committed.
+- A "Safe demonstration" section in `docs/CLAUDE_MCP_INTEGRATION.md`, ahead of the two existing prose walkthroughs, and a pointer from README.md's MCP section.
+
+### Assessed
+
+- The prose walkthroughs and Phase 14's two example scripts already substantially covered "demonstrate this safely" before this phase started — the specific, concrete gap was that no existing example proved a *real, reachable* target only ever produces a constructed command, never an actual request. Closing that one gap was judged sufficient rather than building a larger demonstration suite.
+
+All 15 phases of `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`'s original plan are now done or (Phase 12) assessed with no gap found — the Claude MCP integration work is complete. 1104/1104 tests passing (no test changes, example scripts aren't part of the pytest suite); ruff/mypy(15-file scope)/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.14.2] — 2026-07-14
 
 Claude MCP Integration — Phase 11 (broader test categories). PATCH per `docs/VERSIONING.md` — a bug fix plus test-only additions, no new tool/resource.
