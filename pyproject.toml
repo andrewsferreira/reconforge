@@ -28,7 +28,7 @@ dev = [
   "mypy>=1.11.0",
   "bandit>=1.8.0",
   "pip-audit>=2.8.0",
-  "types-PyYAML>=6.0.12",
+  "types-PyYAML>=6.0.12.20260518",
 ]
 # Convenience installs for each module's pip-installable optional tools
 # (per docs/SUPPORT_MATRIX.md). Every tool below is still invoked as an
