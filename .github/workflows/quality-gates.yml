@@ -36,11 +36,14 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
+      - name: Documentation link check
+        run: python scripts/check_doc_links.py
+
       - name: Type check (mypy)
         run: mypy --follow-imports=skip --ignore-missing-imports reconforge/cli.py core/runner.py core/workflow_orchestrator.py
 
       - name: Security scan (bandit)
-        run: bandit -r core modules reconforge mcp_validation -c pyproject.toml
+        run: bandit -r core modules reconforge mcp_validation scripts -c pyproject.toml
 
       - name: Dependency audit (pip-audit)
         run: pip-audit

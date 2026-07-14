@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.7] — 2026-07-14
+
+Phase 23 (Documentation Link Checker): closed the pre-existing P3 item to add a CI documentation-link check. PATCH per `docs/VERSIONING.md` — new dev/CI tooling script, no change to ReconForge's runtime public surface.
+
+### Added
+
+- `scripts/check_doc_links.py`: verifies every internal Markdown link in the repo (discovered via `git ls-files '*.md'`, so it automatically respects `.gitignore`) resolves to a real file, skipping external `http(s)://`/`mailto:` links and in-page `#anchor`s. Wired into `.github/workflows/quality-gates.yml` as a new "Documentation link check" step and into the normal test suite via `tests/test_doc_links.py` (4 tests).
+- `bandit`'s CI scan scope expanded to include `scripts/` (previously only `core modules reconforge mcp_validation`).
+
+### Fixed
+
+- `docs/DOCUMENTATION_MAP.md`: the checker's first run immediately found 7 dead links in a second, independent documentation index never touched by the Phase 19/22 `DOCUMENTATION_INDEX.md` repairs — references to the same class of long-deleted files (`AUDIT_REPORT.md`, `PHASE_1_CONSISTENCY_AUDIT.md`, `STABILIZATION_CHECK_P6/7/8/9.md`). Fixed using the struck-through-entry convention Phase 22 established, plus one illustrative example link rewritten as inline code.
+
+4 new tests added (859 → 863); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.6] — 2026-07-14
 
 Phase 22 (Documentation Index Completion): closed the ~20-file gap `docs/DOCUMENTATION_INDEX.md` was left with in Phase 19. PATCH per `docs/VERSIONING.md` — documentation-only update.

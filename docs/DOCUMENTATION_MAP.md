@@ -3,7 +3,10 @@
 > **Purpose:** Defines which document is the canonical (authoritative) source for each topic.
 > When multiple documents cover the same topic, this map designates the primary source
 > and lists secondary references.
-> Last updated: 2026-03-21
+> Last updated: 2026-07-13 — six Historical Documents entries (`AUDIT_REPORT.md`,
+> `PHASE_1_CONSISTENCY_AUDIT.md`, `STABILIZATION_CHECK_P6/7/8/9.md`) no longer exist
+> in the repository and are kept as struck-through, explicitly-dead entries rather
+> than silently removed, per `scripts/check_doc_links.py`'s findings.
 
 ---
 
@@ -73,17 +76,17 @@ These documents are preserved as historical records. They reflect the project st
 
 | Document | Date | Description |
 |----------|------|-------------|
-| [AUDIT_REPORT.md](AUDIT_REPORT.md) | 2026-03-17 | Comprehensive technical audit |
+| ~~AUDIT_REPORT.md~~ (removed) | 2026-03-17 | Comprehensive technical audit — superseded by [ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) |
 | [RECONFORGE_MODULE_REPORT.md](RECONFORGE_MODULE_REPORT.md) | 2026-03-17 | Module inventory report |
 | [COMMAND_REFACTORING_REPORT.md](COMMAND_REFACTORING_REPORT.md) | 2026-03-20 | Command execution refactoring (Priority 1) |
-| [PHASE_1_CONSISTENCY_AUDIT.md](PHASE_1_CONSISTENCY_AUDIT.md) | 2026-03-21 | Documentation consistency audit |
+| ~~PHASE_1_CONSISTENCY_AUDIT.md~~ (removed) | 2026-03-21 | Documentation consistency audit |
 | [PRIORITY_4_COMPLETION_REPORT.md](PRIORITY_4_COMPLETION_REPORT.md) | 2026-03-21 | Documentation completion report |
 | [FINAL_STABILIZATION_REPORT.md](FINAL_STABILIZATION_REPORT.md) | 2026-03-21 | Final stabilization validation |
 | [MIGRATION_CONFIG_SCHEMA.md](MIGRATION_CONFIG_SCHEMA.md) | 2026-03-21 | Config schema unification guide |
-| [STABILIZATION_CHECK_P9.md](STABILIZATION_CHECK_P9.md) | 2026-03-21 | Priority 9 stabilization check |
-| [../STABILIZATION_CHECK_P6.md](../STABILIZATION_CHECK_P6.md) | 2026-03-21 | Priority 6 stabilization check |
-| [../STABILIZATION_CHECK_P7.md](../STABILIZATION_CHECK_P7.md) | 2026-03-21 | Priority 7 stabilization check |
-| [../STABILIZATION_CHECK_P8.md](../STABILIZATION_CHECK_P8.md) | 2026-03-21 | Priority 8 stabilization check |
+| ~~STABILIZATION_CHECK_P9.md~~ (removed) | 2026-03-21 | Priority 9 stabilization check |
+| ~~STABILIZATION_CHECK_P6.md~~ (removed) | 2026-03-21 | Priority 6 stabilization check |
+| ~~STABILIZATION_CHECK_P7.md~~ (removed) | 2026-03-21 | Priority 7 stabilization check |
+| ~~STABILIZATION_CHECK_P8.md~~ (removed) | 2026-03-21 | Priority 8 stabilization check |
 
 ---
 
@@ -103,7 +106,7 @@ These documents are preserved as historical records. They reflect the project st
 
 ## Cross-Reference Rules
 
-1. **Do not duplicate detailed explanations.** When a non-canonical document discusses a canonical topic, add a cross-reference: `> See [CANONICAL_DOC.md](CANONICAL_DOC.md) for details.`
+1. **Do not duplicate detailed explanations.** When a non-canonical document discusses a canonical topic, add a cross-reference: `> See CANONICAL_DOC.md for details.` (illustrative filename, not a real link)
 2. **Canonical sources are authoritative.** If a secondary reference conflicts with the canonical source, the canonical source is correct.
 3. **Historical documents are frozen.** Do not update historical documents to match current state — they reflect the project at a specific point in time.
 4. **Module READMEs are canonical for module internals.** `docs/MODULES.md` provides the overview; module-level READMEs provide implementation details.
