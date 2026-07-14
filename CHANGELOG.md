@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.12.2] — 2026-07-14
+
+Claude MCP Integration — Phase 12 (assessed) + Phase 14 (README section + examples). PATCH per `docs/VERSIONING.md` — documentation and examples only, no code capability change.
+
+### Added
+
+- README.md gained a "Claude and MCP Integration" section: what `reconforge mcp serve` is, a two-line quick-start, and pointers to the full setup guide and the new examples.
+- `examples/claude_mcp/query_status.py` and `examples/claude_mcp/plan_workflow.py`: two minimal, runnable scripts using the `mcp` Python SDK's client directly (not through any Claude client) to spawn the real server and call `reconforge_get_status`/`reconforge_plan_workflow`. Both were actually executed against a real subprocess before being committed, confirming correct JSON output (including the Phase 13 audit line on stderr) rather than just being read for plausibility.
+
+### Assessed
+
+- Phase 12 (remaining CI hardening) — checked whether the `mcp` SDK dependency needed explicit Dependabot coverage before writing any config change. `.github/dependabot.yml`'s pip ecosystem entry (`directory: "/"`, added in an earlier pre-MCP phase, no exclusions) already scans `requirements-dev.txt`, where `mcp>=1.2.0` lives — confirmed via `git branch -a --list '*dependabot*'` that real update branches already exist for other packages in that same file (bandit, mypy, pytest, pyyaml, ruff). No code change; closing this checklist item honestly rather than fabricating a redundant edit.
+
+1053/1053 tests passing (unchanged — docs/examples only); ruff/mypy/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.12.1] — 2026-07-14
 
 Claude MCP Integration — Phase 13 (structured audit events). PATCH per `docs/VERSIONING.md` — richer observability on existing tool calls, no new tool.

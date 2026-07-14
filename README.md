@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.12.1 • 1053/1053 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.12.2 • 1053/1053 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -174,6 +174,25 @@ outputs/<target>/<module>/
 | [OBSERVABILITY_AND_CONTRACTS.md](docs/OBSERVABILITY_AND_CONTRACTS.md) | Execution IDs, structured audit logs, env overlays, and versioned data contracts |
 | [BURP_MCP_INTEGRATION.md](docs/BURP_MCP_INTEGRATION.md) | `reconforge burp` subcommands, the Burp MCP provider, and the standalone [`mcp_validation/`](mcp_validation/README.md) connectivity-check tool |
 | [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md) | Connect Claude Desktop/Claude Code to `reconforge mcp serve` — setup, security model, tool reference, walkthroughs |
+
+## Claude and MCP Integration
+
+`reconforge mcp serve` runs an MCP (Model Context Protocol) server so Claude Desktop or Claude Code
+can inspect ReconForge's state and plan recon workflows over stdio — 12 read-only tools (status,
+module/engagement/scope introspection, workflow planning, dry-run command preview, findings,
+reports) plus one tool that can trigger real execution, gated behind an active engagement, a
+validated scope file, `explicit_confirmation`, and (for INTRUSIVE-tier phases) an operator-edited
+server-wide config flag — Claude never grants itself permission to run anything.
+
+```bash
+pip install -e ".[mcp]"
+reconforge mcp serve   # blocks, waiting for an MCP client over stdio
+```
+
+See [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md) for the Claude Desktop/Code setup
+steps, the full security model, and the tool reference. [`examples/claude_mcp/`](examples/claude_mcp/)
+has two runnable scripts (`query_status.py`, `plan_workflow.py`) showing how to talk to the server
+directly with the `mcp` Python SDK, outside of any Claude client.
 
 ## Testing
 
