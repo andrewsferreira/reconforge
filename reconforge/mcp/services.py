@@ -15,6 +15,7 @@ straight off disk in the same layout the CLI itself writes.
 from __future__ import annotations
 
 import importlib
+import json
 import platform
 import shutil
 from datetime import datetime, timezone
@@ -29,11 +30,14 @@ from core.engagement import EngagementManager
 from core.exceptions import EngagementError
 from core.exceptions import EngagementNotFoundError as CoreEngagementNotFoundError
 from core.exceptions import ReconForgeError, TargetValidationError
+from core.logger import sanitize_log
+from core.output_manager import OutputManager
 from core.target_parser import parse_target
 from core.version import __version__ as RECONFORGE_VERSION
 
 from reconforge.mcp.errors import (
     EngagementNotFoundError,
+    FindingNotFoundError,
     InvalidMCPRequestError,
     ScopeFileError,
     UnknownPhaseError,
@@ -43,8 +47,14 @@ from reconforge.mcp.schemas import (
     DryRunRequest,
     DryRunResponse,
     EngagementSummary,
+    GenerateReportRequest,
+    GenerateReportResponse,
     GetEngagementRequest,
     GetEngagementResponse,
+    GetFindingRequest,
+    GetFindingResponse,
+    GetFindingsRequest,
+    GetFindingsResponse,
     GetModuleDetailsRequest,
     GetModuleDetailsResponse,
     GetScopeRequest,
@@ -59,8 +69,13 @@ from reconforge.mcp.schemas import (
     PlannedStep,
     PlanWorkflowRequest,
     PlanWorkflowResponse,
+    SanitizedFinding,
     ScopeDecision,
+    SummarizeFindingsRequest,
+    SummarizeFindingsResponse,
     TimelineEntrySummary,
+    TrustedFindingMetadata,
+    UntrustedFindingEvidence,
 )
 
 _MODULES_DIR = Path(modules.__file__).resolve().parent
@@ -398,4 +413,216 @@ def dry_run(request: DryRunRequest) -> DryRunResponse:
         commands=module.runner.get_command_log(),
         artifacts_written=[str(module.output.module_dir(module_cls.MODULE_NAME))],
         warnings=warnings,
+    )
+
+
+# ── reconforge_get_findings / reconforge_get_finding / summarize / report ──
+
+# Findings evidence can be arbitrarily large (a full HTTP response body, a
+# banner grab, ...) — bounded here so a single finding can't blow out an
+# MCP response. This becomes a configurable mcp.max_evidence_bytes setting
+# once docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md §9's config section is built;
+# a fixed, documented constant is the honest interim state.
+_MAX_EVIDENCE_CHARS = 4000
+
+_SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
+_CONFIDENCE_ORDER = ("confirmed", "high", "medium", "low", "heuristic")
+
+
+def _iter_findings_files(output_base: str, target: str | None, module: str | None) -> list[Path]:
+    base = Path(output_base)
+    if not base.is_dir():
+        return []
+
+    if target:
+        target_dirs = [base / OutputManager._sanitize(target)]
+    else:
+        # "workflow" holds engagement/vault files, not a per-target output
+        # tree (see _engagement_dir above) — exclude it from an unscoped scan.
+        target_dirs = [d for d in base.iterdir() if d.is_dir() and d.name != "workflow"]
+
+    files: list[Path] = []
+    for target_dir in target_dirs:
+        if not target_dir.is_dir():
+            continue
+        module_dirs = [target_dir / module] if module else list(target_dir.iterdir())
+        for module_dir in module_dirs:
+            candidate = module_dir / "findings.json"
+            if candidate.is_file():
+                files.append(candidate)
+    return sorted(files)
+
+
+def _load_raw_findings(path: Path) -> list[dict[str, Any]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [f for f in data if isinstance(f, dict)]
+
+
+def _load_findings(output_base: str, target: str | None, module: str | None) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for path in _iter_findings_files(output_base, target, module):
+        findings.extend(_load_raw_findings(path))
+    return findings
+
+
+def _severity_rank(value: str) -> int:
+    return _SEVERITY_ORDER.index(value) if value in _SEVERITY_ORDER else len(_SEVERITY_ORDER)
+
+
+def _confidence_rank(value: str) -> int:
+    return _CONFIDENCE_ORDER.index(value) if value in _CONFIDENCE_ORDER else len(_CONFIDENCE_ORDER)
+
+
+def _sanitize_finding(raw: dict[str, Any]) -> SanitizedFinding:
+    description = sanitize_log(str(raw.get("description", "")))
+    evidence = sanitize_log(str(raw.get("evidence", "")))
+    truncated = len(evidence) > _MAX_EVIDENCE_CHARS
+    if truncated:
+        evidence = evidence[:_MAX_EVIDENCE_CHARS] + f"\n...[truncated at {_MAX_EVIDENCE_CHARS} characters]"
+
+    references = raw.get("references", [])
+    if not isinstance(references, list):
+        references = []
+
+    return SanitizedFinding(
+        trusted_metadata=TrustedFindingMetadata(
+            finding_id=str(raw.get("id", "")),
+            finding_type=str(raw.get("finding_type", "")),
+            severity=str(raw.get("severity", "info")),
+            confidence=str(raw.get("confidence", "low")),
+            confidence_reason=sanitize_log(str(raw.get("confidence_reason", ""))),
+            target=str(raw.get("target", "")),
+            module=str(raw.get("module", "")),
+            phase=str(raw.get("phase", "")),
+            timestamp=str(raw.get("timestamp", "")),
+        ),
+        untrusted_evidence=UntrustedFindingEvidence(
+            description=description,
+            evidence=evidence,
+            truncated=truncated,
+        ),
+        recommendation=sanitize_log(str(raw.get("recommendation", ""))),
+        references=[str(r) for r in references],
+    )
+
+
+def get_findings(request: GetFindingsRequest) -> GetFindingsResponse:
+    raw = _load_findings(request.output_base, request.target, request.module)
+    if request.severity:
+        raw = [f for f in raw if f.get("severity") == request.severity]
+    if request.confidence:
+        raw = [f for f in raw if f.get("confidence") == request.confidence]
+
+    total = len(raw)
+    limited = raw[: request.limit]
+    return GetFindingsResponse(
+        findings=[_sanitize_finding(f) for f in limited],
+        total_count=total,
+        truncated=total > len(limited),
+    )
+
+
+def get_finding(request: GetFindingRequest) -> GetFindingResponse:
+    raw = _load_findings(request.output_base, request.target, request.module)
+    match = next((f for f in raw if str(f.get("id", "")) == request.finding_id), None)
+    if match is None:
+        raise FindingNotFoundError(f"No finding found for id '{request.finding_id}'")
+    return GetFindingResponse(finding=_sanitize_finding(match))
+
+
+def summarize_findings(request: SummarizeFindingsRequest) -> SummarizeFindingsResponse:
+    raw = _load_findings(request.output_base, request.target, request.module)
+
+    by_severity: dict[str, int] = {}
+    by_confidence: dict[str, int] = {}
+    by_module: dict[str, int] = {}
+    for finding in raw:
+        severity = str(finding.get("severity", "info"))
+        confidence = str(finding.get("confidence", "low"))
+        module_name = str(finding.get("module", ""))
+        by_severity[severity] = by_severity.get(severity, 0) + 1
+        by_confidence[confidence] = by_confidence.get(confidence, 0) + 1
+        if module_name:
+            by_module[module_name] = by_module.get(module_name, 0) + 1
+
+    top = sorted(
+        raw,
+        key=lambda f: (_severity_rank(str(f.get("severity", "info"))), _confidence_rank(str(f.get("confidence", "low")))),
+    )[:10]
+
+    return SummarizeFindingsResponse(
+        total=len(raw),
+        by_severity=by_severity,
+        by_confidence=by_confidence,
+        by_module=by_module,
+        modules_with_findings=sorted(by_module.keys()),
+        top_findings=[_sanitize_finding(f).trusted_metadata for f in top],
+    )
+
+
+def _render_executive_report(target: str, findings: list[SanitizedFinding]) -> str:
+    by_severity: dict[str, int] = {}
+    for finding in findings:
+        severity = finding.trusted_metadata.severity
+        by_severity[severity] = by_severity.get(severity, 0) + 1
+
+    lines = [f"# Executive Summary — {target}", "", f"**Total findings:** {len(findings)}", ""]
+    for severity in _SEVERITY_ORDER:
+        if severity in by_severity:
+            lines.append(f"- {severity.capitalize()}: {by_severity[severity]}")
+    lines.append("")
+    lines.append("## Top Risks")
+    if not findings:
+        lines.append("(none)")
+    for finding in findings[:5]:
+        m = finding.trusted_metadata
+        lines.append(f"- [{m.severity}/{m.confidence}] {m.finding_type} on {m.target} ({m.module})")
+    return "\n".join(lines)
+
+
+def _render_technical_report(target: str, findings: list[SanitizedFinding]) -> str:
+    lines = [f"# Technical Findings Report — {target}", "", f"**Total findings:** {len(findings)}", ""]
+    for finding in findings:
+        m = finding.trusted_metadata
+        e = finding.untrusted_evidence
+        lines.append(f"## {m.finding_type} — {m.severity}/{m.confidence}")
+        lines.append(f"- Target: {m.target}")
+        lines.append(f"- Module/Phase: {m.module}/{m.phase}")
+        if m.confidence_reason:
+            lines.append(f"- Confidence reason: {m.confidence_reason}")
+        lines.append("")
+        if e.description:
+            lines.append(f"Description: {e.description}")
+        if e.evidence:
+            lines.append(f"Evidence: {e.evidence}")
+        if finding.recommendation:
+            lines.append(f"Recommendation: {finding.recommendation}")
+        lines.append("")
+    if not findings:
+        lines.append("(no findings)")
+    return "\n".join(lines)
+
+
+def generate_report(request: GenerateReportRequest) -> GenerateReportResponse:
+    raw = _load_findings(request.output_base, request.target, None)
+    findings = sorted(
+        (_sanitize_finding(f) for f in raw),
+        key=lambda sf: (_severity_rank(sf.trusted_metadata.severity), _confidence_rank(sf.trusted_metadata.confidence)),
+    )
+
+    if request.report_type == "executive":
+        content = _render_executive_report(request.target, findings)
+    else:
+        content = _render_technical_report(request.target, findings)
+
+    return GenerateReportResponse(
+        report_type=request.report_type,
+        target=request.target,
+        content=content,
+        generated_from_finding_count=len(findings),
     )
