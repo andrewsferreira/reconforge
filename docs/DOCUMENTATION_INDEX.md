@@ -1,7 +1,12 @@
 # ReconForge — Documentation Index
 
 > **Navigation guide for all project documentation**
-> Last updated: 2026-07-14 · 47 Markdown documents (42 in `docs/`, 5 at project root; this index itself is the 47th) · 29 PDF exports
+> Last updated: 2026-07-14 · 47 Markdown documents (42 in `docs/`, 5 at project root; this index itself is the 47th)
+>
+> The 29 tracked PDF exports mentioned in earlier versions of this index have
+> been removed from git (Phase 24, 2026-07-14) — untracked binary duplicates
+> of Markdown sources that added repo weight with no CI/tooling dependency on
+> them; see `CHANGELOG.md`.
 >
 > Every Markdown file in the repository has an entry below (confirmed via a
 > full `find`-based inventory cross-check). Two previously-listed files
@@ -52,7 +57,7 @@ Prerequisites (Python 3.10+), `pip install` instructions, external tool installa
 ---
 
 ### USAGE.md
-📍 **Location:** [`docs/USAGE.md`](USAGE.md) · [PDF](USAGE.pdf)
+📍 **Location:** [`docs/USAGE.md`](USAGE.md)
 **Status:** ✅ Complete (319 lines)
 
 Full CLI reference for all six subcommands (`network`, `web`, `api`, `surface`, `ad`, `workflow`). Covers common flags (`--target`, `--opsec`, `--phases`, `--dry-run`, `--encrypt-loot`), per-module examples, OPSEC mode behavior, and output interpretation.
@@ -60,7 +65,7 @@ Full CLI reference for all six subcommands (`network`, `web`, `api`, `surface`, 
 ---
 
 ### WORKFLOW_GUIDE.md
-📍 **Location:** [`docs/WORKFLOW_GUIDE.md`](WORKFLOW_GUIDE.md) · [PDF](WORKFLOW_GUIDE.pdf)
+📍 **Location:** [`docs/WORKFLOW_GUIDE.md`](WORKFLOW_GUIDE.md)
 **Status:** ✅ Complete (320 lines)
 
 Cross-module workflow orchestration: pipeline definition, `WorkflowContext` data passing, conditional step evaluation, `CredentialVault` sharing, `EngagementManager` lifecycle, and example pipelines (full recon, targeted, stealth).
@@ -68,7 +73,7 @@ Cross-module workflow orchestration: pipeline definition, `WorkflowContext` data
 ---
 
 ### FAQ.md
-📍 **Location:** [`docs/FAQ.md`](FAQ.md) · [PDF](FAQ.pdf)
+📍 **Location:** [`docs/FAQ.md`](FAQ.md)
 **Status:** ✅ Complete (506 lines)
 
 Practical Q&A troubleshooting guide organized by topic (installation/setup, tool availability, permissions, encryption). Points to the canonical spec docs (`FINDINGS.md`, `CONFIGURATION.md`, `USAGE.md`, `MODULES.md`, `ARCHITECTURE.md`) for anything beyond quick fixes rather than duplicating them.
@@ -76,7 +81,7 @@ Practical Q&A troubleshooting guide organized by topic (installation/setup, tool
 ---
 
 ### RUNBOOKS.md
-📍 **Location:** [`docs/RUNBOOKS.md`](RUNBOOKS.md) · [PDF](RUNBOOKS.pdf)
+📍 **Location:** [`docs/RUNBOOKS.md`](RUNBOOKS.md)
 **Status:** ✅ Complete (532 lines)
 
 Step-by-step operator runbooks for common assessment scenarios (external web app assessment is Runbook 1), each with prerequisites, exact CLI commands, expected output file listings, and guidance on which findings matter. Cross-references `FINDINGS.md`/`SEVERITY_CRITERIA.md`/`MODULES.md` rather than restating them.
@@ -84,7 +89,7 @@ Step-by-step operator runbooks for common assessment scenarios (external web app
 ---
 
 ### SUPPORT_MATRIX.md
-📍 **Location:** [`docs/SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) · [PDF](SUPPORT_MATRIX.pdf)
+📍 **Location:** [`docs/SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md)
 **Status:** ✅ Complete (129 lines)
 
 Compatibility reference: supported Python versions (3.10 minimum), OS/platform support tiers (Kali/Parrot fully tested, macOS/Windows-WSL2 partial, no official Docker image), the (intentionally short) Python dependency list, per-module external tool tables with install commands, root/privileged-operation requirements, and explicitly unsupported environments.
@@ -94,7 +99,7 @@ Compatibility reference: supported Python versions (3.10 minimum), OS/platform s
 ## 2. Architecture & Design
 
 ### ARCHITECTURE.md
-📍 **Location:** [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) · [PDF](ARCHITECTURE.pdf)
+📍 **Location:** [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
 **Status:** ✅ Complete (305 lines)
 
 System-level design: the `tools/ → parsers/ → phases/ → module.py → core/` pipeline, directory structure, core services layer (17 modules), data flow diagrams, security model (no `shell=True`, `validate_arg()`, credential sanitization), and module-specific extensions (Surface `intelligence/`, AD extended pipeline).
@@ -102,7 +107,7 @@ System-level design: the `tools/ → parsers/ → phases/ → module.py → core
 ---
 
 ### MODULES.md
-📍 **Location:** [`docs/MODULES.md`](MODULES.md) · [PDF](MODULES.pdf)
+📍 **Location:** [`docs/MODULES.md`](MODULES.md)
 **Status:** ✅ Complete (409 lines)
 
 Detailed documentation for all five modules: Network (5 tools, 4 phases), Web (9 tools, 4 phases), API (4 tools, 4 phases), Surface (2 tools, 6 intelligence components, 4 phases), and AD (8 tools, 5 phases with collectors/analyzers/attack paths/reporters). Includes base class signatures, phase lists, and tool inventories.
@@ -110,7 +115,7 @@ Detailed documentation for all five modules: Network (5 tools, 4 phases), Web (9
 ---
 
 ### CONFIGURATION.md
-📍 **Location:** [`docs/CONFIGURATION.md`](CONFIGURATION.md) · [PDF](CONFIGURATION.pdf)
+📍 **Location:** [`docs/CONFIGURATION.md`](CONFIGURATION.md)
 **Status:** ✅ Complete (290 lines)
 
 `tools.yaml` schema (binary paths, timeouts, scan profiles, safety settings), `profiles.yaml` schema (OPSEC modes, timing, technique toggles, noise-level gates), `ConfigLoader` API, `ToolConfig` typed accessor, and `ProfileLoader` resolution logic. Single source of truth — no env-var overrides.
@@ -118,7 +123,7 @@ Detailed documentation for all five modules: Network (5 tools, 4 phases), Web (9
 ---
 
 ### FINDINGS.md
-📍 **Location:** [`docs/FINDINGS.md`](FINDINGS.md) · [PDF](FINDINGS.pdf)
+📍 **Location:** [`docs/FINDINGS.md`](FINDINGS.md)
 **Status:** ✅ Complete (208 lines)
 
 The 5-level confidence model (`confirmed` → `heuristic`), 5-level severity scale (`critical` → `info`), automatic severity clamping rules, and `FindingsManager` API. Key concept: heuristic-only detections are auto-capped to `low` severity.
@@ -126,7 +131,7 @@ The 5-level confidence model (`confirmed` → `heuristic`), 5-level severity sca
 ---
 
 ### SEVERITY_CRITERIA.md
-📍 **Location:** [`docs/SEVERITY_CRITERIA.md`](SEVERITY_CRITERIA.md) · [PDF](SEVERITY_CRITERIA.pdf)
+📍 **Location:** [`docs/SEVERITY_CRITERIA.md`](SEVERITY_CRITERIA.md)
 **Status:** ✅ Complete (300 lines)
 
 Detailed evidence requirements for each severity × confidence combination. Defines what constitutes `confirmed` vs. `heuristic` evidence, per-tool classification examples, and the clamping enforcement matrix. Companion to FINDINGS.md.
@@ -134,7 +139,7 @@ Detailed evidence requirements for each severity × confidence combination. Defi
 ---
 
 ### LIMITATIONS.md
-📍 **Location:** [`docs/LIMITATIONS.md`](LIMITATIONS.md) · [PDF](LIMITATIONS.pdf)
+📍 **Location:** [`docs/LIMITATIONS.md`](LIMITATIONS.md)
 **Status:** ✅ Complete (422 lines)
 
 Honest account of what ReconForge deliberately does not do: not a full exploitation framework (no post-exploitation, no payload/shell handling — the web module's `exploit_candidates` phase is detection-only and opt-in), not a vulnerability scanner (no CVE database, no authenticated/compliance scanning, no CVSS), and not a replacement for manual testing (no business-logic understanding, no creative vulnerability chaining). Also documents the redirect/DNS-resolution scope-enforcement gap for CLI-tool-wrapping modules (added Phase 5). The project's own "what we don't claim" reference — the mirror image of the module/feature docs.
@@ -168,7 +173,7 @@ High-level architecture sketch (diagram + short narrative) for a proposed AI orc
 ## 3. Developer Documentation
 
 ### DEVELOPMENT.md
-📍 **Location:** [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) · [PDF](DEVELOPMENT.pdf)
+📍 **Location:** [`docs/DEVELOPMENT.md`](DEVELOPMENT.md)
 **Status:** ✅ Complete (402 lines)
 
 Project structure overview, step-by-step guides for adding tools/parsers/phases, testing guidelines (pytest, 375 tests), code standards (type hints, docstrings, `list[str]` commands), and the 11-parameter base class constructor contract.
@@ -176,7 +181,7 @@ Project structure overview, step-by-step guides for adding tools/parsers/phases,
 ---
 
 ### EXTENDING.md
-📍 **Location:** [`docs/EXTENDING.md`](EXTENDING.md) · [PDF](EXTENDING.pdf)
+📍 **Location:** [`docs/EXTENDING.md`](EXTENDING.md)
 **Status:** ✅ Complete (94 lines)
 
 Concise quick-reference for extending the framework: inheriting from module base classes (`NetworkPhaseBase`, `ADPhaseBase`, `WebPhaseBase`), registering phases in orchestrators, and adding new tool wrappers/parsers. Complements DEVELOPMENT.md.
@@ -184,7 +189,7 @@ Concise quick-reference for extending the framework: inheriting from module base
 ---
 
 ### API_REFERENCE.md
-📍 **Location:** [`docs/API_REFERENCE.md`](API_REFERENCE.md) · [PDF](API_REFERENCE.pdf)
+📍 **Location:** [`docs/API_REFERENCE.md`](API_REFERENCE.md)
 **Status:** ✅ Complete (620 lines)
 
 Full class/method reference for: `Runner` + `RunResult`, `ConfigLoader`, `ToolConfig`, `ProfileLoader`, `FindingsManager`, `LootManager`, `CredentialVault`, `EngagementManager`, `WorkflowOrchestrator`, `OutputManager`, `NotesManager`, `OpsecChecks`, `Validators`, and all module base classes.
@@ -192,7 +197,7 @@ Full class/method reference for: `Runner` + `RunResult`, `ConfigLoader`, `ToolCo
 ---
 
 ### MIGRATION_CONFIG_SCHEMA.md
-📍 **Location:** [`docs/MIGRATION_CONFIG_SCHEMA.md`](MIGRATION_CONFIG_SCHEMA.md) · [PDF](MIGRATION_CONFIG_SCHEMA.pdf)
+📍 **Location:** [`docs/MIGRATION_CONFIG_SCHEMA.md`](MIGRATION_CONFIG_SCHEMA.md)
 **Status:** ✅ Complete (227 lines)
 
 Migration guide for the `web_tools:` → unified `tools:` namespace consolidation. Before/after YAML examples, `ConfigLoader` changes, and per-file migration checklist. Relevant for anyone working with pre-unification branches.
@@ -200,7 +205,7 @@ Migration guide for the `web_tools:` → unified `tools:` namespace consolidatio
 ---
 
 ### VERSIONING.md
-📍 **Location:** [`docs/VERSIONING.md`](VERSIONING.md) · [PDF](VERSIONING.pdf)
+📍 **Location:** [`docs/VERSIONING.md`](VERSIONING.md)
 **Status:** ✅ Complete (139 lines)
 
 Semantic Versioning 2.0.0 policy: what counts as MAJOR (breaking CLI/config/output-schema changes, module removal), MINOR (new modules/tools/phases/features, backward-compatible), and PATCH (bug fixes, parser corrections, doc updates). The policy every phase of the `ARCHITECTURE_REVIEW.md` remediation mandate has bumped the version against — consult this before classifying any change.
@@ -208,7 +213,7 @@ Semantic Versioning 2.0.0 policy: what counts as MAJOR (breaking CLI/config/outp
 ---
 
 ### INTEGRATION_TESTING.md
-📍 **Location:** [`docs/INTEGRATION_TESTING.md`](INTEGRATION_TESTING.md) · [PDF](INTEGRATION_TESTING.pdf)
+📍 **Location:** [`docs/INTEGRATION_TESTING.md`](INTEGRATION_TESTING.md)
 **Status:** ✅ Complete (718 lines)
 
 How to validate full CLI flows without live targets or installed tools: mock `Runner.run()` (the single choke point every external command passes through) to return canned `RunResult`s, then assert on phase orchestration, OPSEC enforcement, tool command construction, parser handling, finding generation, loot dedup, and output file structure. Covers what to test, why external tools must never run in CI, and worked examples for full end-to-end module flows.
@@ -248,7 +253,7 @@ Despite its name, this is also a self-assessment by the project author (with AI 
 ---
 
 ### PRIORITY_4_COMPLETION_REPORT.md
-📍 **Location:** [`docs/PRIORITY_4_COMPLETION_REPORT.md`](PRIORITY_4_COMPLETION_REPORT.md) · [PDF](PRIORITY_4_COMPLETION_REPORT.pdf)
+📍 **Location:** [`docs/PRIORITY_4_COMPLETION_REPORT.md`](PRIORITY_4_COMPLETION_REPORT.md)
 **Status:** 📜 Historical (carries its own "HISTORICAL DOCUMENT" banner, dated 2026-03-21)
 
 A dated snapshot of the "Priority 4: Documentation Completion" pass — an inventory of every doc file that existed at the time (20 `docs/` Markdown files, 6 module-level READMEs, root-level files), with line counts and one-line purposes for each. Explicitly self-labeled as historical and superseded by this index for current documentation state; several files it lists (`AUDIT_REPORT.md`, `STABILIZATION_CHECK_P9.md`, the three root `STABILIZATION_CHECK_P6/P7/P8.md` files) have since been removed from the repository — expected drift for a document that documents itself as a point-in-time snapshot, not a bug.
@@ -272,7 +277,7 @@ Same format as the Jerry assessment above, applied to HTB "Knife" (PHP 8.1.0-dev
 ---
 
 ### COMMAND_REFACTORING_REPORT.md
-📍 **Location:** [`docs/COMMAND_REFACTORING_REPORT.md`](COMMAND_REFACTORING_REPORT.md) · [PDF](COMMAND_REFACTORING_REPORT.pdf)
+📍 **Location:** [`docs/COMMAND_REFACTORING_REPORT.md`](COMMAND_REFACTORING_REPORT.md)
 **Status:** ✅ Complete (467 lines)
 
 Documents the Priority-1 refactoring of all 27 tool wrappers from `f"tool ..."` string commands to `["tool", "--flag", arg]` list commands. Before/after metrics, per-file changelog, and `Runner` deprecation-warning behavior.
@@ -280,7 +285,7 @@ Documents the Priority-1 refactoring of all 27 tool wrappers from `f"tool ..."` 
 ---
 
 ### FINAL_STABILIZATION_REPORT.md
-📍 **Location:** [`docs/FINAL_STABILIZATION_REPORT.md`](FINAL_STABILIZATION_REPORT.md) · [PDF](FINAL_STABILIZATION_REPORT.pdf)
+📍 **Location:** [`docs/FINAL_STABILIZATION_REPORT.md`](FINAL_STABILIZATION_REPORT.md)
 **Status:** ✅ Complete (256 lines)
 
 10-point checklist validation confirming framework stability: 375/375 tests passing, no critical blockers, two non-critical issues documented (Surface CLI missing `--encrypt-loot`, minor), and deferred technical debt inventory.
@@ -422,7 +427,7 @@ without this index being updated. Confirmed absent as of 2026-07-13.
 | Format | Count | Purpose |
 |--------|------:|---------|
 | Markdown (`.md`) | 47 (42 in `docs/`, 5 at project root) | Primary documentation (version-controlled). All 46 non-index files have an entry below (this file is the 47th, indexing the others) |
-| PDF (`.pdf`) | 29 (27 in `docs/`/root, 2 nested under `modules/`) | Exported snapshots for offline/client distribution |
+| PDF (`.pdf`) | 0 | Removed from git in Phase 24 (2026-07-14) — were untracked binary duplicates of the Markdown sources above, with no CI or tooling dependency on them |
 
 ---
 

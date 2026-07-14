@@ -6,6 +6,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.8] — 2026-07-14
+
+Phase 24 (Remove Tracked PDF Duplicates): closed the pre-existing P3 item to remove the 29 tracked PDF exports of Markdown docs from git. PATCH per `docs/VERSIONING.md` — repo-hygiene cleanup, no change to ReconForge's runtime public surface.
+
+### Removed
+
+- 29 tracked PDF files (2.0MB total): 26 confirmed duplicates of a same-directory `.md` source by basename, 2 more (`AD_MODULE_SUMMARY.pdf`, `WEB_MODULE_SUMMARY.pdf`) matched to their real `docs/`-located `.md` source, and `CLEANUP_REPORT.pdf` — present unreferenced since the initial commit, with no `.md` source ever tracked and unreadable content in this environment — removed as an unauditable opaque binary rather than a confirmed duplicate. Confirmed via repo-wide grep that no code, CI, or tooling referenced any of the 29 paths before deleting.
+
+### Fixed
+
+- `docs/DOCUMENTATION_INDEX.md`: removed the 20 now-dangling "PDF" links pointing at the deleted files (caught immediately by Phase 23's `scripts/check_doc_links.py`) and updated the header/File Format Summary table to reflect the removal instead of leaving a stale "29 PDF exports" claim.
+
+No code changes; full suite re-run to confirm zero impact (863 passing, unchanged). ruff, mypy, and bandit all pass.
+
 ## [2.5.7] — 2026-07-14
 
 Phase 23 (Documentation Link Checker): closed the pre-existing P3 item to add a CI documentation-link check. PATCH per `docs/VERSIONING.md` — new dev/CI tooling script, no change to ReconForge's runtime public surface.
