@@ -18,6 +18,7 @@ import importlib
 import json
 import platform
 import shutil
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,18 +38,22 @@ from core.version import __version__ as RECONFORGE_VERSION
 
 from reconforge.mcp.errors import (
     EngagementNotFoundError,
+    ExecutionConflictError,
     FindingNotFoundError,
     InvalidMCPRequestError,
+    PolicyBlockedError,
     ScopeFileError,
     UnknownPhaseError,
 )
-from reconforge.mcp.policy import ExecutionTier, classify_phase
+from reconforge.mcp.policy import ExecutionTier, classify_phase, evaluate
 from reconforge.mcp.sanitization import sanitize_untrusted_text
 from reconforge.mcp.schemas import (
     MODULE_NAMES,
     DryRunRequest,
     DryRunResponse,
     EngagementSummary,
+    ExecuteApprovedPhaseRequest,
+    ExecuteApprovedPhaseResponse,
     GenerateReportRequest,
     GenerateReportResponse,
     GetEngagementRequest,
@@ -625,4 +630,139 @@ def generate_report(request: GenerateReportRequest) -> GenerateReportResponse:
         target=request.target,
         content=content,
         generated_from_finding_count=len(findings),
+    )
+
+
+# ── reconforge_execute_approved_phase ─────────────────────────────────
+#
+# The one tool in this package that can trigger real (non-dry-run)
+# execution. Every check below is independently re-verified here — none
+# of it is trusted from the request alone, per
+# docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md §6's 17-point verification list:
+#  (1)/(2) engagement exists and is active — _load_engagement_summary()
+#      + mgr.status check.
+#  (3)/(4)/(11) target allowed, scope enforced, approval valid —
+#      ScopeAuthorization.assert_authorized(), the exact mechanism the
+#      CLI's --enforce-scope already uses.
+#  (5)/(6) module/phase exist — pydantic Literal + VALID_PHASES check.
+#  (7) phase enabled — no separate enable/disable registry exists yet;
+#      "exists in VALID_PHASES" is the current definition of enabled.
+#  (8) OPSEC profile allows the phase — enforced inside the real module
+#      run (core/opsec_checks.py) exactly as it is for the CLI; not
+#      duplicated here at the technique level, since no clean
+#      phase-to-technique mapping exists to check against in advance.
+#  (9) required tools available — best-effort, non-fatal (Runner already
+#      handles a missing tool per-command; this would only add an
+#      earlier, coarser warning).
+#  (10) arguments pass existing validators — parse_target(); module
+#      parameters are not accepted by this tool at all yet (see the
+#      CREDENTIAL_USE rejection below), so there is nothing else to
+#      validate.
+#  (12) explicit_confirmation is true — checked by policy.evaluate(),
+#      which never sets it itself.
+#  (13) execution not already running — _EXECUTION_LOCK, a process-wide
+#      non-blocking lock (this server is one process per Claude session
+#      — a full multi-worker job queue is Phase 6, not needed yet).
+#  (14) rate limits — not implemented (no config section exists yet:
+#      docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md §9).
+#  (15) output/timeout limits — Runner's own timeout/max_output_bytes,
+#      passed through from the request.
+#  (16)/(17) credentials only from an approved reference, never inline —
+#      no credential-reference mechanism exists yet, so CREDENTIAL_USE-
+#      tier phases are rejected outright rather than accepting inline
+#      credentials through the MCP request.
+
+_EXECUTION_LOCK = threading.Lock()
+
+
+def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteApprovedPhaseResponse:
+    try:
+        parse_target(request.target)
+    except TargetValidationError as exc:
+        raise InvalidMCPRequestError(str(exc)) from exc
+
+    module_cls = _module_class(request.module)
+    valid_phases = list(module_cls.VALID_PHASES)
+    if request.phase not in valid_phases:
+        raise UnknownPhaseError(
+            f"Unknown phase '{request.phase}' for module '{request.module}'. Valid phases: {valid_phases}"
+        )
+
+    tier = classify_phase(request.module, request.phase)
+    if tier is ExecutionTier.CREDENTIAL_USE:
+        raise PolicyBlockedError(
+            f"'{request.module}/{request.phase}' is classified CREDENTIAL_USE. Credentialed "
+            "execution through MCP is not implemented yet — no approved credential-reference "
+            "mechanism exists, and this tool never accepts inline credentials. Run this phase "
+            "via the CLI directly with your own -u/-p flags instead."
+        )
+    if tier is ExecutionTier.PROHIBITED:
+        raise PolicyBlockedError(f"'{request.module}/{request.phase}' is a PROHIBITED-tier action.")
+
+    has_engagement = False
+    if request.engagement_id:
+        engagement_path = _engagement_dir(request.output_base) / f"{request.engagement_id}.json"
+        if engagement_path.is_file():
+            try:
+                _summary, mgr = _load_engagement_summary(engagement_path)
+                has_engagement = mgr.status == "active"
+            except EngagementNotFoundError:
+                has_engagement = False
+
+    has_validated_scope = False
+    scope = None
+    if request.scope_file and request.approval_id:
+        try:
+            scope = ScopeAuthorization.from_file(request.scope_file)
+            scope.assert_authorized(target=request.target, provided_approval_id=request.approval_id)
+            has_validated_scope = True
+        except ValueError:
+            has_validated_scope = False
+
+    decision = evaluate(
+        tier,
+        has_engagement=has_engagement,
+        has_validated_scope=has_validated_scope,
+        explicit_confirmation=request.explicit_confirmation,
+        approval_id=request.approval_id,
+    )
+    if not decision.allowed:
+        raise PolicyBlockedError(
+            f"Execution denied for '{request.module}/{request.phase}' (tier={tier.value}): {decision.reason}"
+        )
+
+    if not _EXECUTION_LOCK.acquire(blocking=False):
+        raise ExecutionConflictError("Another execution is already in progress on this server process.")
+
+    warnings: list[str] = []
+    try:
+        kwargs: dict[str, Any] = {
+            "target": request.target,
+            "output_base": request.output_base,
+            "opsec_mode": request.opsec_profile,
+            "verbose": False,
+            "dry_run": False,
+            "timeout": request.timeout,
+            "scope": scope,
+            "approval_id": request.approval_id,
+        }
+        if request.module == "ad":
+            kwargs["domain"] = request.domain
+
+        module = module_cls(**kwargs)
+        try:
+            module.run(phases=[request.phase])
+        except ReconForgeError as exc:
+            warnings.append(f"Module raised during execution: {exc}")
+    finally:
+        _EXECUTION_LOCK.release()
+
+    return ExecuteApprovedPhaseResponse(
+        module=request.module,
+        phase=request.phase,
+        target=request.target,
+        tier=tier.value,
+        findings_count=len(module.findings_mgr.get_all()),
+        artifacts_written=[str(module.output.module_dir(module_cls.MODULE_NAME))],
+        warnings=warnings,
     )

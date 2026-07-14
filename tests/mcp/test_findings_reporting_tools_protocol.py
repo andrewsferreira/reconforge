@@ -48,14 +48,15 @@ def _write_finding(tmp_path: Path, target: str, module: str, finding_id: str) ->
     )
 
 
-def test_list_tools_now_includes_all_twelve_read_only_tools():
+def test_list_tools_includes_all_twelve_read_only_tools_plus_execute():
     async def _go() -> None:
         server = build_server()
         async with create_connected_server_and_client_session(server) as session:
             result = await session.list_tools()
             names = {t.name for t in result.tools}
             assert names == set(_TOOLS.keys())
-            assert len(names) == 12
+            assert len(names) == 13
+            assert "reconforge_execute_approved_phase" in names
 
     _run(_go)
 
@@ -133,5 +134,50 @@ def test_generate_report_rejects_invalid_report_type_via_schema_validation(tmp_p
             )
             assert result.isError is True
             assert "Input validation error" in result.content[0].text
+
+    _run(_go)
+
+
+def test_execute_approved_phase_tool_call_denied_without_any_approval(tmp_path: Path):
+    """The protocol-level equivalent of the never-self-approves test: a
+    call with no engagement/scope/confirmation supplied must be denied,
+    not silently execute."""
+
+    async def _go() -> None:
+        server = build_server()
+        async with create_connected_server_and_client_session(server) as session:
+            result = await session.call_tool(
+                "reconforge_execute_approved_phase",
+                {
+                    "engagement_id": "does_not_exist",
+                    "target": "10.10.10.1",
+                    "module": "web",
+                    "phase": "surface",
+                    "output_base": str(tmp_path),
+                },
+            )
+            assert result.isError is True
+
+    _run(_go)
+
+
+def test_execute_approved_phase_tool_call_rejects_credential_use_phase(tmp_path: Path):
+    async def _go() -> None:
+        server = build_server()
+        async with create_connected_server_and_client_session(server) as session:
+            result = await session.call_tool(
+                "reconforge_execute_approved_phase",
+                {
+                    "engagement_id": "does_not_exist",
+                    "target": "10.10.10.1",
+                    "module": "ad",
+                    "phase": "bloodhound",
+                    "domain": "corp.local",
+                    "output_base": str(tmp_path),
+                    "explicit_confirmation": True,
+                },
+            )
+            assert result.isError is True
+            assert "CREDENTIAL_USE" in result.content[0].text
 
     _run(_go)

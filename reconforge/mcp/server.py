@@ -1,12 +1,15 @@
 """ReconForge's MCP server.
 
-Phase 3 of docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md adds 8 read-only
-inspection/planning tools (status, module listing, engagement/scope
-inspection, workflow planning, dry-run) on top of the Phase 2 connection
-foundation. No resources or prompts are registered yet, and no
-execution/findings/reporting tools exist yet either — those are later
-phases, registered against this same ``Server`` instance rather than a
-duplicate one.
+Phase 3 of docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md added 12 read-only
+inspection/planning tools (status, module/engagement/scope listing,
+workflow planning, dry-run, findings/reporting). Phase 5 added one
+controlled-execution tool, ``reconforge_execute_approved_phase`` —
+gated behind an active engagement, a validated scope/approval, and
+explicit operator confirmation (see ``reconforge/mcp/policy.py``); it
+never accepts arbitrary shell or tool commands, only a bounded
+``(module, phase)`` pair already known to this codebase. No resources
+or prompts are registered yet — those are later phases, registered
+against this same ``Server`` instance rather than a duplicate one.
 
 Transport: stdio only. No network transport is implemented anywhere in
 this package, so this server never binds a socket — a Claude Desktop or
@@ -15,6 +18,8 @@ its stdin/stdout.
 """
 
 from __future__ import annotations
+
+import sys
 
 import anyio
 from mcp.server.lowlevel import Server
@@ -27,18 +32,21 @@ SERVER_NAME = "reconforge"
 
 SERVER_INSTRUCTIONS = (
     "ReconForge is a policy-gated reconnaissance framework for authorized "
-    "penetration testing. This MCP server currently exposes read-only "
-    "inspection/planning tools only (status, module/engagement/scope "
-    "listing, workflow planning, dry-run) — no resources/prompts and no "
-    "execution/findings/reporting tools yet. Any future execution "
-    "capability will require an explicit engagement, a validated "
-    "scope/approval, and explicit operator confirmation, and will never "
-    "accept arbitrary shell or tool commands."
+    "penetration testing. This MCP server exposes 12 read-only "
+    "inspection/planning tools (status, module/engagement/scope listing, "
+    "workflow planning, dry-run, findings/reporting) plus one controlled-"
+    "execution tool, reconforge_execute_approved_phase, which requires an "
+    "active engagement, a validated scope/approval, and explicit operator "
+    "confirmation for every call — it never grants its own approval and "
+    "never accepts arbitrary shell or tool commands, only a bounded "
+    "(module, phase) pair. Credentialed phases (AD delegation/bloodhound, "
+    "network brute-forcing) are not executable through this server yet. "
+    "No resources or prompts are registered yet."
 )
 
 
 def build_server() -> Server:
-    """Construct the ReconForge MCP server with its read-only tools registered.
+    """Construct the ReconForge MCP server with its tools registered.
 
     No resource/prompt handlers are registered on the returned server —
     ``Server.get_capabilities()`` reports those as unset, which is the
@@ -57,7 +65,27 @@ async def run_stdio_async() -> None:
     """
     server = build_server()
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+        # stdio_server() already captured the real stdout's underlying
+        # buffer for the JSON-RPC transport itself (it reads
+        # sys.stdout.buffer once, synchronously, on entry — see
+        # mcp.server.stdio.stdio_server's source), so reassigning
+        # sys.stdout now is safe for the transport and necessary for
+        # everything else: core/logger.py::ReconLogger unconditionally
+        # logs to sys.stdout regardless of verbose= (only the log level
+        # threshold changes, not whether stdout is used at all), so any
+        # tool that runs a real module — reconforge_dry_run,
+        # reconforge_execute_approved_phase — would otherwise interleave
+        # ANSI-colored log lines into the JSON-RPC stream and corrupt it.
+        # Confirmed with a real subprocess client (mcp.client.stdio),
+        # which is the only way to catch this — the in-memory transport
+        # used by this package's own tests never touches actual process
+        # stdio, so it can't reproduce this class of bug.
+        original_stdout = sys.stdout
+        sys.stdout = sys.stderr
+        try:
+            await server.run(read_stream, write_stream, server.create_initialization_options())
+        finally:
+            sys.stdout = original_stdout
 
 
 def run_stdio_server() -> None:

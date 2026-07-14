@@ -50,3 +50,17 @@ class FindingNotFoundError(MCPServiceError):
     """No finding matches the requested finding id."""
 
     code = "FINDING_NOT_FOUND"
+
+
+class PolicyBlockedError(MCPServiceError):
+    """The requested execution does not satisfy its policy tier's
+    requirements (reconforge/mcp/policy.py), or targets a tier that has
+    no supported execution path yet (CREDENTIAL_USE, PROHIBITED)."""
+
+    code = "POLICY_BLOCKED"
+
+
+class ExecutionConflictError(MCPServiceError):
+    """Another execution is already in progress on this server process."""
+
+    code = "EXECUTION_CONFLICT"

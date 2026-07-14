@@ -6,6 +6,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.11.0] — 2026-07-14
+
+Claude MCP Integration — Phase 5, part 2/2 (Controlled Execution: the execution tool). MINOR per `docs/VERSIONING.md` — the first tool in this package that can trigger real (non-dry-run) execution, plus a real bug fix.
+
+### Added
+
+- `reconforge_execute_approved_phase` in `reconforge/mcp/{schemas,services,tools}.py`. Every check is independently re-verified inside `services.py`, never trusted from the request: engagement existence + `status == "active"`; scope/approval validity via `ScopeAuthorization.assert_authorized()` (the exact mechanism `--enforce-scope` already uses); the tier decision from Phase 5 part 1's `classify_phase()`/`evaluate()`; a process-wide `threading.Lock()` standing in for the full execution-job model. CREDENTIAL_USE-tier phases (`ad`'s `delegation`/`bloodhound`) are rejected outright — no credential-reference mechanism exists yet, and `brute_force` isn't exposed as a request field at all, so network's hydra path can't be reached through this tool either.
+- `tests/mcp/test_execute_approved_phase.py` (14 tests) and 2 protocol tests in `tests/mcp/test_findings_reporting_tools_protocol.py`: every deny path (missing/inactive engagement, wrong approval_id, target outside scope, no scope file, no explicit_confirmation, CREDENTIAL_USE, an artificially-forced PROHIBITED rejection since no real phase reaches it, concurrent execution) and the one allow path (`surface`'s `vector_correlation` — SAFE_READ_ONLY, no external tool dependency, verified to actually write real output files to disk).
+
+### Fixed
+
+- **A real bug, found manually verifying this phase against a genuine subprocess, not by the test suite**: `core/logger.py::ReconLogger` logs to `sys.stdout` unconditionally (`verbose=` only changes the log level threshold), so any MCP tool that constructs a real module — this includes `reconforge_dry_run` retroactively, present since Phase 3 — interleaved ANSI-colored log lines into the stdio JSON-RPC stream and corrupted it (18 client-side parse failures observed for a single tool call before the fix). Fixed in `reconforge/mcp/server.py::run_stdio_async()` by redirecting `sys.stdout` to `sys.stderr` for the server's lifetime, after the transport has already captured the real stdout buffer.
+- `tests/mcp/test_stdio_transport_integrity.py` (2 tests): the only tests in this package that use a real subprocess client instead of the in-memory transport, because the in-memory transport (used everywhere else since Phase 2) never touches actual process stdio and cannot reproduce this class of bug. Verified to actually fail without the fix before being committed with it.
+- `reconforge/mcp/__init__.py` and `server.py`'s `SERVER_INSTRUCTIONS`, both stale since Phase 3-B (still claiming "8 tools" and "no execution/findings/reporting tools yet").
+
+18 new tests (1021 → 1039, `pytest -q`); ruff/mypy(CI-scoped)/bandit/pip-audit all pass. The full `reconforge/mcp/` package (7 files) continues to pass `mypy --disallow-untyped-defs --disallow-incomplete-defs --warn-return-any` with no new `type: ignore`s.
+
+### Notes
+
+- Phase 5 (Controlled Execution) is now complete: policy classification (part 1) + the execution tool (part 2).
+- Phase 6 onward (execution job model beyond the single process-wide lock, MCP resources, richer typed errors, config section, Claude Desktop/Code setup docs, wider CI, observability, the safe demonstration walkthrough) is next, not started.
+
 ## [2.10.0] — 2026-07-14
 
 Claude MCP Integration — Phase 5, part 1/2 (Controlled Execution: execution policy). MINOR per `docs/VERSIONING.md` — a new module and an enhanced existing tool response, backward-compatible. **No execution tool exists yet** — this phase adds classification/evaluation logic only.
