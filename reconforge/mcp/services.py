@@ -42,6 +42,7 @@ from reconforge.mcp.errors import (
     ScopeFileError,
     UnknownPhaseError,
 )
+from reconforge.mcp.sanitization import sanitize_untrusted_text
 from reconforge.mcp.schemas import (
     MODULE_NAMES,
     DryRunRequest,
@@ -418,13 +419,6 @@ def dry_run(request: DryRunRequest) -> DryRunResponse:
 
 # ── reconforge_get_findings / reconforge_get_finding / summarize / report ──
 
-# Findings evidence can be arbitrarily large (a full HTTP response body, a
-# banner grab, ...) — bounded here so a single finding can't blow out an
-# MCP response. This becomes a configurable mcp.max_evidence_bytes setting
-# once docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md §9's config section is built;
-# a fixed, documented constant is the honest interim state.
-_MAX_EVIDENCE_CHARS = 4000
-
 _SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 _CONFIDENCE_ORDER = ("confirmed", "high", "medium", "low", "heuristic")
 
@@ -479,11 +473,9 @@ def _confidence_rank(value: str) -> int:
 
 
 def _sanitize_finding(raw: dict[str, Any]) -> SanitizedFinding:
-    description = sanitize_log(str(raw.get("description", "")))
-    evidence = sanitize_log(str(raw.get("evidence", "")))
-    truncated = len(evidence) > _MAX_EVIDENCE_CHARS
-    if truncated:
-        evidence = evidence[:_MAX_EVIDENCE_CHARS] + f"\n...[truncated at {_MAX_EVIDENCE_CHARS} characters]"
+    description, description_truncated = sanitize_untrusted_text(str(raw.get("description", "")))
+    evidence, evidence_truncated = sanitize_untrusted_text(str(raw.get("evidence", "")))
+    truncated = description_truncated or evidence_truncated
 
     references = raw.get("references", [])
     if not isinstance(references, list):

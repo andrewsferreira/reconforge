@@ -25,6 +25,20 @@ ModuleName = Literal["network", "ad", "web", "api", "surface"]
 OpsecProfile = Literal["stealth", "normal", "aggressive"]
 
 
+class TrustedResponse(BaseModel):
+    """Base class for every MCP tool response.
+
+    ``trust: "server_generated"`` is a belt-and-suspenders marker
+    (docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md §5): the real trust boundary
+    is the ``trusted_metadata``/``untrusted_evidence`` field split within
+    findings-bearing responses, not this field — but every response
+    carrying it lets a client assert structurally that nothing labeled
+    otherwise is a server-authored instruction.
+    """
+
+    trust: Literal["server_generated"] = "server_generated"
+
+
 # ── reconforge_get_status ────────────────────────────────────────────
 
 
@@ -32,7 +46,7 @@ class GetStatusRequest(BaseModel):
     pass
 
 
-class GetStatusResponse(BaseModel):
+class GetStatusResponse(TrustedResponse):
     reconforge_version: str
     python_version: str
     os: str
@@ -58,7 +72,7 @@ class ModuleSummary(BaseModel):
     opt_in_capabilities: list[str]
 
 
-class ListModulesResponse(BaseModel):
+class ListModulesResponse(TrustedResponse):
     modules: list[ModuleSummary]
 
 
@@ -66,7 +80,7 @@ class GetModuleDetailsRequest(BaseModel):
     module: ModuleName
 
 
-class GetModuleDetailsResponse(BaseModel):
+class GetModuleDetailsResponse(TrustedResponse):
     module: ModuleSummary
     documentation_reference: str = Field(
         default="docs/MODULES.md",
@@ -91,7 +105,7 @@ class EngagementSummary(BaseModel):
     findings_summary: dict[str, int]
 
 
-class ListEngagementsResponse(BaseModel):
+class ListEngagementsResponse(TrustedResponse):
     engagements: list[EngagementSummary]
     discoverability_note: str = Field(
         default=(
@@ -115,7 +129,7 @@ class TimelineEntrySummary(BaseModel):
     detail: str = ""
 
 
-class GetEngagementResponse(BaseModel):
+class GetEngagementResponse(TrustedResponse):
     summary: EngagementSummary
     timeline: list[TimelineEntrySummary]
     loot_summary: dict[str, int]
@@ -128,7 +142,7 @@ class GetScopeRequest(BaseModel):
     scope_file: str
 
 
-class GetScopeResponse(BaseModel):
+class GetScopeResponse(TrustedResponse):
     allowed_targets: list[str]
     approval_id: str
     valid_until: str
@@ -165,7 +179,7 @@ class ScopeDecision(BaseModel):
     reason: str = ""
 
 
-class PlanWorkflowResponse(BaseModel):
+class PlanWorkflowResponse(TrustedResponse):
     normalized_target: str
     selected_modules: list[PlannedStep]
     scope_decision: ScopeDecision
@@ -189,7 +203,7 @@ class DryRunRequest(BaseModel):
     approval_id: str | None = None
 
 
-class DryRunResponse(BaseModel):
+class DryRunResponse(TrustedResponse):
     module: str
     target: str
     phases_run: list[str]
@@ -231,8 +245,7 @@ class UntrustedFindingEvidence(BaseModel):
     source: str = "target_controlled"
 
 
-class SanitizedFinding(BaseModel):
-    trust: Literal["server_generated"] = "server_generated"
+class SanitizedFinding(TrustedResponse):
     trusted_metadata: TrustedFindingMetadata
     untrusted_evidence: UntrustedFindingEvidence
     recommendation: str
@@ -248,7 +261,7 @@ class GetFindingsRequest(BaseModel):
     limit: int = Field(default=200, gt=0, le=2000)
 
 
-class GetFindingsResponse(BaseModel):
+class GetFindingsResponse(TrustedResponse):
     findings: list[SanitizedFinding]
     total_count: int
     truncated: bool
@@ -261,7 +274,7 @@ class GetFindingRequest(BaseModel):
     module: ModuleName | None = None
 
 
-class GetFindingResponse(BaseModel):
+class GetFindingResponse(TrustedResponse):
     finding: SanitizedFinding
 
 
@@ -274,7 +287,7 @@ class SummarizeFindingsRequest(BaseModel):
     module: ModuleName | None = None
 
 
-class SummarizeFindingsResponse(BaseModel):
+class SummarizeFindingsResponse(TrustedResponse):
     total: int
     by_severity: dict[str, int]
     by_confidence: dict[str, int]
@@ -297,7 +310,7 @@ class GenerateReportRequest(BaseModel):
     report_type: ReportType = "technical"
 
 
-class GenerateReportResponse(BaseModel):
+class GenerateReportResponse(TrustedResponse):
     report_type: str
     target: str
     format: Literal["markdown"] = "markdown"

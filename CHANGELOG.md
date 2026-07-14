@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.9.1] — 2026-07-14
+
+Claude MCP Integration — Phase 4 (Prompt-Injection Resistance). PATCH per `docs/VERSIONING.md` — a dedicated hardening/adversarial-testing pass on the 12 tools Phase 3 already shipped, not a new tool or capability.
+
+### Added
+
+- `reconforge/mcp/sanitization.py`: centralizes untrusted-content handling — `sanitize_untrusted_text()` (Unicode NFC normalization, ANSI/terminal-escape-sequence stripping, C0 control-character stripping while preserving `\t`/`\n`/`\r`, `core/logger.py::sanitize_log()` secret redaction, line-count and byte-length truncation with an explicit `truncated` flag) and `is_binary_content()` (a decode-based check, provided for a future raw-output/HTTP-body path — not reachable from any tool today, since `findings.json` requires valid UTF-8 and `Runner.get_command_log()` only returns already-decoded strings; documented as such rather than claimed wired in).
+- `reconforge/mcp/schemas.py::TrustedResponse`: a new base class every one of the 12 tool response models now inherits, carrying an explicit `trust: "server_generated"` root marker — belt-and-suspenders on top of the `trusted_metadata`/`untrusted_evidence` field split, which remains the real trust boundary.
+- `reconforge/mcp/services.py::_sanitize_finding()` now calls the centralized module instead of its own inline truncation logic (`_MAX_EVIDENCE_CHARS` deleted from `services.py`, replaced by the module's `MAX_EVIDENCE_CHARS`/`MAX_EVIDENCE_LINES`).
+- `tests/mcp/test_sanitization.py` (10 tests): direct unit coverage of the new module.
+- `tests/mcp/test_prompt_injection_adversarial.py` (16 tests, parametrized over 8 payload categories matching the working spec's own list — instruction-override text, a fake "call the execute tool" directive, fake scope-expansion/environment-variable-reveal directives, an HTML comment forging a system prompt, a terminal escape sequence, nested JSON containing a fabricated tool-call structure, a 500KB oversized payload, and base64/URL-encoded payloads): writes each payload into a real `findings.json` fixture and runs it through the actual `reconforge_get_findings`/`reconforge_get_finding`/`reconforge_summarize_findings` code paths, asserting each payload survives as inert `untrusted_evidence` text — never promoted to a trusted field, never causing a crash or a re-parse of the payload as JSON.
+
+26 new tests (952 → 978, `pytest -q`); ruff/mypy(CI-scoped)/bandit/pip-audit all pass. The full `reconforge/mcp/` package (6 files, including the new module) continues to pass `mypy --disallow-untyped-defs --disallow-incomplete-defs --warn-return-any` with no new `type: ignore`s beyond the one pre-existing false positive from Phase 3.
+
+### Notes
+
+- Phase 4 (Prompt-Injection Resistance) is now complete.
+- Phase 5 (Controlled Execution) is next, not started — the first phase that would let Claude trigger a real (non-dry-run) module execution, gated behind the `SAFE_READ_ONLY → PROHIBITED` policy tiers `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md` already committed to designing before any of this code was written.
+
 ## [2.9.0] — 2026-07-14
 
 Claude MCP Integration — Phase 3, part 2/2 (Read-Only MCP Capabilities: findings and reporting tools). MINOR per `docs/VERSIONING.md` — 4 new read-only MCP tools, backward-compatible, no existing behavior changed. Completes Phase 3: all 12 planned read-only tools now exist.
