@@ -144,6 +144,29 @@ def test_denied_without_scope_file_at_all(tmp_path: Path):
         services.execute_approved_phase(request)
 
 
+def test_web_target_with_a_port_reaches_the_engagement_check_not_rejected_as_invalid(
+    tmp_path: Path,
+):
+    """Regression test: _authorize_execution used to validate every
+    module's target with parse_target() (bare IP/CIDR/hostname only),
+    which rejects a "host:port" string outright even though WebModule
+    itself accepts it. If that bug were still present this request
+    would fail target validation (InvalidMCPRequestError) before ever
+    reaching the engagement check below — asserting the specific
+    PolicyBlockedError/"engagement_id" failure instead proves the
+    target was accepted and validation proceeded past it."""
+    request = schemas.ExecuteApprovedPhaseRequest(
+        engagement_id="does_not_exist",
+        target="127.0.0.1:8899",
+        module="web",
+        phase="surface",
+        output_base=str(tmp_path),
+        explicit_confirmation=True,
+    )
+    with pytest.raises(PolicyBlockedError, match="engagement_id"):
+        services.execute_approved_phase(request)
+
+
 # ── CREDENTIAL_USE / PROHIBITED are never executable through this tool ─
 
 

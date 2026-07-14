@@ -6,6 +6,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.14.2] — 2026-07-14
+
+Claude MCP Integration — Phase 11 (broader test categories). PATCH per `docs/VERSIONING.md` — a bug fix plus test-only additions, no new tool/resource.
+
+### Fixed
+
+- `reconforge/mcp/services.py`'s `dry_run`/`_authorize_execution` validated every module's target with `parse_target()` (bare IP/CIDR/hostname only), which rejects a `"host:port"` string outright — even though `WebModule`/`APIModule` themselves accept exactly that shape via their own `_normalise_url()`. The MCP layer could not dry-run or execute a web/api phase against any target on a non-default port. Found while building a real `lab/vulnerable_app.py` integration test (below). Fixed with a new `_validate_target_for_module()` that dispatches on `request.module`: web/api targets go through `validate_url()` (matching the module's own normalization) plus `validate_arg()` (the same shell-metacharacter check `core/runner.py` applies to every constructed subprocess argument — `validate_url()` alone doesn't reject those; `list[str]` subprocess execution already makes such characters inert against real injection, but rejecting them here keeps web/api targets held to the same immediate, clear-error input-quality bar every other module's target already gets from `parse_target()`).
+- A second, self-inflicted bug found while chasing 100% coverage on the fix above: an initial two-`except`-clause version (`except ValidationError` then `except InvalidToolArgumentError`) had a dead second branch — `InvalidToolArgumentError` is itself a `ValidationError` subclass (`core/exceptions.py`), so the broader clause always matched first and the narrower one could never run. Coverage caught it immediately (lines never hit despite a test written specifically to exercise that path); collapsed into a single `except ValidationError` clause, since both branches did the same thing anyway.
+
+### Added
+
+- `tests/mcp/test_lab_integration.py`: `reconforge_dry_run` driven through a real MCP client/server session against a real `ThreadingHTTPServer` on loopback (same fixture pattern as `tests/lab/test_vulnerable_app.py`). Scoped to dry-run only — a genuine `reconforge_execute_approved_phase` run needs whatweb/wafw00f actually installed, which neither this dev environment nor CI has, consistent with this project's established "unit tests against mocked tool execution, not real binaries" philosophy.
+- Path-traversal / off-allowlist adversarial tests for `resources.py` (Phase 7), extending `tests/mcp/test_resources.py`: every malicious URI is rejected twice over — the `mcp` SDK's own `AnyUrl` parsing normalizes `../` segments before `resources.py` ever sees them, and the allowlist membership check rejects anything not literally one of the 7 hardcoded URIs regardless.
+- `tests/mcp/test_no_credential_exposure.py`: AST-based structural guardrail proving no `reconforge/mcp/*.py` module imports `CredentialVault`/`LootManager` — the credential-exfiltration test category from the implementation plan's §11, trivially satisfied by construction today and now pinned against silent regression.
+- Regression tests for the target-validation fix in `test_services.py` and `test_execute_approved_phase.py`.
+
+### Assessed
+
+- Every other §11 test category (unit: schemas/policy/sanitization, all already at 100%; protocol: server init, tool/resource discovery; security: scope-bypass and approval-spoofing denial paths; regression: full suite green, dry-run never calls subprocess) was already adequately covered — confirmed by direct inspection before writing anything new, not assumed. §11's proposed dedicated `validation.py` module was never built and is assessed as an intentional, adequate deviation, not a gap: pydantic schema validation plus the service layer's own typed-error wrapping already does what that module would have.
+
+26 new tests (1104 total, up from 1078); `reconforge/mcp/services.py` stays at its pre-existing 93% coverage (every line the fix added reached 100%, including both exception branches of the new validator); every other `reconforge/mcp/*.py` file stays at 100%. ruff/mypy(15-file scope)/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.14.1] — 2026-07-14
 
 Claude MCP Integration — Phase 7 scope note. PATCH per `docs/VERSIONING.md` — documentation clarification only, no code change.

@@ -30,10 +30,12 @@ from core.config_loader import ConfigLoader
 from core.engagement import EngagementManager
 from core.exceptions import EngagementError
 from core.exceptions import EngagementNotFoundError as CoreEngagementNotFoundError
-from core.exceptions import ReconForgeError, TargetValidationError
+from core.exceptions import ReconForgeError, TargetValidationError, ValidationError
 from core.logger import sanitize_log
 from core.output_manager import OutputManager
+from core.runner import validate_arg
 from core.target_parser import parse_target
+from core.validators import validate_url
 from core.version import __version__ as RECONFORGE_VERSION
 
 from reconforge.mcp.errors import (
@@ -107,6 +109,51 @@ _MODULE_TARGET_TYPES = {
     "api": "HTTP(S) API base URL",
     "surface": "IP address or hostname",
 }
+
+# web/api accept a bare host or a full "http(s)://host[:port]" URL —
+# WebModule/APIModule._normalise_url() prepends "http://" if no scheme is
+# given, then validates with validate_url(), which permits a non-default
+# port. Every other module only ever receives a bare IP/CIDR/hostname
+# (parse_target()). Using parse_target() unconditionally for a single-
+# module operation (dry_run/_authorize_execution) would reject a target
+# the module itself would happily accept, e.g. "127.0.0.1:8080" — real
+# bug found while building the lab.vulnerable_app.py integration test in
+# MCP Phase 11, fixed by dispatching on module here instead.
+_URL_TARGET_MODULES = frozenset({"web", "api"})
+
+
+def _validate_target_for_module(target: str, module: str) -> None:
+    """Validate *target* using the same rules the named module's own
+    constructor would apply, so dry_run/_authorize_execution never
+    reject a target the module would actually accept (or vice versa).
+
+    validate_url() alone only checks scheme/netloc/no-userinfo — unlike
+    parse_target(), it does not reject shell metacharacters, so a
+    web/api target is also run through validate_arg() (the same check
+    core/runner.py applies to every constructed subprocess argument).
+    list[str] subprocess execution (never shell=True) already makes such
+    characters inert against real injection, but rejecting them here
+    keeps web/api targets held to the same immediate, clear-error
+    input-quality bar every other module's target already gets from
+    parse_target(), instead of silently accepting nonsense that would
+    otherwise only surface as a confusing failure deep inside a module.
+    """
+    if module in _URL_TARGET_MODULES:
+        candidate = target if target.startswith(("http://", "https://")) else f"http://{target}"
+        try:
+            validate_url(candidate)
+            validate_arg(candidate, "target")
+        # InvalidToolArgumentError is itself a ValidationError subclass
+        # (core/exceptions.py) — one clause, not two, so there is no
+        # except-ordering trap where the broader type silently swallows
+        # the narrower one before it's ever reached.
+        except ValidationError as exc:
+            raise InvalidMCPRequestError(str(exc)) from exc
+        return
+    try:
+        parse_target(target)
+    except TargetValidationError as exc:
+        raise InvalidMCPRequestError(str(exc)) from exc
 
 # Grounded in the actual opt_in-gated capabilities found in each module's
 # run() signature (network's brute_force flag, web's exploit phase, api's
@@ -382,10 +429,7 @@ def plan_workflow(request: PlanWorkflowRequest) -> PlanWorkflowResponse:
 
 
 def dry_run(request: DryRunRequest) -> DryRunResponse:
-    try:
-        parse_target(request.target)
-    except TargetValidationError as exc:
-        raise InvalidMCPRequestError(str(exc)) from exc
+    _validate_target_for_module(request.target, request.module)
 
     module_cls = _module_class(request.module)
     valid_phases = list(module_cls.VALID_PHASES)
@@ -700,10 +744,7 @@ def _authorize_execution(
     (``reconforge/mcp/jobs.py``) so both enforce identical policy — the
     job model is not a separate, weaker path around this check.
     """
-    try:
-        parse_target(request.target)
-    except TargetValidationError as exc:
-        raise InvalidMCPRequestError(str(exc)) from exc
+    _validate_target_for_module(request.target, request.module)
 
     module_cls = _module_class(request.module)
     valid_phases = list(module_cls.VALID_PHASES)

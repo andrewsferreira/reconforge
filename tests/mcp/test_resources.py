@@ -78,6 +78,59 @@ def test_read_unknown_resource_uri_raises_mcp_error():
     _run(_go)
 
 
+# ── adversarial: path-traversal / off-allowlist URIs (MCP Phase 11) ──
+#
+# Two independent layers reject every case below: the mcp SDK's own
+# pydantic AnyUrl parsing normalizes "../" segments out of the URI
+# before resources.py ever sees it (confirmed by reading the resulting
+# McpError's message, which always names the *normalized* string), and
+# resources.py's allowlist membership check (`uri_str not in _ALL_URIS`)
+# rejects anything that isn't one of the 7 exact, hardcoded URIs even if
+# normalization somehow produced a real-looking one.
+
+
+@pytest.mark.parametrize(
+    "malicious_uri",
+    [
+        "reconforge://docs/../../../etc/passwd",
+        "reconforge://docs/claude-mcp-integration/../../../../../../etc/passwd",
+        "reconforge://modules/../../../../etc/passwd",
+        "file:///etc/passwd",
+        "reconforge://",
+        "reconforge://docs/",
+        "reconforge://docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md",
+        "reconforge://docs/ARCHITECTURE_REVIEW.md",
+    ],
+)
+def test_read_resource_rejects_every_path_traversal_and_off_allowlist_uri(malicious_uri: str):
+    async def _go() -> None:
+        server = build_server()
+        async with create_connected_server_and_client_session(server) as session:
+            with pytest.raises(McpError):
+                await session.read_resource(malicious_uri)
+
+    _run(_go)
+
+
+def test_list_resources_never_reveals_a_docs_directory_listing():
+    """The allowlist is a fixed dict of 7 URIs, not a directory scan —
+    this pins that invariant down directly against the doc filenames
+    that exist on disk but were never added to the allowlist (e.g.
+    ARCHITECTURE_REVIEW.md, CHANGELOG.md), so a future accidental
+    filesystem-walk regression in resources.py would fail this test."""
+
+    async def _go() -> None:
+        server = build_server()
+        async with create_connected_server_and_client_session(server) as session:
+            result = await session.list_resources()
+            uris = {str(r.uri) for r in result.resources}
+            assert "reconforge://docs/architecture-review" not in uris
+            assert "reconforge://docs/changelog" not in uris
+            assert len(uris) == 7
+
+    _run(_go)
+
+
 def test_successful_resource_read_emits_success_audit_event(
     capsys: pytest.CaptureFixture[str],
 ):

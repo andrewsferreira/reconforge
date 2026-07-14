@@ -257,3 +257,51 @@ def test_dry_run_rejects_invalid_target(tmp_path: Path):
                 output_base=str(tmp_path),
             )
         )
+
+
+def test_dry_run_accepts_a_web_target_with_a_non_default_port(tmp_path: Path):
+    """Regression test: dry_run used to validate every module's target
+    with parse_target() (bare IP/CIDR/hostname only), which rejects a
+    "host:port" string outright — even though WebModule/APIModule's own
+    _normalise_url() accepts exactly this shape. Found while building
+    the lab.vulnerable_app.py integration test (MCP Phase 11)."""
+    response = services.dry_run(
+        schemas.DryRunRequest(
+            target="127.0.0.1:8899",
+            module="web",
+            phases=["surface"],
+            output_base=str(tmp_path),
+        )
+    )
+    assert response.module == "web"
+    assert response.target == "127.0.0.1:8899"
+    assert any("127.0.0.1:8899" in command for command in response.commands)
+
+
+def test_dry_run_rejects_a_web_target_containing_shell_metacharacters(tmp_path: Path):
+    """validate_url() alone only checks scheme/netloc/userinfo, not shell
+    metacharacters — this proves the web/api path still rejects them at
+    the MCP boundary, with the same immediate, clear error every other
+    module's target already gets from parse_target()."""
+    with pytest.raises(InvalidMCPRequestError):
+        services.dry_run(
+            schemas.DryRunRequest(
+                target="127.0.0.1:8899; rm -rf /",
+                module="web",
+                output_base=str(tmp_path),
+            )
+        )
+
+
+def test_dry_run_rejects_a_web_target_with_embedded_userinfo_credentials(tmp_path: Path):
+    """Distinct branch from the shell-metacharacter test above: this one
+    has no shell metacharacters at all, so it can only be caught by
+    validate_url()'s own embedded-userinfo check, not validate_arg()."""
+    with pytest.raises(InvalidMCPRequestError):
+        services.dry_run(
+            schemas.DryRunRequest(
+                target="user:pass@127.0.0.1",
+                module="web",
+                output_base=str(tmp_path),
+            )
+        )
