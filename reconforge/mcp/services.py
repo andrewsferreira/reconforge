@@ -42,6 +42,7 @@ from reconforge.mcp.errors import (
     ScopeFileError,
     UnknownPhaseError,
 )
+from reconforge.mcp.policy import ExecutionTier, classify_phase
 from reconforge.mcp.sanitization import sanitize_untrusted_text
 from reconforge.mcp.schemas import (
     MODULE_NAMES,
@@ -311,17 +312,24 @@ def plan_workflow(request: PlanWorkflowRequest) -> PlanWorkflowResponse:
     for name in ordered:
         summary = _module_summary(name)
         conditional = (not explicit) and name in _CONDITIONAL_MODULES
+        phase_tiers = {phase: classify_phase(name, phase).value for phase in summary.valid_phases}
         steps.append(
             PlannedStep(
                 module=name,
                 phases=summary.valid_phases,
+                phase_tiers=phase_tiers,
                 tool_wrappers=summary.tool_wrappers,
                 conditional=conditional,
                 opt_in_capabilities=summary.opt_in_capabilities,
             )
         )
-        if summary.opt_in_capabilities:
-            required_approvals.append(f"{name}: {'; '.join(summary.opt_in_capabilities)}")
+        elevated_phases = [
+            phase
+            for phase, tier in phase_tiers.items()
+            if tier in (ExecutionTier.INTRUSIVE.value, ExecutionTier.CREDENTIAL_USE.value)
+        ]
+        if elevated_phases:
+            required_approvals.append(f"{name}: {', '.join(elevated_phases)} ({', '.join(phase_tiers[p] for p in elevated_phases)})")
 
     warnings: list[str] = []
     scope_decision = ScopeDecision(enforced=False)

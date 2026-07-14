@@ -164,6 +164,12 @@ class PlanWorkflowRequest(BaseModel):
 class PlannedStep(BaseModel):
     module: str
     phases: list[str]
+    phase_tiers: dict[str, str] = Field(
+        description="reconforge/mcp/policy.py's SAFE_READ_ONLY..PROHIBITED "
+        "classification for each phase, keyed by phase name. No execution "
+        "tool exists yet — this is informational, showing what approval a "
+        "future controlled-execution tool would require for each phase."
+    )
     tool_wrappers: list[str]
     conditional: bool = Field(
         description="True for ad/web/api in the default pipeline: whether they "

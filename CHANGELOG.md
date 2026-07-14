@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.10.0] — 2026-07-14
+
+Claude MCP Integration — Phase 5, part 1/2 (Controlled Execution: execution policy). MINOR per `docs/VERSIONING.md` — a new module and an enhanced existing tool response, backward-compatible. **No execution tool exists yet** — this phase adds classification/evaluation logic only.
+
+### Added
+
+- `reconforge/mcp/policy.py`: the `SAFE_READ_ONLY → PROHIBITED` tier taxonomy committed to in Phase 1. `classify_phase(module, phase, module_parameters=None)` maps every real `(module, phase)` pair to a tier, cross-referenced against actual opt-in gates confirmed in Phase 3 (not invented): `web`'s `exploit` and `api`'s `authorization` phases are INTRUSIVE (both `opt_in=True`-gated in the real module code); `ad`'s `delegation`/`bloodhound` are CREDENTIAL_USE (no code-level flag, but credentialed collection is their entire purpose); `network`'s `authentication` phase is ACTIVE_RECON by default and only elevates to CREDENTIAL_USE when a `brute_force=True` module parameter is present, matching `modules/network/phases/authentication_checks.py`'s real gating (hydra only runs inside `if brute_force:`, the phase itself runs non-invasive checks unconditionally); `surface`'s correlation/prioritization phases are SAFE_READ_ONLY (no new network traffic, just ranking already-collected data). An unrecognized `(module, phase)` defaults to ACTIVE_RECON, not the least-restrictive tier.
+- `evaluate(tier, *, has_engagement, has_validated_scope, explicit_confirmation, approval_id)`: checks a tier's requirements against caller-supplied facts. Every keyword argument defaults to the *denying* value, and the function never sets `explicit_confirmation`/`approval_id` itself — it only reads them. Verified by `test_evaluate_never_self_approves` (every tier above SAFE_READ_ONLY is denied when called with bare defaults) and `test_evaluate_prohibited_is_never_allowed_regardless_of_inputs` (PROHIBITED stays denied even with every other argument at its most permissive value).
+- `reconforge_plan_workflow` (an existing tool, not a new one) now surfaces the real classification: `PlannedStep` gained a `phase_tiers: dict[str, str]` field, and `required_approvals` lists the exact INTRUSIVE/CREDENTIAL_USE phases per module instead of Phase 3's coarser opt-in-text heuristic.
+- `tests/mcp/test_policy.py` (43 tests: parametrized coverage of every documented tier, the brute_force elevation path, every tier's requirement set, `evaluate()`'s allow/deny paths, the two safety-invariant tests) plus 2 integration tests in the same file confirming `reconforge_plan_workflow` surfaces the real tiers.
+
+45 new tests (978 → 1021, `pytest -q`); ruff/mypy(CI-scoped)/bandit/pip-audit all pass. The full `reconforge/mcp/` package (7 files) continues to pass `mypy --disallow-untyped-defs --disallow-incomplete-defs --warn-return-any` with no new `type: ignore`s.
+
+### Notes
+
+- No `reconforge_execute_approved_phase` tool exists — nothing this policy module classifies can currently be executed through MCP.
+- Phase 5 part 2/2 (the actual execution tool, its 17-point verification against real engagement/scope state, and the execution job/cancellation model) is next, not started — deliberately the most security-sensitive piece of this integration, sequenced last.
+
 ## [2.9.1] — 2026-07-14
 
 Claude MCP Integration — Phase 4 (Prompt-Injection Resistance). PATCH per `docs/VERSIONING.md` — a dedicated hardening/adversarial-testing pass on the 12 tools Phase 3 already shipped, not a new tool or capability.
