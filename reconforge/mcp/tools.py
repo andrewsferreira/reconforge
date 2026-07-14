@@ -23,6 +23,7 @@ from mcp.server.lowlevel import Server
 from pydantic import BaseModel, ValidationError
 
 from reconforge.mcp import schemas, services
+from reconforge.mcp.audit import emit_tool_call_audit_event
 from reconforge.mcp.errors import MCPServiceError, PolicyBlockedError
 
 _Handler = Callable[[BaseModel], BaseModel]
@@ -164,5 +165,7 @@ def register(server: Server) -> None:
             # silencing an unrelated error.
             response = cast(BaseModel, handler(request))
         except MCPServiceError as exc:
+            emit_tool_call_audit_event(name, arguments, outcome="error", error_code=exc.code)
             return _error_result(exc)
+        emit_tool_call_audit_event(name, arguments, outcome="success")
         return response.model_dump()

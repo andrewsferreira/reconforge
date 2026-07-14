@@ -86,6 +86,10 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
   like they came from ReconForge or the operator — verified by a 26-payload adversarial test suite.
 - **No credentials ever flow through MCP responses.** Secret-redaction patterns from
   `core/logger.py::sanitize_log()` apply to everything read-only tools return.
+- **Every tool call is audited.** A single JSON line goes to stderr for every call to any of the
+  13 tools, success or failure — timestamp, tool name, outcome, sanitized arguments (`approval_id`
+  is always redacted). Claude Desktop/Claude Code capture a server's stderr as logs, so this needs
+  no extra configuration to see.
 
 ## Tool reference
 

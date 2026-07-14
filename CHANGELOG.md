@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.12.1] — 2026-07-14
+
+Claude MCP Integration — Phase 13 (structured audit events). PATCH per `docs/VERSIONING.md` — richer observability on existing tool calls, no new tool.
+
+### Added
+
+- `reconforge/mcp/audit.py::emit_tool_call_audit_event()`: one JSON line to stderr for every one of the 13 tool calls, success or failure — timestamp, tool name, outcome, sanitized arguments, and (on failure) the raising error's `code`. Wired into `tools.py::_call_tool`'s single dispatch choke point rather than instrumented per tool, so every existing and future tool gets coverage automatically.
+- stderr, not a file: matches the exact convention `server.py::run_stdio_async()`'s stdout redirect already established (stdout is exclusively the JSON-RPC channel), needs no config or request-controlled filesystem path, and MCP clients (Claude Desktop, Claude Code) already capture a server's stderr as logs.
+- `approval_id` is redacted unconditionally regardless of value; every other string argument runs through `core/logger.py::sanitize_log()`.
+- `tests/mcp/test_audit_events.py` (5 tests, using pytest's `capsys`): success and error events have the right shape, an unknown-tool-name call still gets audited, `approval_id` never appears in the raw stderr text, and the low-level emit function itself writes exactly one valid JSON line.
+
+Verified manually against a real in-memory session before writing tests (captured both a success and an error event), and confirmed `tests/mcp/test_stdio_transport_integrity.py`'s real-subprocess stdout assertions are unaffected (they only check stdout, not stderr).
+
+1053/1053 tests passing (1048 + 5 new); ruff/mypy/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.12.0] — 2026-07-14
 
 Claude MCP Integration — Phase 9 (server-wide config gate). MINOR per `docs/VERSIONING.md` — a new capability: a server-wide off switch for INTRUSIVE-tier execution.
