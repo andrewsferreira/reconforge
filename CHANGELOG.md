@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.14.1] — 2026-07-14
+
+Claude MCP Integration — Phase 7 scope note. PATCH per `docs/VERSIONING.md` — documentation clarification only, no code change.
+
+### Changed
+
+- `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`'s Phase 7 entry now explains, honestly, how the shipped resource set differs from §10's original proposal: `docs/SECURITY.md` (never created in this codebase) was swapped for `CLAUDE_MCP_INTEGRATION.md`/`CONFIGURATION.md`, which do exist; `reconforge://support-matrix` was simply lower priority; and the two proposed `{id}`-parameterized resources (`reconforge://engagements/{id}/summary`, `reconforge://executions/{id}/summary`) were deliberately not built, since the static-allowlist resource pattern this package uses can't parameterize by an arbitrary id without either accepting a client-supplied path fragment (in tension with §10's own "no parameterized filesystem path" principle) or implementing MCP's separate resource-templates primitive — and the identical data is already safely available through the existing `reconforge_get_engagement`/`reconforge_get_execution_status` tools.
+
+1078/1078 tests passing (no test changes); ruff/mypy(15-file scope)/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.14.0] — 2026-07-14
 
 Claude MCP Integration — Phase 7 (MCP resources). MINOR per `docs/VERSIONING.md` — a new MCP capability (resources), not just tools.
