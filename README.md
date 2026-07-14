@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.14.3 • 1104/1104 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.14.4 • 1105/1105 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -204,7 +204,7 @@ SDK, outside of any Claude client.
 ```bash
 pip install -e ".[dev]"
 python -m pytest
-# 1104 tests, all passing (~23s)
+# 1105 tests, all passing (~23s)
 ```
 
 These are unit tests against mocked tool execution and stored fixtures — they validate parsing, validation, and orchestration logic, not real binaries. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for what has and has not been validated against live tools.

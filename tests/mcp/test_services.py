@@ -149,8 +149,23 @@ def test_get_scope_reads_allowed_targets_and_is_not_expired(tmp_path: Path):
 
     response = services.get_scope(schemas.GetScopeRequest(scope_file=str(scope_file)))
     assert response.allowed_targets == ["10.10.10.1"]
-    assert response.approval_id == "APPROVAL-1"
+    assert response.approval_configured is True
     assert response.is_expired is False
+
+
+def test_get_scope_never_exposes_the_raw_approval_id(tmp_path: Path):
+    """Security regression: reconforge_get_scope used to return the real
+    approval_id value, which Claude could read back and self-supply as
+    proof of authorization elsewhere. approval_configured is a boolean,
+    never the secret itself — assert the literal value is nowhere in the
+    serialized response."""
+    scope_file = tmp_path / "scope.yaml"
+    _write_scope_file(scope_file, datetime.now(timezone.utc) + timedelta(days=1))
+
+    response = services.get_scope(schemas.GetScopeRequest(scope_file=str(scope_file)))
+    dumped = response.model_dump_json()
+    assert "APPROVAL-1" not in dumped
+    assert not hasattr(response, "approval_id")
 
 
 def test_get_scope_flags_expired_scope(tmp_path: Path):

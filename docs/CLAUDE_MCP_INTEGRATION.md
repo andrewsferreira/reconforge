@@ -103,7 +103,7 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 | `reconforge_get_module_details` | Full phase/tool/target-type detail for one named module. |
 | `reconforge_list_engagements` | Engagements saved under `<output_base>/workflow/`. |
 | `reconforge_get_engagement` | Status, scope, modules run, findings/loot summary, timeline. |
-| `reconforge_get_scope` | Read a scope authorization file's allowed targets, approval id, expiry. |
+| `reconforge_get_scope` | Read a scope authorization file's allowed targets and expiry, and whether an approval id is configured (the value itself is never returned — see "Security model"). |
 | `reconforge_plan_workflow` | Propose which modules/phases would run for a target — never executes. |
 | `reconforge_dry_run` | Show the exact sanitized commands that would run, via the real command-construction code path — never runs an external tool. |
 | `reconforge_get_findings` | List sanitized findings, filterable by target/module/severity/confidence. |

@@ -6,6 +6,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.14.4] — 2026-07-14
+
+Security hardening — first step of a broader MCP trust-boundary review. PATCH per `docs/VERSIONING.md` — security fix, breaking change to one response field.
+
+### Fixed (security)
+
+- **`reconforge_get_scope` no longer returns the raw `approval_id` value.** The scope authorization file's approval identifier is exactly the value `reconforge_execute_approved_phase`'s `approval_id` request field is checked against — returning it from a read-only tool meant an MCP client (including the model itself) could read the real approval id back and supply it as its own "proof" of operator approval, defeating the purpose of a separate approval identifier entirely. `GetScopeResponse.approval_id: str` is replaced with `approval_configured: bool` — non-sensitive metadata (a scope file is only ever loadable if it has an approval id at all, per `core/authorization_gate.py`), never the secret itself. `docs/CLAUDE_MCP_INTEGRATION.md`'s tool reference updated to match.
+
+### Note
+
+This is the first of several planned MCP trust-boundary hardening changes — including making operator approval genuinely out-of-band (an MCP request field like `explicit_confirmation` is not, by itself, proof a human reviewed anything, since the model can supply it itself) and replacing free-form `scope_file`/`output_base` path parameters with server-controlled logical references. Those are larger, separate changes and will land as their own commits.
+
+1105/1105 tests passing (1104 + 1 new); ruff/mypy(15-file scope)/doc-link-check all pass.
+
 ## [2.14.3] — 2026-07-14
 
 Claude MCP Integration — Phase 15 (safe demonstration), the final phase of the 15-phase plan. PATCH per `docs/VERSIONING.md` — a new runnable example plus documentation, no code capability change.

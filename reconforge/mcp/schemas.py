@@ -144,7 +144,7 @@ class GetScopeRequest(BaseModel):
 
 class GetScopeResponse(TrustedResponse):
     allowed_targets: list[str]
-    approval_id: str
+    approval_configured: bool
     valid_until: str
     is_expired: bool
     enforcement_mode: str = "explicit_scope_file"

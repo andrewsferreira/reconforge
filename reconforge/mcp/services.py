@@ -344,7 +344,7 @@ def get_scope(request: GetScopeRequest) -> GetScopeResponse:
     is_expired = datetime.now(timezone.utc) > auth.valid_until
     return GetScopeResponse(
         allowed_targets=list(auth.allowed_targets),
-        approval_id=auth.approval_id,
+        approval_configured=bool(auth.approval_id),
         valid_until=auth.valid_until.isoformat(),
         is_expired=is_expired,
     )
