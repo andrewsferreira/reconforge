@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.5.11 • 878/878 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.6.0 • 878/878 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -60,6 +60,15 @@ All modules share a common core providing:
 ```bash
 # Install (editable, with dev tooling)
 pip install -e ".[dev]"
+
+# Optional: pull in a module's pip-installable external tools too
+# (impacket, bloodhound-python, enum4linux-ng, netexec for AD;
+# wafw00f for web; arjun for API — see docs/SUPPORT_MATRIX.md for the
+# full external-tool list, most of which are apt/go/gem installs and
+# not pip packages at all, so these extras don't cover every tool)
+pip install -e ".[ad]"
+pip install -e ".[web]"
+pip install -e ".[api]"
 
 # Or, without installing, from a repo checkout:
 # python -m reconforge <module> --target ...

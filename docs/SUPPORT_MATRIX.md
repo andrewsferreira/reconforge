@@ -3,7 +3,7 @@
 > **See also:** [SETUP.md](SETUP.md) for installation, [MODULES.md](MODULES.md) for module details.
 
 
-> Version 1.1.0 — Last updated: 2026-04-13
+> Version 1.2.0 — Last updated: 2026-07-14
 
 ---
 
@@ -50,6 +50,8 @@ No other Python packages are required. The framework is intentionally dependency
 ## External Tools by Module
 
 Missing tools are detected at runtime and their features are gracefully skipped. No tool absence causes a crash.
+
+For the tools below marked `pip install`, `pip install -e ".[ad]"` / `".[web]"` / `".[api]"` installs all of that module's pip-installable tools in one step (network and surface have none — every tool in those two modules is an apt/system install). This is a convenience only: these tools are still invoked as external subprocesses, never imported, so the extras don't change what's functionally required to run ReconForge at all — see the "Python Package Dependencies" table above.
 
 ### Network Module
 

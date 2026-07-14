@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.6.0] — 2026-07-14
+
+Phase 28 (Packaging Extras): closed the pre-existing P3 item to add per-module packaging extras. MINOR per `docs/VERSIONING.md` — new backward-compatible install capability, no existing behavior changed.
+
+### Added
+
+- `pyproject.toml`: `reconforge[ad]` (`enum4linux-ng`, `impacket`, `bloodhound`, `netexec`), `reconforge[web]` (`wafw00f`), `reconforge[api]` (`arjun`) — scoped to exactly the tools each module has that are actually `pip install`-able per `docs/SUPPORT_MATRIX.md`, confirmed by reading that doc's per-module tables rather than guessing. `network`/`surface` correctly received no extras group (100% apt/system tools in both). Versions deliberately left unpinned — third-party tools outside this project's release cycle.
+- `README.md`: Quick Start now documents the three new `pip install -e ".[...]"` commands.
+- `docs/SUPPORT_MATRIX.md`: cross-reference note for the new extras; doc's own version stamp bumped 1.1.0 → 1.2.0.
+
+No code changes; verified via `pip install -e . --dry-run` and the full packaging smoke test. Full suite re-run to confirm zero impact (878 passing, unchanged); ruff, mypy, and bandit all pass.
+
 ## [2.5.11] — 2026-07-14
 
 Phase 27 (Network Module Success-Honesty Sweep): closed the remainder of the gap Phase 17 believed was already covered for the network module. PATCH per `docs/VERSIONING.md` — bug fix, no new public surface.
