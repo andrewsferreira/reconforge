@@ -5,7 +5,14 @@ from typing import Dict, Optional
 
 DETECTION_LEVELS = {
     "nmap_ping_sweep": {"noise": "low", "description": "ICMP/ARP ping sweep"},
-    "nmap_syn_scan": {"noise": "medium", "description": "SYN stealth scan"},
+    # A no-handshake SYN scan is nmap's default and genuinely the quieter
+    # port-discovery technique relative to a full TCP connect scan (below);
+    # it was previously misclassified "medium", which is_allowed() denies
+    # in stealth mode — silently zeroing out every open port that
+    # network/phases/port_scanning.py and surface/phases/port_discovery.py
+    # gate on this exact technique, in the one mode a user picks specifically
+    # to still get results while staying quiet.
+    "nmap_syn_scan": {"noise": "low", "description": "SYN stealth scan"},
     "nmap_connect_scan": {"noise": "high", "description": "Full TCP connect scan"},
     "nmap_version_scan": {"noise": "medium", "description": "Service version detection"},
     "nmap_script_scan": {"noise": "high", "description": "NSE script scanning"},

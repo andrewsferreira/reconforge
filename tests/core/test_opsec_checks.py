@@ -14,21 +14,21 @@ from core.opsec_checks import OpsecChecker
 
 def test_stealth_mode_allows_only_low_noise():
     assert is_allowed("nmap_ping_sweep", "stealth") is True  # low
-    assert is_allowed("nmap_syn_scan", "stealth") is False  # medium
+    assert is_allowed("nmap_version_scan", "stealth") is False  # medium
     assert is_allowed("nmap_connect_scan", "stealth") is False  # high
     assert is_allowed("nmap_aggressive", "stealth") is False  # very_high
 
 
 def test_normal_mode_allows_low_and_medium():
     assert is_allowed("nmap_ping_sweep", "normal") is True  # low
-    assert is_allowed("nmap_syn_scan", "normal") is True  # medium
+    assert is_allowed("nmap_version_scan", "normal") is True  # medium
     assert is_allowed("nmap_connect_scan", "normal") is False  # high
     assert is_allowed("nmap_aggressive", "normal") is False  # very_high
 
 
 def test_aggressive_mode_allows_everything_up_to_very_high():
     assert is_allowed("nmap_ping_sweep", "aggressive") is True
-    assert is_allowed("nmap_syn_scan", "aggressive") is True
+    assert is_allowed("nmap_version_scan", "aggressive") is True
     assert is_allowed("nmap_connect_scan", "aggressive") is True
     assert is_allowed("nmap_aggressive", "aggressive") is True
 
@@ -85,6 +85,22 @@ def test_nmap_kerberos_detect_entry_exists_and_is_lower_noise_than_nse_scripts()
     assert detect is not None
     assert detect["noise"] == "low"
     assert scripts["noise"] == "high"
+
+
+def test_nmap_syn_scan_is_low_noise_and_allowed_in_stealth_mode():
+    """Phase 25 regression: nmap_syn_scan was misclassified "medium" noise,
+    which is_allowed() denies in stealth mode — despite this technique's
+    own description ("SYN stealth scan") and despite
+    modules/network/phases/port_scanning.py and
+    modules/surface/phases/port_discovery.py both gating their entire
+    scan on this exact technique with no lower-noise fallback. The result:
+    `--opsec stealth` silently produced zero port-scan results in both
+    modules, the one mode an operator picks specifically to still get
+    results while staying quiet. Reclassified to "low"."""
+    level = get_detection_level("nmap_syn_scan")
+    assert level is not None
+    assert level["noise"] == "low"
+    assert is_allowed("nmap_syn_scan", "stealth") is True
 
 
 # ── OpsecChecker.check() ────────────────────────────────────────────
@@ -168,8 +184,8 @@ def test_warn_returns_none_for_unknown_technique():
 
 def test_set_mode_changes_subsequent_checks():
     checker = OpsecChecker(mode="stealth")
-    assert checker.check("nmap_syn_scan") is False
+    assert checker.check("nmap_version_scan") is False  # medium, blocked in stealth
 
     checker.set_mode("normal")
 
-    assert checker.check("nmap_syn_scan") is True
+    assert checker.check("nmap_version_scan") is True  # medium, allowed in normal

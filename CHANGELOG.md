@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.9] — 2026-07-14
+
+Phase 25 (Stealth-Mode Port Scan Fix): closed the pre-existing P2 item to audit `OpsecChecker`'s interaction with tool-level OPSEC intensity scaling. PATCH per `docs/VERSIONING.md` — bug fix restoring intended runtime behavior, no new public surface.
+
+### Fixed
+
+- `core/detection_map.py`: `"nmap_syn_scan"` was misclassified `noise="medium"` despite its own description ("SYN stealth scan") — `is_allowed()` only permits `"low"`-noise techniques in stealth mode, so `--opsec stealth` silently produced **zero port-scan results** in both `network/phases/port_scanning.py` and `surface/phases/port_discovery.py`, the two production call sites that gate their entire scan on this technique with no lower-noise fallback. Reclassified to `noise="low"`, matching a plain SYN scan's genuinely quieter profile relative to a full TCP connect scan and unblocking downstream logic in both phases that was clearly written assuming stealth-mode SYN scans do find ports.
+
+5 new tests added (863 → 868) — two integration-style regression tests per affected module using the real `OpsecChecker` (not a stub), confirmed to fail against the pre-fix classification and pass after it; full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.8] — 2026-07-14
 
 Phase 24 (Remove Tracked PDF Duplicates): closed the pre-existing P3 item to remove the 29 tracked PDF exports of Markdown docs from git. PATCH per `docs/VERSIONING.md` — repo-hygiene cleanup, no change to ReconForge's runtime public surface.
