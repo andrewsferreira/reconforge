@@ -62,7 +62,11 @@ class ServiceFingerprintPhase(SurfacePhaseBase):
         finding_count += self._run_http_probe(target, ports, results)
 
         results["finding_count"] = finding_count
-        results["success"] = True
+        # Honest success signal: both sub-steps can no-op (opsec-blocked,
+        # tool unavailable, no candidate ports) without raising — success
+        # reflects whether a tool actually executed, tracked via the
+        # existing tools_used list, not whether findings were generated.
+        results["success"] = bool(self.tools_used)
 
         parsed_file = self.phase_output("service_fingerprint_results.json")
         parsed_file.write_text(json.dumps(results, indent=2, default=str))

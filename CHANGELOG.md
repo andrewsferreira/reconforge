@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.10] — 2026-07-14
+
+Phase 26 (Surface Module Success-Honesty Correction): closed a gap Phase 17 incorrectly believed was already covered. PATCH per `docs/VERSIONING.md` — bug fix, no new public surface.
+
+### Fixed
+
+- `modules/surface/phases/service_fingerprint.py`: `run()` set `results["success"] = True` unconditionally regardless of whether `_run_version_scan()`/`_run_http_probe()` actually executed a tool — both can silently no-op (opsec-blocked, nmap/httpx unavailable, no candidate ports). Same "decorative success" class Phase 17 fixed across 11 AD/web/api files; missed there because the early returns live inside this file's two private sub-methods, invisible from `run()`'s own control flow. Fixed to `results["success"] = bool(self.tools_used)`, matching Phase 17's established pattern.
+
+4 new tests added (868 → 872) — the first regression coverage this file has ever had; full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.9] — 2026-07-14
 
 Phase 25 (Stealth-Mode Port Scan Fix): closed the pre-existing P2 item to audit `OpsecChecker`'s interaction with tool-level OPSEC intensity scaling. PATCH per `docs/VERSIONING.md` — bug fix restoring intended runtime behavior, no new public surface.
