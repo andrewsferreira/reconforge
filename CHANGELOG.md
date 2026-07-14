@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.4] — 2026-07-13
+
+Phase 20 (CVE Enricher Hardening): closed the last open item from Phase 8's confidence-model audit. PATCH per `docs/VERSIONING.md` — internal reliability hardening, no new public surface.
+
+### Fixed
+
+- `core/cve_enricher.py::lookup_cves_for_cpe()`: `FindingsManager.add()` is called in tight per-share/per-user/per-port loops throughout phase code, and each call can reach this function when `RECONFORGE_NVD_LOOKUP=1` is set. Previously it re-read the on-disk CVE cache from disk on every single call (no in-memory fast path) and had no rate-limiting between live NVD API requests — a real risk of the NVD API rate-limiting or blocking the operator's IP on an engagement with many findings that each embed a different CPE string. Added a process-lifetime in-memory cache and a 6-second minimum interval between live requests (under NVD's documented public-API limit of ~5 requests/30s without a key).
+
+4 new tests added (848 → 852); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.3] — 2026-07-13
 
 Phase 19 (Correctness & Consistency Cleanup): three small, bounded items batched together. PATCH per `docs/VERSIONING.md` — pure bug fixes and a docs correction, no new public surface.
