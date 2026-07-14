@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.6] — 2026-07-14
+
+Phase 22 (Documentation Index Completion): closed the ~20-file gap `docs/DOCUMENTATION_INDEX.md` was left with in Phase 19. PATCH per `docs/VERSIONING.md` — documentation-only update.
+
+### Documented
+
+- `docs/DOCUMENTATION_INDEX.md`: wrote real entries for all 24 previously-undocumented files (20 in `docs/`, 4 at project root — `AGENTS.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`), each read before writing its description. Fixed a second dead link Phase 19 missed (`AUDIT_REPORT.md`, struck through) and gave `ARCHITECTURE_REVIEW.md` — the audit's actual living successor — its own entry. Correctly flagged `PROJECT_SCORECARD.md`/`INDEPENDENT_SECURITY_ASSESSMENT_2026-04-13.md` as author self-assessments. Added two new sections (§6 Burp MCP/Intelligence Engine Guides, §7 Root-Level Project Files) rather than force-fitting unrelated docs into existing categories. Updated the header, Quick Links table, and File Format Summary to reflect the now-complete inventory (all 46 non-index Markdown files have an entry, cross-checked via a full `find`-based inventory).
+
+No code changes; full suite re-run to confirm zero impact (859 passing, unchanged). ruff, mypy, and bandit all pass.
+
 ## [2.5.5] — 2026-07-13
 
 Phase 21 (Report-Generation Error Handling): closed the item deferred in Phase 15, unblocked now that Phase 17's `results["success"]`-honesty redesign has shipped. PATCH per `docs/VERSIONING.md` — reuses the existing `core/exceptions.py::ModuleError`, no new public surface.

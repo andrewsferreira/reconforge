@@ -1,17 +1,13 @@
 # ReconForge — Documentation Index
 
 > **Navigation guide for all project documentation**
-> Last updated: 2026-07-13 · 47 Markdown documents (42 in `docs/`, 5 at project root) · 29 PDF exports
+> Last updated: 2026-07-14 · 47 Markdown documents (42 in `docs/`, 5 at project root; this index itself is the 47th) · 29 PDF exports
 >
-> **Known gap:** this index does not yet describe every Markdown file in the
-> repository — ~20 files added since the last full pass (e.g.
-> `ARCHITECTURE_REVIEW.md`, `LIMITATIONS.md`, `VERSIONING.md`,
-> `BURP_MCP_INTEGRATION.md`, `attack_path_generation.md`,
-> `AI_ORCHESTRATION_ARCHITECTURE.md`, `RUNBOOKS.md`, `FAQ.md`, and others —
-> see `docs/` directly for the full current listing) have no entry below
-> yet. A full re-accounting with per-file descriptions is tracked as a
-> dedicated documentation pass rather than folded into this fix, to avoid
-> writing descriptions for files not actually reviewed here.
+> Every Markdown file in the repository has an entry below (confirmed via a
+> full `find`-based inventory cross-check). Two previously-listed files
+> (`AUDIT_REPORT.md`, `STABILIZATION_CHECK_P9.md`) no longer exist and are
+> kept as struck-through, explicitly-dead entries rather than silently
+> removed — see §4 and §8.
 
 ---
 
@@ -29,8 +25,11 @@
 | Understand findings/severity | [FINDINGS.md](#findingsmd) + [SEVERITY_CRITERIA.md](#severity_criteriamd) |
 | Run multi-module workflows | [WORKFLOW_GUIDE.md](#workflow_guidemd) |
 | Integrate Burp MCP provider | [BURP_MCP_INTEGRATION.md](#burp_mcp_integrationmd) |
-
-| Review audit & stabilization | [AUDIT_REPORT.md](#audit_reportmd) + [FINAL_STABILIZATION_REPORT.md](#final_stabilization_reportmd) |
+| Review the current audit / remediation status | [ARCHITECTURE_REVIEW.md](#architecture_reviewmd) |
+| Troubleshoot a problem | [FAQ.md](#faqmd) |
+| Follow a step-by-step assessment | [RUNBOOKS.md](#runbooksmd) |
+| Know what ReconForge doesn't do | [LIMITATIONS.md](#limitationsmd) |
+| Report a security issue | [SECURITY.md](#securitymd) |
 
 ---
 
@@ -65,6 +64,30 @@ Full CLI reference for all six subcommands (`network`, `web`, `api`, `surface`, 
 **Status:** ✅ Complete (320 lines)
 
 Cross-module workflow orchestration: pipeline definition, `WorkflowContext` data passing, conditional step evaluation, `CredentialVault` sharing, `EngagementManager` lifecycle, and example pipelines (full recon, targeted, stealth).
+
+---
+
+### FAQ.md
+📍 **Location:** [`docs/FAQ.md`](FAQ.md) · [PDF](FAQ.pdf)
+**Status:** ✅ Complete (506 lines)
+
+Practical Q&A troubleshooting guide organized by topic (installation/setup, tool availability, permissions, encryption). Points to the canonical spec docs (`FINDINGS.md`, `CONFIGURATION.md`, `USAGE.md`, `MODULES.md`, `ARCHITECTURE.md`) for anything beyond quick fixes rather than duplicating them.
+
+---
+
+### RUNBOOKS.md
+📍 **Location:** [`docs/RUNBOOKS.md`](RUNBOOKS.md) · [PDF](RUNBOOKS.pdf)
+**Status:** ✅ Complete (532 lines)
+
+Step-by-step operator runbooks for common assessment scenarios (external web app assessment is Runbook 1), each with prerequisites, exact CLI commands, expected output file listings, and guidance on which findings matter. Cross-references `FINDINGS.md`/`SEVERITY_CRITERIA.md`/`MODULES.md` rather than restating them.
+
+---
+
+### SUPPORT_MATRIX.md
+📍 **Location:** [`docs/SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) · [PDF](SUPPORT_MATRIX.pdf)
+**Status:** ✅ Complete (129 lines)
+
+Compatibility reference: supported Python versions (3.10 minimum), OS/platform support tiers (Kali/Parrot fully tested, macOS/Windows-WSL2 partial, no official Docker image), the (intentionally short) Python dependency list, per-module external tool tables with install commands, root/privileged-operation requirements, and explicitly unsupported environments.
 
 ---
 
@@ -110,6 +133,38 @@ Detailed evidence requirements for each severity × confidence combination. Defi
 
 ---
 
+### LIMITATIONS.md
+📍 **Location:** [`docs/LIMITATIONS.md`](LIMITATIONS.md) · [PDF](LIMITATIONS.pdf)
+**Status:** ✅ Complete (422 lines)
+
+Honest account of what ReconForge deliberately does not do: not a full exploitation framework (no post-exploitation, no payload/shell handling — the web module's `exploit_candidates` phase is detection-only and opt-in), not a vulnerability scanner (no CVE database, no authenticated/compliance scanning, no CVSS), and not a replacement for manual testing (no business-logic understanding, no creative vulnerability chaining). Also documents the redirect/DNS-resolution scope-enforcement gap for CLI-tool-wrapping modules (added Phase 5). The project's own "what we don't claim" reference — the mirror image of the module/feature docs.
+
+---
+
+### ARTIFACT_POLICY.md
+📍 **Location:** [`docs/ARTIFACT_POLICY.md`](ARTIFACT_POLICY.md)
+**Status:** ✅ Complete (54 lines)
+
+Policy for runtime output handling: the `outputs/` tree is git-ignored (only synthetic fixtures live in `tests/fixtures/`), storage separation by environment, retention defaults (30/180/365 days for raw/parsed/final artifacts), sensitive-data handling (`--encrypt-loot`, key file permissions, `RECONFORGE_VAULT_KEY`/`RECONFORGE_LOOT_KEY` out-of-band key supply), and auditability guidance for engagement traceability.
+
+---
+
+### OBSERVABILITY_AND_CONTRACTS.md
+📍 **Location:** [`docs/OBSERVABILITY_AND_CONTRACTS.md`](OBSERVABILITY_AND_CONTRACTS.md)
+**Status:** ✅ Complete (59 lines)
+
+Documents three related capabilities: per-module observability (`execution_id`, structured JSONL logs, per-phase duration/status metadata, `audit.json`), `ConfigLoader`'s layered environment-aware config resolution (base → environment overlay → secret-placeholder resolution via `RECONFORGE_SECRET_PROVIDER`), and versioned data-contract sidecars (`findings.contract.json`, `loot.contract.json`, `results.contract.json`) that preserve backward compatibility with legacy output files while adding a `schema_version`-tagged strict-consumer format.
+
+---
+
+### AI_ORCHESTRATION_ARCHITECTURE.md
+📍 **Location:** [`docs/AI_ORCHESTRATION_ARCHITECTURE.md`](AI_ORCHESTRATION_ARCHITECTURE.md)
+**Status:** ✅ Complete (45 lines)
+
+High-level architecture sketch (diagram + short narrative) for a proposed AI orchestration layer sitting above the `WorkflowOrchestrator`: a central intelligence engine normalizing findings into exploit hypotheses, a host→service→endpoint context graph, a confidence-driven decision engine for adaptive (non-static) module sequencing, and severity/likelihood/reachability-weighted triage scoring. Short and conceptual — read `reconforge/intelligence/engine.py` and `reconforge/attack_paths/engine.py` for what's actually implemented today versus what this document sketches as direction.
+
+---
+
 ## 3. Developer Documentation
 
 ### DEVELOPMENT.md
@@ -144,13 +199,75 @@ Migration guide for the `web_tools:` → unified `tools:` namespace consolidatio
 
 ---
 
+### VERSIONING.md
+📍 **Location:** [`docs/VERSIONING.md`](VERSIONING.md) · [PDF](VERSIONING.pdf)
+**Status:** ✅ Complete (139 lines)
+
+Semantic Versioning 2.0.0 policy: what counts as MAJOR (breaking CLI/config/output-schema changes, module removal), MINOR (new modules/tools/phases/features, backward-compatible), and PATCH (bug fixes, parser corrections, doc updates). The policy every phase of the `ARCHITECTURE_REVIEW.md` remediation mandate has bumped the version against — consult this before classifying any change.
+
+---
+
+### INTEGRATION_TESTING.md
+📍 **Location:** [`docs/INTEGRATION_TESTING.md`](INTEGRATION_TESTING.md) · [PDF](INTEGRATION_TESTING.pdf)
+**Status:** ✅ Complete (718 lines)
+
+How to validate full CLI flows without live targets or installed tools: mock `Runner.run()` (the single choke point every external command passes through) to return canned `RunResult`s, then assert on phase orchestration, OPSEC enforcement, tool command construction, parser handling, finding generation, loot dedup, and output file structure. Covers what to test, why external tools must never run in CI, and worked examples for full end-to-end module flows.
+
+---
+
 ## 4. Audit & Stabilization Reports
 
-### AUDIT_REPORT.md
-📍 **Location:** [`docs/AUDIT_REPORT.md`](AUDIT_REPORT.md) · [PDF](AUDIT_REPORT.pdf)
-**Status:** ✅ Complete (259 lines)
+### ~~AUDIT_REPORT.md~~ (removed)
 
-Comprehensive technical audit from an offensive security perspective. Overall score: **6.5/10**. Covers directory structure, module completeness, config/code sync, test quality, OPSEC enforcement, and findings pipeline. Identifies architectural drift as the central problem and provides prioritized remediation.
+This file no longer exists in the repository (confirmed absent as of 2026-07-14) but was still listed here as if current, describing a "6.5/10... architectural drift" audit — that role is now filled by `ARCHITECTURE_REVIEW.md` below, the living document that superseded it. Entry kept, struck through, per the same policy applied to the dead `STABILIZATION_CHECK_P9.md` link further down this section.
+
+---
+
+### ARCHITECTURE_REVIEW.md
+📍 **Location:** [`docs/ARCHITECTURE_REVIEW.md`](ARCHITECTURE_REVIEW.md)
+**Status:** 🔄 Living document — updated after every remediation phase
+
+The project's primary, currently-maintained audit — and the one actually cross-checked against real command execution (`pytest`, `ruff`, `mypy`, `bandit`) rather than documentation claims. Structure: current architecture, strengths, architectural weaknesses, security risks, duplicated components, misleading/unverified claims, untested assumptions, dead code, incomplete/overstated features, P0 release-blocker summary, and a prioritized P1/P2/P3 remediation checklist — each item tracked to resolution with a dated note explaining what changed and why. §4 ("Status of the phased mandate") is a running phase-by-phase log of every remediation pass from Phase 1 onward, including this one. Supersedes the historical `AUDIT_REPORT.md` (removed) and the self-assessed `PROJECT_SCORECARD.md`/`INDEPENDENT_SECURITY_ASSESSMENT_2026-04-13.md` below as the authoritative account of project quality.
+
+---
+
+### PROJECT_SCORECARD.md
+📍 **Location:** [`docs/PROJECT_SCORECARD.md`](PROJECT_SCORECARD.md)
+**Status:** ⚠️ Author self-assessment (carries its own disclaimer banner)
+
+A self-scored snapshot (9.5/10, dated April 2026) written by the project author, not an independent reviewer — the file's own banner says so explicitly and points readers to `ARCHITECTURE_REVIEW.md` for a claims-cross-checked-against-code audit instead. Covers strong points (modular architecture, quality gates, observability, contract sidecars, autonomy features), remaining gaps, a stage-by-stage evolution narrative, and recommended next priorities. Treat the score as a maintainer's opinion, not validation.
+
+---
+
+### INDEPENDENT_SECURITY_ASSESSMENT_2026-04-13.md
+📍 **Location:** [`docs/INDEPENDENT_SECURITY_ASSESSMENT_2026-04-13.md`](INDEPENDENT_SECURITY_ASSESSMENT_2026-04-13.md)
+**Status:** ⚠️ Author self-assessment despite the filename (carries its own disclaimer banner), written in Portuguese
+
+Despite its name, this is also a self-assessment by the project author (with AI assistance), not a third-party review — the file's own banner corrects the title and flags that its "383 tests passing" claim didn't match the real count even at the time it was written (445, per the banner). Self-score: 7.8/10. Covers objective strengths/gaps, a per-business-goal readiness diagnosis (bug bounty vs. professional consulting), and a phased remediation roadmap. Same caveat as `PROJECT_SCORECARD.md`: a maintainer's opinion, cross-check against `ARCHITECTURE_REVIEW.md`.
+
+---
+
+### PRIORITY_4_COMPLETION_REPORT.md
+📍 **Location:** [`docs/PRIORITY_4_COMPLETION_REPORT.md`](PRIORITY_4_COMPLETION_REPORT.md) · [PDF](PRIORITY_4_COMPLETION_REPORT.pdf)
+**Status:** 📜 Historical (carries its own "HISTORICAL DOCUMENT" banner, dated 2026-03-21)
+
+A dated snapshot of the "Priority 4: Documentation Completion" pass — an inventory of every doc file that existed at the time (20 `docs/` Markdown files, 6 module-level READMEs, root-level files), with line counts and one-line purposes for each. Explicitly self-labeled as historical and superseded by this index for current documentation state; several files it lists (`AUDIT_REPORT.md`, `STABILIZATION_CHECK_P9.md`, the three root `STABILIZATION_CHECK_P6/P7/P8.md` files) have since been removed from the repository — expected drift for a document that documents itself as a point-in-time snapshot, not a bug.
+
+---
+
+### HTB_JERRY_CAPABILITY_ASSESSMENT.md
+📍 **Location:** [`docs/HTB_JERRY_CAPABILITY_ASSESSMENT.md`](HTB_JERRY_CAPABILITY_ASSESSMENT.md)
+**Status:** ✅ Complete (46 lines, written in Portuguese, dated 2026-04-13)
+
+A capability assessment asking a narrow, concrete question: can ReconForge autonomously complete the HTB "Jerry" box end-to-end (Tomcat Manager default-credential login → malicious WAR upload → reverse shell)? Verdict: no — the framework covers enumeration and Tomcat fingerprinting well, but has no Tomcat Manager exploitation playbook, no WAR-deploy automation, and no post-compromise executor (self-scored 6.4/10 for this specific scenario). Useful as a concrete, falsifiable capability boundary rather than an abstract claim.
+
+---
+
+### HTB_KNIFE_CAPABILITY_ASSESSMENT.md
+📍 **Location:** [`docs/HTB_KNIFE_CAPABILITY_ASSESSMENT.md`](HTB_KNIFE_CAPABILITY_ASSESSMENT.md)
+**Status:** ✅ Complete (46 lines, written in Portuguese, dated 2026-04-13)
+
+Same format as the Jerry assessment above, applied to HTB "Knife" (PHP 8.1.0-dev backdoor RCE via a malformed `User-Agent` header → reverse shell → `sudo knife exec` privilege escalation). Verdict: no autonomous end-to-end capability — no native exploit for the PHP dev-build backdoor and no automated privesc executor for the specific `sudo knife` chain (self-scored 6.1/10 for this scenario).
 
 ---
 
@@ -210,7 +327,88 @@ Official internal validator runbook for Burp MCP integration. Covers CLI/module/
 
 ---
 
-## 6. Root-Level Stabilization Checks (outside `docs/`)
+## 6. Burp MCP / Intelligence Engine Guides
+
+These five documents cover the Burp MCP-backed HTTP collection, correlation, and attack-path
+generation stack (`reconforge/attack_paths/`, `reconforge/intelligence/`, `reconforge/collectors/`,
+`reconforge/normalizers/`, `core/adapters/burp/`) — distinct from the recon-module (`network`/`web`/
+`api`/`surface`/`ad`) tool/parser/phase architecture covered in §2-§3 above.
+
+### BURP_MCP_INTEGRATION.md
+📍 **Location:** [`docs/BURP_MCP_INTEGRATION.md`](BURP_MCP_INTEGRATION.md)
+**Status:** ✅ Complete (133 lines)
+
+The integration architecture reference: `core/adapters/burp/` module layout, the safe/enabled Burp tool subset (`send_http1_request`, `send_http2_request`, `get_proxy_http_history[_regex]`), default-blocked tool categories (config-changing, intercept-toggling, scanner/intruder), `BurpMcpConfig` fields, the `mcp_validation/run_validation.py` connectivity/capability check command, the `NormalizedBurpHttpRecord` normalization boundary, and current limitations (tool argument schemas not yet strongly typed).
+
+---
+
+### attack_path_generation.md
+📍 **Location:** [`docs/attack_path_generation.md`](attack_path_generation.md)
+**Status:** ✅ Complete (69 lines)
+
+Documents `reconforge/attack_paths/engine.py`: how classified findings become candidate multi-step attack paths, each step replayed live and tagged `unreachable`/`reachable`/`corroborated` (never "confirmed exploitation" — that requires authorized-lab validation per `FINDINGS.md`). Covers the 7 engine phases (graph build → primitive mapping → candidate generation → replay/tagging → scoring → refinement → failure analysis), the `reconforge burp attack-paths` CLI command, and `AttackPathReport`/`AttackPath` output structure.
+
+---
+
+### burp_web_lifecycle.md
+📍 **Location:** [`docs/burp_web_lifecycle.md`](burp_web_lifecycle.md)
+**Status:** ✅ Complete (44 lines)
+
+The `reconforge burp lifecycle-validate` command: validates baseline-request/replay consistency, controlled mutation execution, response classification, session continuity, and gap analysis through a single structured `LifecycleReport` — no raw MCP payloads forwarded, all request-capable actions go through Burp provider methods with upstream scope enforcement.
+
+---
+
+### http_collection.md
+📍 **Location:** [`docs/http_collection.md`](http_collection.md)
+**Status:** ✅ Complete (77 lines)
+
+The `HttpCollector`/`HttpObservationNormalizer` pipeline that turns Burp provider outputs into a stable, provider-agnostic `HTTPObservation` schema (request/response fields, `evidence_id`, `source_tool`/`source_provider`). Covers the two collection flows (single-request, proxy-history), evidence-ID traceability, the `summarize()` aggregate stats helper, and how to extend the normalizer to a non-Burp provider. Documents a real current limitation: response bodies are stored as base64-prefixed text, not decoded structured data.
+
+---
+
+### vulnerability_intelligence.md
+📍 **Location:** [`docs/vulnerability_intelligence.md`](vulnerability_intelligence.md)
+**Status:** ✅ Complete (69 lines)
+
+The `reconforge burp intelligence-validate` engine: converts mutated-HTTP behavior into `MutationIntelligence`/`VulnerabilityClassification`/`ParameterProfile`/`CorrelationRelationship`/`PrioritizedFinding` models via deterministic, evidence-backed rules (`IDOR_candidate`, `auth_bypass_candidate`, `reflection_detected`, `enumeration_vector` — explicitly no AI-based tagging). The validation loop runs baseline vs. correlation-enabled passes and flags improvement when correlation yields more or higher-scored findings.
+
+---
+
+## 7. Root-Level Project Files (outside `docs/`)
+
+### AGENTS.md
+📍 **Location:** [`../AGENTS.md`](../AGENTS.md)
+**Status:** ✅ Complete (339 lines)
+
+The agent operating contract governing this repository's own phased remediation mandate: project mission, core architecture principles (single orchestration authority, adapter-only integrations, policy-first execution, deterministic-by-default behavior, "evidence over narration"), non-negotiable rules, trust boundaries, execution/scope-enforcement rules, coding/architecture/logging/testing/documentation standards, anti-patterns, and the Definition of Done every phase in `ARCHITECTURE_REVIEW.md` §4 is held to.
+
+---
+
+### CHANGELOG.md
+📍 **Location:** [`../CHANGELOG.md`](../CHANGELOG.md)
+**Status:** 🔄 Living document — updated every release
+
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/)-formatted release history, one entry per version bump, each classified MAJOR/MINOR/PATCH per `VERSIONING.md`'s policy. Since the Phase 1 remediation mandate began, effectively every phase closes with a version bump and a CHANGELOG entry describing what was fixed/added/documented and why — the terse counterpart to `ARCHITECTURE_REVIEW.md` §4's fuller narrative for the same history.
+
+---
+
+### CONTRIBUTING.md
+📍 **Location:** [`../CONTRIBUTING.md`](../CONTRIBUTING.md)
+**Status:** ✅ Complete (169 lines)
+
+Contributor guidelines: branch naming (`<type>/<short-description>`), Conventional Commits style, test expectations per change type (new tool wrapper/parser/phase/core component, bug fix), documentation-update expectations, code review checklist (no `shell=True`, `list[str]` commands only, input validation, correct confidence/severity, no secrets), merge policy (squash-merge, ≥1 approval, green CI), and the process for proposing new tools/phases/modules.
+
+---
+
+### SECURITY.md
+📍 **Location:** [`../SECURITY.md`](../SECURITY.md)
+**Status:** ✅ Complete (42 lines)
+
+Security policy: scope is ReconForge's own code (not the third-party tools it wraps), only the latest `main` release is supported, vulnerabilities should be reported via GitHub's private security-advisory feature rather than a public issue, and a reminder that ReconForge is for authorized testing only — findings *produced by* ReconForge follow the target engagement's own disclosure process, not this repository's.
+
+---
+
+## 8. Root-Level Stabilization Checks (outside `docs/`)
 
 `STABILIZATION_CHECK_P6.md`/`P7.md`/`P8.md` (project root) and
 `STABILIZATION_CHECK_P9.md` (`docs/`) were previously listed here but no
@@ -223,7 +421,7 @@ without this index being updated. Confirmed absent as of 2026-07-13.
 
 | Format | Count | Purpose |
 |--------|------:|---------|
-| Markdown (`.md`) | 47 (42 in `docs/`, 5 at project root) | Primary documentation (version-controlled). ~20 of these are not yet described in this index — see the "Known gap" note at the top |
+| Markdown (`.md`) | 47 (42 in `docs/`, 5 at project root) | Primary documentation (version-controlled). All 46 non-index files have an entry below (this file is the 47th, indexing the others) |
 | PDF (`.pdf`) | 29 (27 in `docs/`/root, 2 nested under `modules/`) | Exported snapshots for offline/client distribution |
 
 ---
@@ -270,4 +468,4 @@ Summary of the Phase 6 documentation quality pass: files audited, issues found a
 
 ---
 
-*This index is manually maintained, not auto-generated — it previously claimed otherwise while carrying a 4-month-old snapshot with dead links to deleted files (fixed 2026-07-13). When adding new documentation, add an entry here.*
+*This index is manually maintained, not auto-generated — it previously claimed otherwise while carrying a 4-month-old snapshot with dead links to deleted files (fixed 2026-07-13) and ~20 real files with no entry at all (fixed 2026-07-14). When adding new documentation, add an entry here — the "Known gap" disclaimer this file carried between those two dates is exactly what happens when that doesn't happen.*
