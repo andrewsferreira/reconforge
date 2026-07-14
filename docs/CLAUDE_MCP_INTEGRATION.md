@@ -75,6 +75,11 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
   - The requested phase must not classify as `CREDENTIAL_USE` or `PROHIBITED` — AD's
     `delegation`/`bloodhound` phases and any credential-brute-force path are rejected outright,
     with no way to supply credentials through MCP at all.
+  - **INTRUSIVE-tier phases** (`web`'s `exploit`, `api`'s `authorization`) additionally require
+    `config/mcp.yaml`'s `mcp.allow_intrusive_execution: true` — off by default, and not settable
+    via the MCP request itself. Meeting every requirement above still isn't enough for these two
+    phases unless an operator has explicitly opted the whole server in by editing that file. See
+    [CONFIGURATION.md](CONFIGURATION.md#mcpyaml).
 - **Findings and report content separate server-generated structure from target-derived text.**
   Every response carries `trusted_metadata`/`untrusted_evidence` fields (or a flat
   `trust: "server_generated"` marker) so a scanned target can never plant instructions that look

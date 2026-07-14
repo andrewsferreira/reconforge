@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reconforge"
-version = "2.11.4"
+version = "2.12.0"
 description = "An evidence-driven reconnaissance and attack-path analysis framework for authorized penetration testing and Red Team laboratories."
 readme = "README.md"
 requires-python = ">=3.10"

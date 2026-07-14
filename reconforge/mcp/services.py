@@ -675,6 +675,15 @@ def generate_report(request: GenerateReportRequest) -> GenerateReportResponse:
 _EXECUTION_LOCK = threading.Lock()
 
 
+def _intrusive_execution_allowed() -> bool:
+    """Reads config/mcp.yaml's ``mcp.allow_intrusive_execution`` — the
+    server-wide off switch for INTRUSIVE-tier phases (see
+    ``reconforge/mcp/policy.py::evaluate()``). Deliberately not derived
+    from the MCP request in any way: an operator changes this by editing
+    the file, not by anything a client can send."""
+    return bool(ConfigLoader().load("mcp").get("mcp", {}).get("allow_intrusive_execution", False))
+
+
 def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteApprovedPhaseResponse:
     try:
         parse_target(request.target)
@@ -725,6 +734,7 @@ def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteAppro
         has_validated_scope=has_validated_scope,
         explicit_confirmation=request.explicit_confirmation,
         approval_id=request.approval_id,
+        intrusive_execution_allowed=_intrusive_execution_allowed(),
     )
     if not decision.allowed:
         raise PolicyBlockedError(

@@ -168,6 +168,53 @@ def test_prohibited_tier_is_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyP
         services.execute_approved_phase(request)
 
 
+# ── INTRUSIVE additionally requires config/mcp.yaml's server-wide gate ─
+
+
+def test_intrusive_tier_rejected_even_when_fully_authorized_because_config_gate_defaults_off(tmp_path: Path):
+    """web/exploit is INTRUSIVE — config/mcp.yaml's mcp.allow_intrusive_execution
+    defaults to false, so even a fully-authorized request (engagement,
+    scope, confirmation, approval_id all present) must still be denied."""
+    request = _full_request(tmp_path, module="web", phase="exploit", approval_id="APPROVAL-1")
+    with pytest.raises(PolicyBlockedError, match="allow_intrusive_execution"):
+        services.execute_approved_phase(request)
+
+
+def test_intrusive_tier_reaches_execution_when_config_gate_is_enabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Proves the config gate is actually read and passed through to
+    evaluate() — uses a no-op fake module (like
+    test_lock_is_released_after_execution_raises_internally does) so this
+    doesn't depend on web/exploit's real tool execution succeeding
+    against a fake target."""
+
+    class _NoOpModule:
+        MODULE_NAME = "web"
+        VALID_PHASES = ["exploit"]
+
+        def __init__(self, **kwargs):
+            pass
+
+        def run(self, phases):
+            pass
+
+        @property
+        def findings_mgr(self):
+            return type("FindingsMgr", (), {"get_all": staticmethod(list)})()
+
+        @property
+        def output(self):
+            return type("Output", (), {"module_dir": staticmethod(lambda name: tmp_path)})()
+
+    monkeypatch.setattr(services, "_intrusive_execution_allowed", lambda: True)
+    monkeypatch.setattr(services, "_module_class", lambda name: _NoOpModule)
+    request = _full_request(tmp_path, module="web", phase="exploit", approval_id="APPROVAL-1")
+    response = services.execute_approved_phase(request)
+    assert response.tier == "intrusive"
+    assert response.findings_count == 0
+
+
 # ── other guards ────────────────────────────────────────────────────
 
 

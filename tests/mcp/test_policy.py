@@ -159,14 +159,41 @@ def test_evaluate_intrusive_and_credential_use_denied_without_approval_id(tier):
     assert "approval_id" in decision.missing_requirements
 
 
-@pytest.mark.parametrize("tier", [ExecutionTier.INTRUSIVE, ExecutionTier.CREDENTIAL_USE])
-def test_evaluate_intrusive_and_credential_use_allowed_with_full_approval(tier):
+def test_evaluate_credential_use_allowed_with_full_approval():
     decision = evaluate(
-        tier,
+        ExecutionTier.CREDENTIAL_USE,
         has_engagement=True,
         has_validated_scope=True,
         explicit_confirmation=True,
         approval_id="APPROVAL-123",
+    )
+    assert decision.allowed is True
+
+
+def test_evaluate_intrusive_denied_without_config_gate_even_with_full_approval():
+    """INTRUSIVE has an extra server-wide off switch
+    (mcp.allow_intrusive_execution in config/mcp.yaml, defaults to false)
+    that per-request approval alone can't satisfy — an operator has to
+    opt the whole server in, not just approve one request."""
+    decision = evaluate(
+        ExecutionTier.INTRUSIVE,
+        has_engagement=True,
+        has_validated_scope=True,
+        explicit_confirmation=True,
+        approval_id="APPROVAL-123",
+    )
+    assert decision.allowed is False
+    assert any("allow_intrusive_execution" in m for m in decision.missing_requirements)
+
+
+def test_evaluate_intrusive_allowed_with_full_approval_and_config_gate_enabled():
+    decision = evaluate(
+        ExecutionTier.INTRUSIVE,
+        has_engagement=True,
+        has_validated_scope=True,
+        explicit_confirmation=True,
+        approval_id="APPROVAL-123",
+        intrusive_execution_allowed=True,
     )
     assert decision.allowed is True
 

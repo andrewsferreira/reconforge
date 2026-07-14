@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.12.0] — 2026-07-14
+
+Claude MCP Integration — Phase 9 (server-wide config gate). MINOR per `docs/VERSIONING.md` — a new capability: a server-wide off switch for INTRUSIVE-tier execution.
+
+### Added
+
+- `config/mcp.yaml`: `mcp.allow_intrusive_execution` (default `false`), a server-wide off switch for INTRUSIVE-tier phases (`web`'s `exploit`, `api`'s `authorization`). Closes a gap `reconforge/mcp/policy.py` had flagged in its own comments since Phase 5 part 1 ("a separate mcp.allow_intrusive_execution config gate ... will add a further server-wide off switch once the config section exists").
+- `reconforge/mcp/policy.py::evaluate()` gained an `intrusive_execution_allowed` parameter (defaults to the denying value, consistent with the function's documented invariant that every keyword argument defaults to deny). When unset, INTRUSIVE-tier phases get an extra `missing_requirements` entry — on top of, not instead of, the existing per-request requirements (active engagement, validated scope, `explicit_confirmation`, `approval_id`).
+- `reconforge/mcp/services.py::_intrusive_execution_allowed()` reads the setting fresh on every call (`ConfigLoader().load("mcp")`, matching the existing inline `ConfigLoader()` idiom already used by `get_status`'s tool-availability check) and passes it into `evaluate()`. Deliberately **not** exposed as a request field — a per-request approval is a decision an operator can make in the moment for one target; enabling INTRUSIVE execution at all is a standing, server-wide posture change that should require editing a file, not something a single MCP request could talk its way into.
+- `docs/CONFIGURATION.md` gained a `## mcp.yaml` section (previously claimed only two config files existed); `docs/CLAUDE_MCP_INTEGRATION.md`'s security-model summary now mentions the gate.
+
+### Tests
+
+- Split `test_policy.py`'s `test_evaluate_intrusive_and_credential_use_allowed_with_full_approval` (parametrized over both tiers) into three: CREDENTIAL_USE is unaffected by this gate, INTRUSIVE is denied without it even with full per-request approval, and INTRUSIVE is allowed once both the gate and full approval are present.
+- Two new tests in `test_execute_approved_phase.py`: the config-gate denial reaches `execute_approved_phase` end to end, and (using the same no-op-fake-module technique as the existing lock-release test, to avoid depending on `web/exploit`'s real tool execution) the gate genuinely lets execution proceed when enabled.
+
+1048/1048 tests passing (1045 + 3 net new); ruff/mypy/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.11.4] — 2026-07-14
 
 CI recovery: dependency vulnerability. PATCH per `docs/VERSIONING.md` — no code capability change.

@@ -1,0 +1,24 @@
+# ReconForge MCP server configuration.
+#
+# See docs/CLAUDE_MCP_INTEGRATION.md for setup and
+# docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md for the execution-tier policy
+# model this file's settings gate.
+
+mcp:
+  # Server-wide off switch for INTRUSIVE-tier execution
+  # (reconforge/mcp/policy.py's SAFE_READ_ONLY -> PROHIBITED taxonomy;
+  # today that's web's "exploit" phase and api's "authorization" phase).
+  #
+  # This is an *additional* gate on top of every per-request requirement
+  # (active engagement, validated scope, explicit_confirmation,
+  # approval_id) -- meeting all of those still isn't enough for an
+  # INTRUSIVE-tier phase unless this is also true. It exists because a
+  # single fully-authorized MCP request is a per-target decision an
+  # operator can make in the moment; enabling INTRUSIVE execution at all
+  # is a standing, server-wide posture change an operator should make
+  # deliberately by editing this file, not something any one MCP request
+  # should be able to talk its way into. Not settable via the MCP request
+  # itself -- only editing this file changes it.
+  #
+  # Off by default.
+  allow_intrusive_execution: false

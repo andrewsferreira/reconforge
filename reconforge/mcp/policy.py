@@ -118,9 +118,10 @@ _TIER_REQUIREMENTS: dict[ExecutionTier, TierRequirements] = {
     ExecutionTier.LOW_IMPACT: TierRequirements(True, True, True, False, False),
     ExecutionTier.ACTIVE_RECON: TierRequirements(True, True, True, True, False),
     # allowed_by_default=True here means "reachable if every requirement is
-    # met" — a separate mcp.allow_intrusive_execution config gate (planned,
-    # not built: docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md §9) will add a
-    # further server-wide off switch once the config section exists.
+    # met" — evaluate()'s intrusive_execution_allowed parameter adds a
+    # further, server-wide off switch on top of these per-request
+    # requirements (config/mcp.yaml's mcp.allow_intrusive_execution, off
+    # by default — see services.py::_intrusive_execution_allowed()).
     ExecutionTier.INTRUSIVE: TierRequirements(True, True, True, True, True),
     ExecutionTier.CREDENTIAL_USE: TierRequirements(True, True, True, True, True),
     ExecutionTier.PROHIBITED: TierRequirements(False, True, True, True, True),
@@ -146,6 +147,7 @@ def evaluate(
     has_validated_scope: bool = False,
     explicit_confirmation: bool = False,
     approval_id: str | None = None,
+    intrusive_execution_allowed: bool = False,
 ) -> PolicyDecision:
     """Decide whether *tier*'s requirements are satisfied by the given facts.
 
@@ -156,7 +158,11 @@ def evaluate(
     originate from the actual MCP request the operator supplied, verified
     by the caller of this function (a future ``reconforge_execute_approved_phase``
     tool) against ``core/authorization_gate.py::ScopeAuthorization``, not
-    fabricated here.
+    fabricated here. ``intrusive_execution_allowed`` is likewise never
+    derived from the request — it comes only from
+    ``config/mcp.yaml``'s ``mcp.allow_intrusive_execution`` (a
+    server-wide, operator-controlled setting a single MCP request cannot
+    influence), read by the caller before invoking this function.
     """
     if tier is ExecutionTier.PROHIBITED:
         return PolicyDecision(
@@ -177,6 +183,8 @@ def evaluate(
         missing.append("explicit_confirmation=true")
     if reqs.requires_approval_id and not approval_id:
         missing.append("approval_id")
+    if tier is ExecutionTier.INTRUSIVE and not intrusive_execution_allowed:
+        missing.append("mcp.allow_intrusive_execution=true in config/mcp.yaml (server-wide, operator-controlled)")
 
     allowed = not missing
     reason = "all tier requirements satisfied" if allowed else f"missing: {', '.join(missing)}"

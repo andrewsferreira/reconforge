@@ -1,17 +1,17 @@
 # ReconForge Configuration Guide
 
-> Version 1.2.0 — Last updated: 2026-07-14
+> Version 1.3.0 — Last updated: 2026-07-14
 
 ## Overview
 
-ReconForge uses two YAML configuration files as the single source of truth:
+ReconForge's CLI/module layer uses two YAML configuration files as the single source of truth for tool/profile settings:
 
 | File | Purpose |
 |------|---------|
 | `config/tools.yaml` | Tool binary paths, default arguments, timeouts, scan profiles, safety settings |
 | `config/profiles.yaml` | OPSEC-aware scan profiles with timing, technique toggles, and noise-level gates |
 
-There are no fallback namespaces or hardcoded config overrides for these two files — they are authoritative for tool/profile settings. Several cross-cutting behaviors (secrets backend selection, a kill switch, encryption key overrides, an optional risk-approval gate) are controlled by environment variables instead, since they're either security-sensitive (keys should not have to live in a YAML file) or need to be settable without editing a checked-in config file — see [Environment Variables](#environment-variables) below.
+There are no fallback namespaces or hardcoded config overrides for these two files — they are authoritative for tool/profile settings. A third file, `config/mcp.yaml`, configures the separate `reconforge/mcp/` server package (see [mcp.yaml](#mcpyaml) below) — it's loaded through the same `ConfigLoader`, but governs execution policy rather than tool/profile settings, so it's kept distinct from the two above. Several cross-cutting behaviors (secrets backend selection, a kill switch, encryption key overrides, an optional risk-approval gate) are controlled by environment variables instead, since they're either security-sensitive (keys should not have to live in a YAML file) or need to be settable without editing a checked-in config file — see [Environment Variables](#environment-variables) below.
 
 ## tools.yaml
 
@@ -189,6 +189,27 @@ When `ProfileLoader` is initialized with `(config, opsec_mode, module)`, it reso
 2. **Exact match**: `opsec_mode` as-is
 3. **Base mode**: via canonical mapping (`stealth`, `normal`, `aggressive`)
 4. **Empty dict**: all defaults
+
+---
+
+## mcp.yaml
+
+Configuration for `reconforge/mcp/`, the package that lets Claude Desktop/Claude Code act as an MCP client against a ReconForge-hosted MCP server (`reconforge mcp serve` — see [CLAUDE_MCP_INTEGRATION.md](CLAUDE_MCP_INTEGRATION.md)). Loaded via `ConfigLoader().load("mcp")`, same mechanism as `tools.yaml`/`profiles.yaml`, but read directly by `reconforge/mcp/services.py` rather than through a dedicated accessor class — there's currently one setting.
+
+### Structure
+
+```yaml
+mcp:
+  allow_intrusive_execution: false
+```
+
+### Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|--------------|
+| `mcp.allow_intrusive_execution` | bool | `false` | Server-wide off switch for INTRUSIVE-tier phases (`web`'s `exploit`, `api`'s `authorization` — see `reconforge/mcp/policy.py`'s tier taxonomy). An *additional* gate on top of every per-request requirement the `reconforge_execute_approved_phase` MCP tool already checks (active engagement, validated scope, `explicit_confirmation`, `approval_id`) — meeting all of those still isn't enough for an INTRUSIVE-tier phase unless this is also `true`. Not settable via the MCP request itself; only editing this file changes it, by design — a single fully-authorized request is a per-target decision an operator can make in the moment, but enabling INTRUSIVE execution at all is a standing posture change that should require deliberately editing a file, not something any one request should be able to talk its way into. |
+
+CREDENTIAL_USE-tier phases (`ad`'s `delegation`/`bloodhound`) are unaffected by this setting — they're rejected outright by `reconforge_execute_approved_phase` regardless, since no credential-reference mechanism exists yet (see `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`'s Known Limitations).
 
 ---
 
