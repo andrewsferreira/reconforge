@@ -142,13 +142,4 @@ def register(server: Server) -> None:
         # invariant (every handler always returns a BaseModel) rather than
         # silencing an unrelated error.
         response = cast(BaseModel, handler(request))
-        # The ignore below only fires under `mypy --follow-imports=skip`
-        # (CI's invocation for its own 3-file scope, which doesn't
-        # include this file): skipping imports means mypy can't see
-        # pydantic's real BaseModel stub, so model_dump()'s return type
-        # resolves to Any despite the cast above. A normal (non-skip)
-        # mypy run resolves this correctly but hits this repo's
-        # pre-existing, unrelated duplicate-module-path issue (also seen
-        # on core/adapters/burp/capabilities.py) before reaching this
-        # line — not something introduced here.
-        return response.model_dump()  # type: ignore[no-any-return]
+        return response.model_dump()

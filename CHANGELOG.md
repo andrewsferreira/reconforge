@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.11.1] — 2026-07-14
+
+CI recovery + quality-gate scope widening. PATCH per `docs/VERSIONING.md` — a hardening pass, no new externally-visible capability.
+
+### Fixed
+
+- **CI has been red on every push since Phase 2 of the MCP work (6 consecutive failed runs on `main`), unnoticed because all prior local verification ran against an already `pip install -e .`-ed dev environment, which masked the bug.** Root cause: a stray, empty `__init__.py` has sat directly at the git repository root since the very first commit — a sibling of `core/`, `modules/`, `reconforge/`, not inside the `reconforge/` package directory. Because this repository's own directory is itself named `reconforge` (and GitHub Actions checks out to `<work>/reconforge/reconforge`, doubling the name the same way a local clone nested under a `reconforge/` folder does), that stray file made the *repository root itself* resolve as a second, broken `reconforge` package — with an empty `__path__` pointing at the repo root instead of `reconforge/reconforge/` — whenever the real package wasn't already `pip install`ed. It also fooled pytest's own directory-walking (which stops at the first ancestor directory *without* `__init__.py`) into inserting the repo root's *parent* directory onto `sys.path`, worsening the shadowing. This never mattered until the MCP work added the first test files that `import reconforge.<submodule>` directly (`core.`/`modules.` imports were unaffected) — and CI never runs `pip install -e .` until its final packaging-smoke-test step, after tests already ran, so the shadow bug fired on every CI run from that point on, even though local dev runs (package already installed) never saw it. Fixed by deleting the stray file; verified by running the full suite with the package deliberately uninstalled, reproducing the exact CI failure locally first, then confirming the fix resolves it.
+- `reconforge/mcp/tools.py`'s `# type: ignore[no-any-return]` on `_call_tool`'s return, added in Phase 3 to work around a `mypy --follow-imports=skip` false positive under CI's then-narrow 3-file invocation, is an *unused* ignore once `reconforge/mcp/` is type-checked as a whole (mypy resolves `pydantic.BaseModel.model_dump()`'s real return type correctly once `schemas.py` is analyzed alongside it) — removed now that CI's mypy scope includes the package.
+- A second, related ordering bug in the same CI job: `.github/workflows/quality-gates.yml`'s "Packaging smoke test" step ran `pip install -e .` *after* "Tests with coverage gate", so `tests/mcp/test_stdio_transport_integrity.py`'s two subprocess tests (which spawn the real `reconforge` console script) had no such script to spawn during the test step — they would have started failing the moment the import-shadowing fix above let test collection get that far. Moved `pip install -e .` into the "Install dependencies" step, before any check that needs the package installed; "Packaging smoke test" now just re-verifies the already-installed CLI runs.
+
+### Changed
+
+- `.github/workflows/quality-gates.yml`: mypy now also checks `reconforge/mcp/*.py` (previously only 3 unrelated files: `reconforge/cli.py`, `core/runner.py`, `core/workflow_orchestrator.py` — the 13-file `reconforge/mcp/` package had never been type-checked in CI at all); the coverage gate now also tracks `--cov=reconforge` (previously only `core`/`modules`).
+
+1039/1039 tests passing with the package genuinely absent from `sys.path` (no install) up through the point CI's own install step would run, then present for the rest — matching CI's actual step ordering, not just the locally-installed dev environment; ruff/mypy(11-file scope)/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.11.0] — 2026-07-14
 
 Claude MCP Integration — Phase 5, part 2/2 (Controlled Execution: the execution tool). MINOR per `docs/VERSIONING.md` — the first tool in this package that can trigger real (non-dry-run) execution, plus a real bug fix.
