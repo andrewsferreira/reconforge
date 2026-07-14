@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.11.3] — 2026-07-14
+
+Claude MCP Integration — Phase 8 (structured error codes). PATCH per `docs/VERSIONING.md` — richer detail on existing tool error responses, no new tool.
+
+### Fixed
+
+- Every `reconforge/mcp/errors.py` exception subclass has declared a machine-readable `code` class attribute since Phase 3, but nothing ever surfaced it to the client: `reconforge/mcp/tools.py::_call_tool` let every `MCPServiceError` fall through to the `mcp` SDK's own generic `except Exception as e: return self._make_error_result(str(e))`, which only ever returns plain text. `code` was dead metadata. Similarly, `policy.py::PolicyDecision.missing_requirements` — the exact structured list of what's missing (`engagement_id`, `approval_id`, etc.) — was already computed but got flattened into a prose `reason` string and thrown away the moment `services.py` raised `PolicyBlockedError`.
+- `tools.py` now catches `MCPServiceError` explicitly and returns a `CallToolResult` with `structuredContent={"error_code": ..., "message": ...}` (plus `missing_requirements` when a `PolicyBlockedError` carries one) — a client can now act on *why* a call failed instead of parsing English prose. `content[0].text` is unchanged, so every existing test asserting on message text still passes untouched.
+- `PolicyBlockedError` gained a `missing_requirements: tuple[str, ...] = ()` constructor field; `services.py::execute_approved_phase` now passes `decision.missing_requirements` through instead of discarding it.
+
+### Added
+
+- `tests/mcp/test_structured_errors.py` (6 tests): unknown tool name, `FindingNotFoundError`, `UnknownPhaseError`, a policy denial that exercises all four requirement kinds at once (`web/exploit`, INTRUSIVE-tier — the only tier below CREDENTIAL_USE that also requires `approval_id`), a CREDENTIAL_USE rejection proving `missing_requirements` is *absent* (not present-but-empty) when there's nothing the operator could supply to fix it, and an `ExecutionConflictError` case.
+
+1045/1045 tests passing (1039 + 6 new); ruff/mypy(11-file scope)/bandit/pip-audit/doc-link-check all pass. Also refreshed README.md's stale test-count/coverage/mypy-scope claims (499 tests/~52%/3-file mypy scope, all predating this session's MCP work) and `pyproject.toml`'s `[tool.coverage.run]` `source` to include `reconforge` alongside `core`/`modules`, matching CI's `--cov` flags.
+
 ## [2.11.2] — 2026-07-14
 
 Claude MCP Integration — Phase 10 (Claude Desktop/Code setup guide). PATCH per `docs/VERSIONING.md` — documentation only, no code change.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reconforge"
-version = "2.11.2"
+version = "2.11.3"
 description = "An evidence-driven reconnaissance and attack-path analysis framework for authorized penetration testing and Red Team laboratories."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -102,15 +102,16 @@ exclude_dirs = ["tests", "outputs"]
 skips = ["B105", "B106", "B107"]
 
 [tool.coverage.run]
-source = ["core", "modules"]
+source = ["core", "modules", "reconforge"]
 omit = ["*/tests/*", "outputs/*"]
 
 [tool.coverage.report]
 # Honest floor, not an aspiration: actual measured coverage as of
-# 2026-07-11 is ~52%. The CI workflow previously asserted
-# --cov-fail-under=85 without this ever having been true (nothing in
-# pyproject.toml codified it either, so a local `pytest --cov` run
-# enforced nothing at all). Raising real coverage back toward 85% is
-# tracked as a P1 follow-up in docs/ARCHITECTURE_REVIEW.md rather than
-# silently claimed here.
+# 2026-07-14 is ~69% (core/modules/reconforge combined — reconforge
+# added to `source` above alongside CI's --cov=reconforge, v2.11.1).
+# The CI workflow previously asserted --cov-fail-under=85 without this
+# ever having been true (nothing in pyproject.toml codified it either,
+# so a local `pytest --cov` run enforced nothing at all). Raising real
+# coverage back toward 85% is tracked as a P1 follow-up in
+# docs/ARCHITECTURE_REVIEW.md rather than silently claimed here.
 fail_under = 50

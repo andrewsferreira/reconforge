@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.11.2 • 1039/1039 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.11.3 • 1045/1045 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -180,7 +180,7 @@ outputs/<target>/<module>/
 ```bash
 pip install -e ".[dev]"
 python -m pytest
-# 499 tests, all passing (~9.6s)
+# 1045 tests, all passing (~16s)
 ```
 
 These are unit tests against mocked tool execution and stored fixtures — they validate parsing, validation, and orchestration logic, not real binaries. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for what has and has not been validated against live tools.
@@ -190,10 +190,10 @@ These are unit tests against mocked tool execution and stored fixtures — they 
 Quality gates are codified in CI (`.github/workflows/quality-gates.yml`) and run:
 
 - Ruff (lint)
-- MyPy (type checks — `reconforge/cli.py`, `core/runner.py`, `core/workflow_orchestrator.py`; not yet the full tree)
+- MyPy (type checks — `reconforge/cli.py`, `core/runner.py`, `core/workflow_orchestrator.py`, and all of `reconforge/mcp/*.py`; not yet the full tree)
 - Bandit (SAST)
 - pip-audit (dependency vulnerability audit)
-- Pytest + coverage threshold (currently 50%, codified in `pyproject.toml`'s `[tool.coverage.report]`; measured coverage is ~52%, well short of the 85% previously asserted in CI but never actually enforced anywhere — see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for the tracked plan to raise it)
+- Pytest + coverage threshold (currently 50%, codified in `pyproject.toml`'s `[tool.coverage.report]`; measured coverage is ~69% across `core`/`modules`/`reconforge`, well short of the 85% previously asserted in CI but never actually enforced anywhere — see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for the tracked plan to raise it)
 - Packaging smoke test (`pip install -e .` + `reconforge --help`)
 
 ## Project Structure

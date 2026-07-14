@@ -23,7 +23,7 @@ from mcp.server.lowlevel import Server
 from pydantic import BaseModel, ValidationError
 
 from reconforge.mcp import schemas, services
-from reconforge.mcp.errors import MCPServiceError
+from reconforge.mcp.errors import MCPServiceError, PolicyBlockedError
 
 _Handler = Callable[[BaseModel], BaseModel]
 
@@ -112,6 +112,26 @@ _DESCRIPTIONS: dict[str, str] = {
 }
 
 
+def _error_result(exc: MCPServiceError) -> types.CallToolResult:
+    """Build an MCP error result that carries the same machine-readable
+    ``code`` every ``MCPServiceError`` subclass already declares (previously
+    dead metadata — nothing surfaced it to the client, which only ever saw
+    the SDK's generic ``str(exc)`` text via its own blanket exception
+    handler). ``PolicyBlockedError.missing_requirements`` — the exact list
+    ``policy.py::evaluate()`` computed — rides along too, when present, so a
+    client can act on *what's missing* instead of parsing English prose.
+    """
+    message = str(exc)
+    structured: dict[str, Any] = {"error_code": exc.code, "message": message}
+    if isinstance(exc, PolicyBlockedError) and exc.missing_requirements:
+        structured["missing_requirements"] = list(exc.missing_requirements)
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text=message)],
+        structuredContent=structured,
+        isError=True,
+    )
+
+
 def register(server: Server) -> None:
     """Attach the read-only tool handlers to *server*."""
 
@@ -127,19 +147,22 @@ def register(server: Server) -> None:
         ]
 
     @server.call_tool()
-    async def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        if name not in _TOOLS:
-            raise MCPServiceError(f"Unknown tool: {name}")
-        request_model, handler = _TOOLS[name]
+    async def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any] | types.CallToolResult:
         try:
-            request = request_model.model_validate(arguments)
-        except ValidationError as exc:
-            raise MCPServiceError(f"Invalid arguments for {name}: {exc}") from exc
-        # The heterogeneous concrete handlers stored in _TOOLS (each typed
-        # e.g. Callable[[GetStatusRequest], GetStatusResponse]) don't satisfy
-        # _Handler's parameter contravariance precisely enough for mypy to
-        # keep this typed past the dict lookup — cast documents the known
-        # invariant (every handler always returns a BaseModel) rather than
-        # silencing an unrelated error.
-        response = cast(BaseModel, handler(request))
+            if name not in _TOOLS:
+                raise MCPServiceError(f"Unknown tool: {name}")
+            request_model, handler = _TOOLS[name]
+            try:
+                request = request_model.model_validate(arguments)
+            except ValidationError as exc:
+                raise MCPServiceError(f"Invalid arguments for {name}: {exc}") from exc
+            # The heterogeneous concrete handlers stored in _TOOLS (each typed
+            # e.g. Callable[[GetStatusRequest], GetStatusResponse]) don't satisfy
+            # _Handler's parameter contravariance precisely enough for mypy to
+            # keep this typed past the dict lookup — cast documents the known
+            # invariant (every handler always returns a BaseModel) rather than
+            # silencing an unrelated error.
+            response = cast(BaseModel, handler(request))
+        except MCPServiceError as exc:
+            return _error_result(exc)
         return response.model_dump()

@@ -55,9 +55,22 @@ class FindingNotFoundError(MCPServiceError):
 class PolicyBlockedError(MCPServiceError):
     """The requested execution does not satisfy its policy tier's
     requirements (reconforge/mcp/policy.py), or targets a tier that has
-    no supported execution path yet (CREDENTIAL_USE, PROHIBITED)."""
+    no supported execution path yet (CREDENTIAL_USE, PROHIBITED).
+
+    ``missing_requirements`` carries ``policy.py::PolicyDecision.missing_requirements``
+    verbatim when the denial came from a failed tier-requirement check (e.g.
+    ``("engagement_id", "approval_id")``) — empty for denials that aren't a
+    missing-requirement list (CREDENTIAL_USE rejection, PROHIBITED tier).
+    Surfaced in the MCP response's ``structuredContent`` by
+    ``reconforge/mcp/tools.py`` so a client can act on it programmatically
+    instead of parsing the message string.
+    """
 
     code = "POLICY_BLOCKED"
+
+    def __init__(self, message: str, *, missing_requirements: tuple[str, ...] = ()) -> None:
+        super().__init__(message)
+        self.missing_requirements = missing_requirements
 
 
 class ExecutionConflictError(MCPServiceError):

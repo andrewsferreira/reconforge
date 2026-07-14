@@ -728,7 +728,8 @@ def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteAppro
     )
     if not decision.allowed:
         raise PolicyBlockedError(
-            f"Execution denied for '{request.module}/{request.phase}' (tier={tier.value}): {decision.reason}"
+            f"Execution denied for '{request.module}/{request.phase}' (tier={tier.value}): {decision.reason}",
+            missing_requirements=decision.missing_requirements,
         )
 
     if not _EXECUTION_LOCK.acquire(blocking=False):
