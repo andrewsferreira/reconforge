@@ -1,9 +1,11 @@
-"""Structured audit events for MCP tool calls.
+"""Structured audit events for MCP tool calls and resource reads.
 
-One JSON line is emitted to stderr for every call to any of the 13 MCP
+One JSON line is emitted to stderr for every call to any of the 15 MCP
 tools, success or failure — wired into the single choke point every
 call already passes through (``reconforge/mcp/tools.py::_call_tool``),
-rather than instrumented per tool.
+rather than instrumented per tool. ``reconforge/mcp/resources.py``'s
+``read_resource`` handler emits an analogous event through the same
+stderr channel.
 
 stderr, not a file: this is exactly what the MCP stdio transport
 convention reserves stderr for (stdout is exclusively the JSON-RPC
@@ -59,6 +61,30 @@ def emit_tool_call_audit_event(
         "tool": tool_name,
         "outcome": outcome,
         "arguments": _sanitize_arguments(arguments),
+    }
+    if error_code is not None:
+        event["error_code"] = error_code
+    print(json.dumps(event, default=str), file=sys.stderr, flush=True)
+
+
+def emit_resource_read_audit_event(
+    uri: str,
+    *,
+    outcome: str,
+    error_code: str | None = None,
+) -> None:
+    """Write one structured JSON audit line to stderr for a resource read.
+
+    Mirrors ``emit_tool_call_audit_event`` for ``reconforge/mcp/resources.py``'s
+    ``read_resource`` handler; ``uri`` is always one of a hardcoded
+    allowlist (see ``resources.py``), never client-supplied free text, so
+    no sanitization pass is needed here.
+    """
+    event: dict[str, Any] = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "event": "mcp_resource_read",
+        "uri": uri,
+        "outcome": outcome,
     }
     if error_code is not None:
         event["error_code"] = error_code

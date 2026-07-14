@@ -114,6 +114,24 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 | `reconforge_start_execution` | Same authorization requirements as above, but returns a `job_id` immediately instead of blocking — for phases that might take longer than you want to wait on one call. |
 | `reconforge_get_execution_status` | Poll a job started by `reconforge_start_execution` — status, and the result once completed. |
 
+## Resource reference
+
+Alongside the 15 tools above, the server exposes 7 read-only MCP *resources* — a separate,
+argument-free content-exposure primitive addressed by URI (`resources/list` and `resources/read`)
+rather than an invoked call. Useful for a client that wants to load reference material ambiently
+instead of asking a question through a tool call. Every URI comes from a hardcoded allowlist in
+`reconforge/mcp/resources.py`; there is no way to request a path outside this list.
+
+| URI | Content |
+|---|---|
+| `reconforge://docs/claude-mcp-integration` | This document. |
+| `reconforge://docs/architecture` | `docs/ARCHITECTURE.md` — system architecture. |
+| `reconforge://docs/modules` | `docs/MODULES.md` — narrative module/phase reference. |
+| `reconforge://docs/configuration` | `docs/CONFIGURATION.md` — config.yaml/opsec.yaml/mcp.yaml reference. |
+| `reconforge://docs/findings` | `docs/FINDINGS.md` — finding fields, severity/confidence taxonomy. |
+| `reconforge://docs/limitations` | `docs/LIMITATIONS.md` — documented gaps and non-goals. |
+| `reconforge://modules` | Live JSON module catalog — the same data `reconforge_list_modules` returns, computed from the same code path so the two can't drift. |
+
 ## Walkthrough: read-only exploration
 
 Once connected, a typical read-only session looks like asking Claude:

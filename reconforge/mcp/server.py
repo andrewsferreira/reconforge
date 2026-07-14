@@ -7,9 +7,15 @@ controlled-execution tool, ``reconforge_execute_approved_phase`` —
 gated behind an active engagement, a validated scope/approval, and
 explicit operator confirmation (see ``reconforge/mcp/policy.py``); it
 never accepts arbitrary shell or tool commands, only a bounded
-``(module, phase)`` pair already known to this codebase. No resources
-or prompts are registered yet — those are later phases, registered
-against this same ``Server`` instance rather than a duplicate one.
+``(module, phase)`` pair already known to this codebase. Phase 6 added
+two more execution tools (``reconforge_start_execution``/
+``reconforge_get_execution_status``) sharing the same policy gate.
+Phase 7 added a small set of read-only MCP *resources*
+(``reconforge/mcp/resources.py``) — curated documentation plus a live
+module catalog, addressed by a hardcoded ``reconforge://`` URI
+allowlist, distinct from the tool-call interface above. No prompts are
+registered yet — that would be a later phase, registered against this
+same ``Server`` instance rather than a duplicate one.
 
 Transport: stdio only. No network transport is implemented anywhere in
 this package, so this server never binds a socket — a Claude Desktop or
@@ -26,7 +32,7 @@ from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
 from core.version import __version__ as RECONFORGE_VERSION
-from reconforge.mcp import tools
+from reconforge.mcp import resources, tools
 
 SERVER_NAME = "reconforge"
 
@@ -44,20 +50,22 @@ SERVER_INSTRUCTIONS = (
     "bounded (module, phase) pair; all three share one process-wide "
     "execution lock, so only one runs at a time. Credentialed phases (AD "
     "delegation/bloodhound, network brute-forcing) are not executable "
-    "through this server yet, and there is no execution cancellation. "
-    "No resources or prompts are registered yet."
+    "through this server yet, and there is no execution cancellation. It "
+    "also exposes 7 read-only resources under the reconforge:// URI "
+    "scheme (6 curated documentation pages plus a live module catalog) — "
+    "list them with resources/list. No prompts are registered yet."
 )
 
 
 def build_server() -> Server:
-    """Construct the ReconForge MCP server with its tools registered.
-
-    No resource/prompt handlers are registered on the returned server —
-    ``Server.get_capabilities()`` reports those as unset, which is the
-    accurate state for this phase.
+    """Construct the ReconForge MCP server with its tools and resources
+    registered. No prompt handlers are registered on the returned
+    server — ``Server.get_capabilities()`` reports that as unset, which
+    is the accurate state for this phase.
     """
     server = Server(name=SERVER_NAME, version=RECONFORGE_VERSION, instructions=SERVER_INSTRUCTIONS)
     tools.register(server)
+    resources.register(server)
     return server
 
 

@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.13.0 • 1065/1065 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.14.0 • 1078/1078 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -183,7 +183,9 @@ module/engagement/scope introspection, workflow planning, dry-run command previe
 reports) plus three execution tools (one blocking, two async start/poll for longer-running phases),
 all gated behind an active engagement, a validated scope file, `explicit_confirmation`, and (for
 INTRUSIVE-tier phases) an operator-edited server-wide config flag — Claude never grants itself
-permission to run anything.
+permission to run anything. It also exposes 7 read-only resources under a `reconforge://` URI
+allowlist (6 curated documentation pages plus a live module catalog) for clients that prefer to
+load reference material as MCP resources rather than tool calls.
 
 ```bash
 pip install -e ".[mcp]"
@@ -200,7 +202,7 @@ directly with the `mcp` Python SDK, outside of any Claude client.
 ```bash
 pip install -e ".[dev]"
 python -m pytest
-# 1065 tests, all passing (~17s)
+# 1078 tests, all passing (~21s)
 ```
 
 These are unit tests against mocked tool execution and stored fixtures — they validate parsing, validation, and orchestration logic, not real binaries. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for what has and has not been validated against live tools.

@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.14.0] — 2026-07-14
+
+Claude MCP Integration — Phase 7 (MCP resources). MINOR per `docs/VERSIONING.md` — a new MCP capability (resources), not just tools.
+
+### Added
+
+- `reconforge/mcp/resources.py`: `list_resources`/`read_resource` handlers registered on the same `Server` instance the 15 tools already use (`server.py::build_server()` now also calls `resources.register(server)`). Exposes 7 read-only resources under a hardcoded `reconforge://` URI allowlist — a Python dict, never a filesystem walk or glob, so `read_resource` can only ever resolve to one of the 7 named URIs. 6 are curated documentation pages read verbatim from `docs/` (`CLAUDE_MCP_INTEGRATION.md`, `ARCHITECTURE.md`, `MODULES.md`, `CONFIGURATION.md`, `FINDINGS.md`, `LIMITATIONS.md`); the 7th, `reconforge://modules`, is computed by calling the same `services.list_modules()` the `reconforge_list_modules` tool already uses, so the resource and the tool can't drift apart.
+- `reconforge/mcp/audit.py::emit_resource_read_audit_event()`: the same JSON-lines-to-stderr audit convention as `emit_tool_call_audit_event()`, wired into `resources.py::_read_resource`'s single dispatch point — every resource read, success or failure, is audited exactly like every tool call already is.
+
+### Tests
+
+- `tests/mcp/test_resources.py` (11 tests): `list_resources` returns exactly the 7 allowlisted URIs; every doc resource reads back non-empty markdown; the `reconforge://modules` resource's JSON payload is asserted equal to the `reconforge_list_modules` tool's `structuredContent`, proving the two can't silently diverge; an unknown URI raises `McpError` (via the `mcp` SDK's built-in generic exception-to-`ErrorData` handling — no custom error wrapper was needed here, unlike `tools.py`); audit events are emitted on both the success and error paths.
+- 2 new unit tests for `emit_resource_read_audit_event()` itself in `tests/mcp/test_audit_events.py`.
+- 3 pre-existing tests in `tests/mcp/test_server_foundation.py` updated: they pinned down the Phase-2-era "no resources registered" state (`capabilities.resources is None`, `list_resources()` raising `McpError`), which is no longer accurate — now assert resources are present, and the "capability that doesn't exist yet fails cleanly" test was repointed at `list_prompts()`, since prompts are still genuinely unimplemented.
+- `reconforge/mcp/resources.py` reached 100% coverage.
+
+1078/1078 tests passing (1065 + 13 new); ruff/mypy(15-file scope)/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.13.0] — 2026-07-14
 
 Claude MCP Integration — Phase 6 (execution job model). MINOR per `docs/VERSIONING.md` — two new tools.

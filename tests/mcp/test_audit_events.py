@@ -1,7 +1,8 @@
 """Tests for reconforge/mcp/audit.py and its wiring into
-tools.py::_call_tool — every one of the 13 MCP tools passes through
+tools.py::_call_tool — every one of the 15 MCP tools passes through
 that single choke point, so one JSON audit line to stderr is emitted
 per call, success or failure, without needing per-tool instrumentation.
+Also covers resources.py::_read_resource's analogous audit event.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import anyio
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from reconforge.mcp.audit import emit_tool_call_audit_event
+from reconforge.mcp.audit import emit_resource_read_audit_event, emit_tool_call_audit_event
 from reconforge.mcp.server import build_server
 
 
@@ -112,3 +113,29 @@ def test_emit_tool_call_audit_event_writes_single_valid_json_line(
     parsed = json.loads(lines[0])
     assert parsed["tool"] == "some_tool"
     assert parsed["arguments"] == {"target": "10.10.10.1"}
+
+
+def test_emit_resource_read_audit_event_writes_single_valid_json_line(
+    capsys: pytest.CaptureFixture[str],
+):
+    emit_resource_read_audit_event("reconforge://modules", outcome="success")
+    out = capsys.readouterr()
+    assert out.out == ""
+    lines = [line for line in out.err.splitlines() if line.strip()]
+    assert len(lines) == 1
+    parsed = json.loads(lines[0])
+    assert parsed["event"] == "mcp_resource_read"
+    assert parsed["uri"] == "reconforge://modules"
+    assert parsed["outcome"] == "success"
+    assert "error_code" not in parsed
+
+
+def test_emit_resource_read_audit_event_includes_error_code_on_failure(
+    capsys: pytest.CaptureFixture[str],
+):
+    emit_resource_read_audit_event(
+        "reconforge://docs/not-a-real-doc", outcome="error", error_code="MCP_SERVICE_ERROR"
+    )
+    parsed = json.loads(capsys.readouterr().err.strip())
+    assert parsed["outcome"] == "error"
+    assert parsed["error_code"] == "MCP_SERVICE_ERROR"
