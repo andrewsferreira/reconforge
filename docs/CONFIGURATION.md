@@ -1,6 +1,6 @@
 # ReconForge Configuration Guide
 
-> Version 1.1.0 — Last updated: 2026-04-13
+> Version 1.2.0 — Last updated: 2026-07-14
 
 ## Overview
 
@@ -11,7 +11,7 @@ ReconForge uses two YAML configuration files as the single source of truth:
 | `config/tools.yaml` | Tool binary paths, default arguments, timeouts, scan profiles, safety settings |
 | `config/profiles.yaml` | OPSEC-aware scan profiles with timing, technique toggles, and noise-level gates |
 
-There are no fallback namespaces, no environment variable overrides, and no hardcoded config overrides. The YAML files are authoritative.
+There are no fallback namespaces or hardcoded config overrides for these two files — they are authoritative for tool/profile settings. Several cross-cutting behaviors (secrets backend selection, a kill switch, encryption key overrides, an optional risk-approval gate) are controlled by environment variables instead, since they're either security-sensitive (keys should not have to live in a YAML file) or need to be settable without editing a checked-in config file — see [Environment Variables](#environment-variables) below.
 
 ## tools.yaml
 
@@ -287,4 +287,25 @@ anon = loader.get("ad.anonymous_only", default=False)  # True for stealth_ad
 
 ---
 
-*Configuration system validated: 2026-03-21 — 375/375 tests passing*
+## Environment Variables
+
+All of these are optional and off/empty by default — a fresh checkout with no environment variables set behaves the same as it always has. None of them live in `tools.yaml`/`profiles.yaml` because each is either security-sensitive (a key shouldn't have to live in a checked-in-adjacent file) or needs to be flippable without editing a file (an emergency stop).
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `RECONFORGE_KILL_SWITCH` | unset | Set to `1` to make every `Runner.run()` call refuse to execute (`core/runner.py::_kill_switch_active()`). An emergency global stop — checked before every single command, not just once at startup. |
+| `RECONFORGE_KILL_SWITCH_FILE` | unset | Path to a sentinel file; if its contents (trimmed, lowercased) are one of `1`/`true`/`on`/`stop`/`blocked`, has the same effect as `RECONFORGE_KILL_SWITCH=1`. Useful when you want to flip the switch from another process/script without touching the running one's environment. |
+| `RECONFORGE_POLICY_ENFORCE` | unset (disabled) | Set to `1` to enable `core/risk_policy.py::RiskPolicyEngine` — a second, independent approval-tier gate on top of the `--opsec` noise model. When enabled, every command is classified `low`/`medium`/`high` by a keyword match (`sqlmap`/`hydra`/`netexec` → high; `nuclei`/`nikto`/`ffuf`/`wpscan`/`enum4linux`/`impacket` → medium; everything else → low) and blocked unless `RECONFORGE_APPROVAL_TIER` is at least that tier. **Off by default deliberately, not by oversight**: this project's primary safety model is `--opsec` (stealth/normal/aggressive noise gating, on by default, CLI-flag-driven) plus explicit per-feature opt-in flags (`--brute-force` for hydra, `--authorized-target`/`--lab-mode`/`--enforce-scope` for authorization). Enabling this by default would silently block core, already-safety-gated AD-module functionality (`impacket`/`enum4linux` classified "medium") behind an undocumented env var instead of a discoverable CLI flag — a worse default, not a safer one. It exists for environments that want a *third*, coarser-grained layer (e.g. a blanket "nothing above medium risk without a human setting an env var first" policy for compliance reasons) on top of the two mechanisms above, not as a replacement for either. |
+| `RECONFORGE_APPROVAL_TIER` | `low` | The approval tier granted when `RECONFORGE_POLICY_ENFORCE=1` — one of `low`/`medium`/`high`. Has no effect unless enforcement is also enabled. |
+| `RECONFORGE_LOOT_KEY` | unset | Base64 urlsafe Fernet key for `core/loot_manager.py`'s encryption, taking precedence over the on-disk key file. Keeps the key off disk entirely — recommended if the loot file itself may leave this machine. |
+| `RECONFORGE_VAULT_KEY` | unset | Same as `RECONFORGE_LOOT_KEY`, for `core/credential_vault.py`. |
+| `RECONFORGE_NVD_LOOKUP` | unset (disabled) | Set to `1` to let `core/cve_enricher.py` make live NVD API lookups for CPE strings found in findings (rate-limited, cached — see `docs/ARCHITECTURE_REVIEW.md`'s Phase 20 entry). Off by default since it's a live network call from inside `FindingsManager.add()`, called in tight per-finding loops. |
+| `RECONFORGE_ENV` | `dev` | Selects which `config/environments/<name>.yaml` overlay `ConfigLoader` merges on top of `tools.yaml`/`profiles.yaml`. |
+| `RECONFORGE_SECRET_PROVIDER` | `env` | Backend for `core/secrets_manager.py::SecretManager` — one of `env`, `file`, `aws_secretsmanager` (needs `boto3`), `vault` (HashiCorp Vault KV v2). |
+| `RECONFORGE_SECRETS_FILE` | unset | Path to the JSON key/value file, when `RECONFORGE_SECRET_PROVIDER=file`. |
+
+Not covered above: the Burp MCP integration (`core/adapters/burp/`, `reconforge/entrypoints/burp_validation.py`) reads its own `BURP_MCP_URL`/`BURP_MCP_BASE_URL` and related variables — see `docs/BURP_MCP_INTEGRATION.md` for that subsystem, which is a distinct integration surface from the recon-module configuration this guide covers.
+
+---
+
+*Configuration system last reviewed: 2026-07-14, 878/878 tests passing — see `docs/ARCHITECTURE_REVIEW.md` for the current, continuously-updated audit trail rather than treating this stamp as authoritative going forward.*

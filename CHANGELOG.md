@@ -6,6 +6,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.6.1] — 2026-07-14
+
+Phase 29 (Risk Policy Documentation + False-Claim Fix): closed the pre-existing P2 item on the risk policy engine's off-by-default status, via the "document why" branch rather than "enable by default" (which would silently block core AD-module functionality). PATCH per `docs/VERSIONING.md` — documentation and test coverage only, no behavior change.
+
+### Fixed
+
+- `docs/CONFIGURATION.md`: removed a materially false claim ("no environment variable overrides... the YAML files are authoritative") — a repo-wide grep found 10+ genuinely behavior-affecting `RECONFORGE_*` environment variables, including an entirely undocumented emergency kill switch (`RECONFORGE_KILL_SWITCH`/`RECONFORGE_KILL_SWITCH_FILE`). Added a new "Environment Variables" reference section covering all of them, plus a corrected (500+ tests stale) trailing test-count claim and a doc version stamp bump (1.1.0 → 1.2.0).
+
+### Added
+
+- `tests/core/test_risk_policy.py`: 3 new tests for `RiskPolicyEngine.check()` — the default-off (unset `RECONFORGE_POLICY_ENFORCE`) case had no direct coverage at all despite being the behavior every user actually experiences.
+
+3 new tests added (878 → 881); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.6.0] — 2026-07-14
 
 Phase 28 (Packaging Extras): closed the pre-existing P3 item to add per-module packaging extras. MINOR per `docs/VERSIONING.md` — new backward-compatible install capability, no existing behavior changed.
