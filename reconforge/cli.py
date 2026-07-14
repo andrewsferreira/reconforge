@@ -2,7 +2,7 @@
 """ReconForge - Modular Pentest Reconnaissance Framework.
 
 Author: Andrews Ferreira
-Version: 2.6.3
+Version: 2.7.0
 
 Usage (after `pip install -e .` or `pipx install .`):
     reconforge network --target <target> [options]
@@ -54,6 +54,8 @@ def build_parser() -> argparse.ArgumentParser:
   reconforge workflow --target 10.10.10.1
   reconforge workflow --target 10.10.10.1 --modules network,ad,web
   reconforge workflow --target 10.10.10.1 --opsec stealth --engagement "Q1 Pentest" --client "Acme"
+
+  reconforge mcp serve
 """
     )
 
@@ -118,6 +120,16 @@ def build_parser() -> argparse.ArgumentParser:
     burp_attack_path_parser.add_argument("--json", action="store_true", help="Print structured JSON report")
     burp_attack_path_parser.add_argument("--output", default="", help="Optional output path for JSON report")
     burp_attack_path_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
+
+    mcp_parser = subparsers.add_parser(
+        "mcp",
+        help="Claude Model Context Protocol (MCP) server",
+        description="Start ReconForge's MCP server so Claude Desktop/Claude Code can connect to it "
+                     "(stdio transport only; foundation phase — no tools registered yet, see "
+                     "docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md)",
+    )
+    mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", help="MCP subcommand")
+    mcp_subparsers.add_parser("serve", help="Start the MCP server over stdio")
 
     # Network module
     net_parser = subparsers.add_parser("network", help="Network reconnaissance")
@@ -417,11 +429,19 @@ def main():
     if not args.module:
         parser.print_help()
         sys.exit(1)
-    try:
-        scope = enforce_scope_gate(args)
-        require_authorization(args, scope)
-    except ValueError as e:
-        parser.error(str(e))
+
+    scope: "ScopeAuthorization | None" = None
+    if args.module != "mcp":
+        # Starting the MCP server is not itself an active scan against a
+        # target — it has no --target — so this gate does not apply here.
+        # Any future execution reached *through* the server (Phase 5+)
+        # enforces scope/approval independently via the same ScopeAuthorization
+        # machinery, at the point the scan actually runs.
+        try:
+            scope = enforce_scope_gate(args)
+            require_authorization(args, scope)
+        except ValueError as e:
+            parser.error(str(e))
 
     try:
         _dispatch(args, parser, scope=scope)
@@ -694,6 +714,14 @@ def _dispatch(args, parser, scope: "ScopeAuthorization | None" = None) -> None:
             sys.exit(burp_attack_paths_main(cli_args))
 
         parser.error("burp requires a supported subcommand (validate, lifecycle-validate, intelligence-validate, attack-paths)")
+
+    elif args.module == "mcp":
+        if args.mcp_command == "serve":
+            from reconforge.mcp.server import run_stdio_server
+
+            run_stdio_server()
+        else:
+            parser.error("mcp requires a supported subcommand (serve)")
 
     else:
         print(f"Unknown module: {args.module}")

@@ -1,6 +1,6 @@
 # Claude MCP Integration — Implementation Plan
 
-> Status: **Phase 1 deliverable** (repository assessment). No MCP server code exists yet. This document is the design that Phase 2 onward implements against — see [CLAUDE_MCP_INTEGRATION.md](CLAUDE_MCP_INTEGRATION.md) (added in the docs phase) for the user-facing setup guide once the server exists.
+> Status: Phase 1 (this document) — done. **Phase 2 (MCP Server Foundation) — done**: `reconforge/mcp/server.py` builds a real stdio-only `mcp` SDK `Server` (`reconforge mcp serve` / `python -m reconforge mcp serve`), with **zero tools, resources, or prompts registered** — verified via both an in-memory SDK protocol test and a real subprocess handshake (`mcp.client.stdio.stdio_client` spawning the actual `reconforge` console script), and verified to open no network socket (`lsof` against the running process). Phase 3 (Read-Only MCP Capabilities) is next, pending operator go-ahead. See `docs/CLAUDE_MCP_INTEGRATION.md` (not created yet — added once read-only tools exist) for the eventual user-facing setup guide.
 
 ## 1. Current Architectural Assessment
 

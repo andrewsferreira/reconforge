@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.7.0] — 2026-07-14
+
+Claude MCP Integration — Phase 2 (MCP Server Foundation): the connection/handshake foundation for `reconforge/mcp/`, the package that will let Claude Desktop/Claude Code act as an MCP client against ReconForge. MINOR per `docs/VERSIONING.md` — a new package and CLI subcommand, backward-compatible, no existing behavior changed. Deliberately foundation-only: zero tools, resources, or prompts are registered yet (that's Phase 3).
+
+### Added
+
+- `reconforge/mcp/server.py`: builds a real `mcp` SDK (`>=1.2.0`) low-level `Server` (`build_server()`) and runs it over stdio only (`run_stdio_async()` / `run_stdio_server()`). No network transport exists anywhere in this package — the server only ever talks over stdin/stdout to a client that spawns it as a subprocess.
+- `reconforge mcp serve` CLI subcommand (`reconforge/cli.py`), the server's entry point. Carved out of `main()`'s `--authorized-target`/`--lab-mode`/`--enforce-scope` gate: starting the server is not itself a scan (it has no `--target`); any future execution reached through the server enforces scope/approval independently, via the same `ScopeAuthorization` machinery the CLI already uses, at the point a scan actually runs.
+- `reconforge[mcp]` packaging extra (`pyproject.toml`) for end users who want `reconforge mcp serve`; `mcp>=1.2.0` also added to `requirements-dev.txt` since, unlike the `[ad]`/`[web]`/`[api]` extras (wrapped third-party tools CI never installs), this is first-party code CI must import to test.
+- `tests/mcp/test_server_foundation.py` (5 tests): a real MCP initialize handshake over the SDK's own in-memory client/server transport (`mcp.shared.memory`), asserting the server reports ReconForge's actual version and — since no tools/resources are registered — `list_tools()`/`list_resources()` fail with `McpError` rather than returning a fabricated empty result. `tests/test_mcp_cli_wiring.py` (3 tests): CLI parsing and the authorization-gate carve-out.
+- Separately verified outside the test suite (not just asserted by it): a real subprocess handshake via `mcp.client.stdio.stdio_client` spawning the actual installed `reconforge` console script (`serverInfo.name="reconforge"`, `serverInfo.version="2.7.0"`, all capabilities `None`), and `lsof -p <pid> -a -i` against the running process confirming no network socket is ever opened.
+
+8 new tests (900 total, `pytest -q`); ruff/mypy(CI-scoped)/bandit/pip-audit all pass; `mypy --disallow-untyped-defs --disallow-incomplete-defs --warn-return-any` also passes on the new module (strict typing for new MCP code, per the working spec, ahead of CI's mypy scope being widened in a later quality-gates phase).
+
+### Fixed
+
+- `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`: the Phase 1 status line linked to `docs/CLAUDE_MCP_INTEGRATION.md`, a file that doesn't exist yet (planned for a later phase) — `scripts/check_doc_links.py` only scans git-tracked files, so this dangling link was written and committed in the Phase 1 commit without being caught, since the plan doc itself was untracked at the moment the checker was run that time. Caught by `tests/test_doc_links.py` once the file became tracked; fixed by de-linking the forward reference to plain text.
+
 ## [2.6.3] — 2026-07-14
 
 Claude MCP Integration — Phase 1 (Repository Assessment): the first phase of a large, explicitly incremental effort to let Claude Desktop/Claude Code act as an MCP client against a new ReconForge-hosted MCP server, scoped read-only-first per the operator's own working rules. PATCH per `docs/VERSIONING.md` — planning documentation only, no `reconforge/mcp/` package or other code exists yet.

@@ -6,3 +6,10 @@ mypy>=1.11.0
 bandit>=1.8.0
 pip-audit>=2.8.0
 types-PyYAML>=6.0.12
+
+# reconforge/mcp/ — first-party code under active development, so unlike the
+# reconforge[ad]/[web]/[api] extras (third-party recon tools, not installed
+# in CI), this one IS a dev/test dependency: CI needs it to import and test
+# the MCP server package. End users only need it via `pip install
+# reconforge[mcp]` if they want to run `reconforge mcp serve`.
+mcp>=1.2.0
