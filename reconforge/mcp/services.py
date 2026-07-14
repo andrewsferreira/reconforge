@@ -45,6 +45,7 @@ from reconforge.mcp.errors import (
     ScopeFileError,
     UnknownPhaseError,
 )
+from reconforge.mcp import jobs
 from reconforge.mcp.policy import ExecutionTier, classify_phase, evaluate
 from reconforge.mcp.sanitization import sanitize_untrusted_text
 from reconforge.mcp.schemas import (
@@ -58,6 +59,8 @@ from reconforge.mcp.schemas import (
     GenerateReportResponse,
     GetEngagementRequest,
     GetEngagementResponse,
+    GetExecutionStatusRequest,
+    GetExecutionStatusResponse,
     GetFindingRequest,
     GetFindingResponse,
     GetFindingsRequest,
@@ -78,6 +81,8 @@ from reconforge.mcp.schemas import (
     PlanWorkflowResponse,
     SanitizedFinding,
     ScopeDecision,
+    StartExecutionRequest,
+    StartExecutionResponse,
     SummarizeFindingsRequest,
     SummarizeFindingsResponse,
     TimelineEntrySummary,
@@ -684,7 +689,17 @@ def _intrusive_execution_allowed() -> bool:
     return bool(ConfigLoader().load("mcp").get("mcp", {}).get("allow_intrusive_execution", False))
 
 
-def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteApprovedPhaseResponse:
+def _authorize_execution(
+    request: ExecuteApprovedPhaseRequest,
+) -> tuple[type[Any], ExecutionTier, ScopeAuthorization | None]:
+    """Validate and authorize an execution request — no lock, no
+    execution. Raises the same typed errors ``execute_approved_phase``
+    always has; returns what the caller needs to actually run the
+    phase. Shared by the synchronous ``reconforge_execute_approved_phase``
+    tool and ``reconforge_start_execution``'s job model
+    (``reconforge/mcp/jobs.py``) so both enforce identical policy — the
+    job model is not a separate, weaker path around this check.
+    """
     try:
         parse_target(request.target)
     except TargetValidationError as exc:
@@ -742,31 +757,42 @@ def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteAppro
             missing_requirements=decision.missing_requirements,
         )
 
-    if not _EXECUTION_LOCK.acquire(blocking=False):
-        raise ExecutionConflictError("Another execution is already in progress on this server process.")
+    return module_cls, tier, scope
 
+
+def _execute_module_phase_locked(
+    request: ExecuteApprovedPhaseRequest,
+    module_cls: type[Any],
+    tier: ExecutionTier,
+    scope: ScopeAuthorization | None,
+) -> ExecuteApprovedPhaseResponse:
+    """Actually run *module_cls*'s phase. Assumes the caller already holds
+    ``_EXECUTION_LOCK`` — this function neither acquires nor releases
+    it, so it works equally from the synchronous tool (which wraps the
+    whole call in acquire/finally-release) or a job worker thread
+    (which acquires before starting the thread and releases when the
+    thread finishes — ``threading.Lock`` doesn't require the releasing
+    thread to be the one that acquired it).
+    """
     warnings: list[str] = []
-    try:
-        kwargs: dict[str, Any] = {
-            "target": request.target,
-            "output_base": request.output_base,
-            "opsec_mode": request.opsec_profile,
-            "verbose": False,
-            "dry_run": False,
-            "timeout": request.timeout,
-            "scope": scope,
-            "approval_id": request.approval_id,
-        }
-        if request.module == "ad":
-            kwargs["domain"] = request.domain
+    kwargs: dict[str, Any] = {
+        "target": request.target,
+        "output_base": request.output_base,
+        "opsec_mode": request.opsec_profile,
+        "verbose": False,
+        "dry_run": False,
+        "timeout": request.timeout,
+        "scope": scope,
+        "approval_id": request.approval_id,
+    }
+    if request.module == "ad":
+        kwargs["domain"] = request.domain
 
-        module = module_cls(**kwargs)
-        try:
-            module.run(phases=[request.phase])
-        except ReconForgeError as exc:
-            warnings.append(f"Module raised during execution: {exc}")
-    finally:
-        _EXECUTION_LOCK.release()
+    module = module_cls(**kwargs)
+    try:
+        module.run(phases=[request.phase])
+    except ReconForgeError as exc:
+        warnings.append(f"Module raised during execution: {exc}")
 
     return ExecuteApprovedPhaseResponse(
         module=request.module,
@@ -776,4 +802,40 @@ def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteAppro
         findings_count=len(module.findings_mgr.get_all()),
         artifacts_written=[str(module.output.module_dir(module_cls.MODULE_NAME))],
         warnings=warnings,
+    )
+
+
+def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteApprovedPhaseResponse:
+    module_cls, tier, scope = _authorize_execution(request)
+
+    if not _EXECUTION_LOCK.acquire(blocking=False):
+        raise ExecutionConflictError("Another execution is already in progress on this server process.")
+    try:
+        return _execute_module_phase_locked(request, module_cls, tier, scope)
+    finally:
+        _EXECUTION_LOCK.release()
+
+
+# ── reconforge_start_execution / reconforge_get_execution_status ────
+
+
+def start_execution(request: StartExecutionRequest) -> StartExecutionResponse:
+    job = jobs.start_execution(request)
+    return StartExecutionResponse(job_id=job.job_id, status=job.status)
+
+
+def get_execution_status(request: GetExecutionStatusRequest) -> GetExecutionStatusResponse:
+    job = jobs.get_execution_status(request.job_id)
+    return GetExecutionStatusResponse(
+        job_id=job.job_id,
+        status=job.status,
+        module=job.module,
+        phase=job.phase,
+        target=job.target,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+        result=job.result,
+        error=job.error,
+        error_code=job.error_code,
     )

@@ -88,3 +88,54 @@ def test_execute_approved_phase_over_real_subprocess_does_not_corrupt_stdio(tmp_
     )
     assert is_error is False
     assert failures == []
+
+
+def test_start_execution_job_over_real_subprocess_does_not_corrupt_stdio(tmp_path: Path):
+    """The job model (reconforge/mcp/jobs.py) runs the real module in a
+    background thread rather than the request-handling coroutine —
+    sys.stdout redirection is process-global, not thread-local, so this
+    proves that still holds when the write happens from a different
+    thread than the one server.py's run_stdio_async() set it up on, and
+    that concurrent polling over the same stdio connection while the
+    background thread is writing doesn't corrupt the JSON-RPC stream
+    either."""
+    capture = _ParseFailureCapture()
+    logger = logging.getLogger("mcp.client.stdio")
+    logger.addHandler(capture)
+    try:
+
+        async def _go() -> bool:
+            params = StdioServerParameters(command="reconforge", args=["mcp", "serve"])
+            async with stdio_client(params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    start = await session.call_tool(
+                        "reconforge_start_execution",
+                        {
+                            "engagement_id": "nope",
+                            "target": "10.10.10.1",
+                            "module": "surface",
+                            "phase": "vector_correlation",
+                            "output_base": str(tmp_path),
+                            "explicit_confirmation": True,
+                        },
+                    )
+                    if start.isError:
+                        return True
+                    job_id = start.structuredContent["job_id"]
+                    for _ in range(50):
+                        status = await session.call_tool(
+                            "reconforge_get_execution_status", {"job_id": job_id}
+                        )
+                        if status.isError:
+                            return True
+                        if status.structuredContent["status"] in ("completed", "failed"):
+                            return status.structuredContent["status"] == "failed"
+                        await anyio.sleep(0.05)
+                    return True  # never completed within the poll budget
+
+        is_error = anyio.run(_go)
+        assert is_error is False
+        assert capture.failures == []
+    finally:
+        logger.removeHandler(capture)

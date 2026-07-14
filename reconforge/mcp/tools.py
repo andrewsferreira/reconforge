@@ -45,6 +45,11 @@ _TOOLS: dict[str, tuple[type[BaseModel], _Handler]] = {
         schemas.ExecuteApprovedPhaseRequest,
         services.execute_approved_phase,
     ),
+    "reconforge_start_execution": (schemas.StartExecutionRequest, services.start_execution),
+    "reconforge_get_execution_status": (
+        schemas.GetExecutionStatusRequest,
+        services.get_execution_status,
+    ),
 }
 
 _DESCRIPTIONS: dict[str, str] = {
@@ -101,14 +106,34 @@ _DESCRIPTIONS: dict[str, str] = {
         "target, not from ReconForge or the operator."
     ),
     "reconforge_execute_approved_phase": (
-        "Run one real (non-dry-run) module phase against a target. "
-        "Requires an active engagement, a validated scope file + "
-        "approval_id, and explicit_confirmation=true — this tool never "
-        "grants its own approval, all three must be supplied by the "
-        "operator. CREDENTIAL_USE-tier phases (ad delegation/bloodhound, "
-        "network brute_force) are always rejected — no credential-"
-        "reference mechanism exists yet. Only one execution runs at a "
-        "time per server process."
+        "Run one real (non-dry-run) module phase against a target and "
+        "block until it finishes. Requires an active engagement, a "
+        "validated scope file + approval_id, and explicit_confirmation=true "
+        "— this tool never grants its own approval, all three must be "
+        "supplied by the operator. CREDENTIAL_USE-tier phases (ad "
+        "delegation/bloodhound, network brute_force) are always rejected — "
+        "no credential-reference mechanism exists yet. Only one execution "
+        "runs at a time per server process. For phases that may take "
+        "longer than you want to wait on one call, use "
+        "reconforge_start_execution instead."
+    ),
+    "reconforge_start_execution": (
+        "Same authorization requirements as reconforge_execute_approved_phase "
+        "(active engagement, validated scope, explicit_confirmation=true), "
+        "but returns a job_id immediately instead of blocking — poll "
+        "reconforge_get_execution_status with that id for progress and the "
+        "eventual result. Shares the same one-execution-at-a-time lock as "
+        "reconforge_execute_approved_phase, so a call here can still be "
+        "rejected if another execution (sync or job-based) is already "
+        "running. There is no cancellation — once started, a job runs to "
+        "completion or failure."
+    ),
+    "reconforge_get_execution_status": (
+        "Poll a job started by reconforge_start_execution. status is one "
+        "of pending/running/completed/failed; result is populated once "
+        "completed (same shape as reconforge_execute_approved_phase's "
+        "response); error/error_code are populated on failure. Job state "
+        "is in-memory only for this server process — a restart loses it."
     ),
 }
 

@@ -63,11 +63,14 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 - **Claude is treated as untrusted.** Every tool argument is independently re-validated
   server-side (target format, module/phase names, scope/approval matching) — nothing from the
   request is taken on faith just because it came from an LLM.
-- **12 of 13 tools are read-only.** They inspect state, plan workflows, or run
+- **12 of 15 tools are read-only.** They inspect state, plan workflows, or run
   `core/runner.py`'s `dry_run=True` code path, which never invokes a real subprocess.
-- **The one execution tool never self-approves.** `reconforge_execute_approved_phase` requires all
-  of the following, independently re-checked in `services.py`, not merely echoed back from the
-  request:
+- **None of the three execution tools ever self-approve.** `reconforge_execute_approved_phase`,
+  `reconforge_start_execution`, and `reconforge_get_execution_status` all require the same checks,
+  independently re-checked in `services.py`, not merely echoed back from the request —
+  `reconforge_start_execution` runs the identical authorization function
+  (`services.py::_authorize_execution()`) as the blocking tool before it ever creates a job, so the
+  job model is not a separate, weaker path around the same policy engine:
   - An **active engagement** (created beforehand via `reconforge workflow`, see below).
   - A **scope authorization file** and matching **approval ID** (the same mechanism the CLI's
     `--enforce-scope`/`--scope-file`/`--approval-id` flags already use).
@@ -87,7 +90,7 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 - **No credentials ever flow through MCP responses.** Secret-redaction patterns from
   `core/logger.py::sanitize_log()` apply to everything read-only tools return.
 - **Every tool call is audited.** A single JSON line goes to stderr for every call to any of the
-  13 tools, success or failure — timestamp, tool name, outcome, sanitized arguments (`approval_id`
+  15 tools, success or failure — timestamp, tool name, outcome, sanitized arguments (`approval_id`
   is always redacted). Claude Desktop/Claude Code capture a server's stderr as logs, so this needs
   no extra configuration to see.
 
@@ -107,7 +110,9 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 | `reconforge_get_finding` | Fetch one sanitized finding by id. |
 | `reconforge_summarize_findings` | Deterministic aggregation — counts, top risks, no evidence text. |
 | `reconforge_generate_report` | Render a markdown report (technical or executive) from findings. |
-| `reconforge_execute_approved_phase` | Run one real module phase — the only tool that executes anything; see "Security model" above. |
+| `reconforge_execute_approved_phase` | Run one real module phase and block until it finishes; see "Security model" above. |
+| `reconforge_start_execution` | Same authorization requirements as above, but returns a `job_id` immediately instead of blocking — for phases that might take longer than you want to wait on one call. |
+| `reconforge_get_execution_status` | Poll a job started by `reconforge_start_execution` — status, and the result once completed. |
 
 ## Walkthrough: read-only exploration
 
@@ -158,14 +163,25 @@ Any one of these missing or mismatched — wrong approval ID, target outside the
 `allowed_targets`, an inactive/nonexistent engagement, `explicit_confirmation` omitted — and the
 tool returns a `PolicyBlockedError`, not a partial or best-effort execution.
 
+For a phase that might run long, use `reconforge_start_execution` instead of
+`reconforge_execute_approved_phase` in step 3 — identical fields and identical authorization
+requirements, but it returns a `job_id` immediately; poll `reconforge_get_execution_status` with
+that id until `status` is `completed` or `failed`.
+
 ## Known limitations
 
-See `CLAUDE_MCP_IMPLEMENTATION_PLAN.md` §13 for the complete list. The two most relevant to end
+See `CLAUDE_MCP_IMPLEMENTATION_PLAN.md` §13 for the complete list. The three most relevant to end
 users right now:
 
 - **No credentialed execution.** AD's `delegation`/`bloodhound` phases and any brute-force path are
   not reachable through MCP at all — run those via the CLI directly with your own `-u`/`-p` flags.
-- **One execution at a time, per server process.** A process-wide lock serializes
-  `reconforge_execute_approved_phase` calls; a second call while one is in flight is rejected with
-  `ExecutionConflictError` rather than queued. A full execution-job model (start/status/cancel) is
-  planned for a later phase.
+- **One execution at a time, per server process.** A process-wide lock serializes every execution
+  tool call — `reconforge_execute_approved_phase`, and `reconforge_start_execution`'s background
+  job. A second call while one is in flight is rejected with `ExecutionConflictError` immediately,
+  rather than queued.
+- **No execution cancellation.** `core/runner.py`'s subprocess execution has no cooperative-
+  cancellation hook, so a `reconforge_start_execution` job cannot actually be stopped once running
+  — it runs to completion or failure. There is deliberately no `cancel` tool: one that only worked
+  in the sub-millisecond window before a job's worker thread starts would be misleading rather than
+  useful. Job state is also in-memory only — a server restart loses any in-flight or completed job
+  you haven't already read via `reconforge_get_execution_status`.

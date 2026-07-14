@@ -372,3 +372,45 @@ class ExecuteApprovedPhaseResponse(TrustedResponse):
     findings_count: int
     artifacts_written: list[str]
     warnings: list[str]
+
+
+# ── reconforge_start_execution / reconforge_get_execution_status ────
+#
+# The job model layered on top of reconforge_execute_approved_phase
+# (reconforge/mcp/jobs.py), for phases whose real execution time could
+# exceed how long an MCP client waits for one tool-call response.
+# start_execution runs the identical authorization path
+# (services.py::_authorize_execution) as the synchronous tool before
+# returning — a bad request fails immediately, not after a job was
+# already created — then hands the actual module execution to a
+# background thread and returns right away. Both share
+# services.py::_EXECUTION_LOCK, so "one execution at a time" holds
+# regardless of which tool started it.
+
+
+class StartExecutionRequest(ExecuteApprovedPhaseRequest):
+    """Identical fields to ExecuteApprovedPhaseRequest — same
+    authorization requirements apply, just executed asynchronously."""
+
+
+class StartExecutionResponse(TrustedResponse):
+    job_id: str
+    status: str
+
+
+class GetExecutionStatusRequest(BaseModel):
+    job_id: str
+
+
+class GetExecutionStatusResponse(TrustedResponse):
+    job_id: str
+    status: str
+    module: str
+    phase: str
+    target: str
+    created_at: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    result: ExecuteApprovedPhaseResponse | None = None
+    error: str | None = None
+    error_code: str | None = None

@@ -77,3 +77,13 @@ class ExecutionConflictError(MCPServiceError):
     """Another execution is already in progress on this server process."""
 
     code = "EXECUTION_CONFLICT"
+
+
+class JobNotFoundError(MCPServiceError):
+    """No execution job matches the requested job id (reconforge/mcp/jobs.py).
+
+    Job state lives only in this server process's memory (no
+    persistence across restarts) — this error also covers "the server
+    was restarted since this job_id was issued.\""""
+
+    code = "JOB_NOT_FOUND"

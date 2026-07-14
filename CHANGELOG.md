@@ -6,6 +6,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.13.0] — 2026-07-14
+
+Claude MCP Integration — Phase 6 (execution job model). MINOR per `docs/VERSIONING.md` — two new tools.
+
+### Added
+
+- `reconforge/mcp/jobs.py`: `reconforge_start_execution`/`reconforge_get_execution_status`, alongside the existing blocking `reconforge_execute_approved_phase`. `start_execution` runs the identical `services.py::_authorize_execution()` authorization synchronously (a bad or unauthorized request fails immediately, no job created) and acquires the existing process-wide `_EXECUTION_LOCK` synchronously too (a busy server rejects the call immediately — same failure mode as the blocking tool), then only the actual module execution moves to a background `threading.Thread`. 15 tools total now.
+- `reconforge/mcp/services.py::execute_approved_phase` refactored into `_authorize_execution()` (validation only, no lock/execution) + `_execute_module_phase_locked()` (assumes the lock is already held) — the split both tools now share, verified as a pure refactor by running the full pre-existing test suite unchanged before adding anything new.
+- `JobNotFoundError` in `reconforge/mcp/errors.py` (code `JOB_NOT_FOUND`).
+
+### Deliberately not built
+
+- **No `cancel` tool.** `core/runner.py`'s subprocess execution has no cooperative-cancellation hook, so a running job cannot actually be stopped — a "cancel" would only work in the sub-millisecond window between job creation and the worker thread starting, which never coincides with when an operator would actually want to cancel a long-running scan. Building a tool that mostly doesn't do what its name implies would be worse than not building it; documented as a known limitation instead (same reasoning as Phase 5's CREDENTIAL_USE rejection — don't invent a weak mechanism under pressure to have something to ship).
+
+### Tests
+
+- `tests/mcp/test_execution_jobs.py` (12 tests): the allow path proves real execution genuinely happens and completes asynchronously; deny paths prove authorization failures happen before any job is created; concurrency tests prove `execute_approved_phase` and `start_execution` share one lock (a job in flight blocks the sync tool and vice versa); lock-release tests cover both success and failure (including a failure forced specifically through the worker's `except MCPServiceError` branch via monkeypatch, distinct from the generic `except Exception` catch-all, since nothing in the current real execution path actually raises an `MCPServiceError` post-authorization) — `reconforge/mcp/jobs.py` reached 100% coverage.
+- One new test in `tests/mcp/test_stdio_transport_integrity.py`, against a real subprocess: confirms `sys.stdout` redirection (process-global, not thread-local) still holds when the real module write happens from the background worker thread rather than the request-handling coroutine, and that concurrent client polling over the same stdio connection while that thread writes doesn't corrupt the JSON-RPC stream.
+
+1065/1065 tests passing (1053 + 12 new); ruff/mypy(13-file scope)/bandit/pip-audit/doc-link-check all pass.
+
 ## [2.12.2] — 2026-07-14
 
 Claude MCP Integration — Phase 12 (assessed) + Phase 14 (README section + examples). PATCH per `docs/VERSIONING.md` — documentation and examples only, no code capability change.

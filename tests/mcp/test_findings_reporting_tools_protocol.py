@@ -48,15 +48,17 @@ def _write_finding(tmp_path: Path, target: str, module: str, finding_id: str) ->
     )
 
 
-def test_list_tools_includes_all_twelve_read_only_tools_plus_execute():
+def test_list_tools_includes_all_twelve_read_only_tools_plus_execution_tools():
     async def _go() -> None:
         server = build_server()
         async with create_connected_server_and_client_session(server) as session:
             result = await session.list_tools()
             names = {t.name for t in result.tools}
             assert names == set(_TOOLS.keys())
-            assert len(names) == 13
+            assert len(names) == 15
             assert "reconforge_execute_approved_phase" in names
+            assert "reconforge_start_execution" in names
+            assert "reconforge_get_execution_status" in names
 
     _run(_go)
 
