@@ -43,6 +43,7 @@ from core.profile_loader import ProfileLoader
 from core.telemetry import ModuleTelemetry
 from core.data_contracts import SCHEMA_VERSION, build_contract
 from core.validators import validate_domain
+from core.exceptions import ModuleError
 
 from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
 from modules.ad.tools.ldapsearch import ADLdapsearchTool
@@ -491,6 +492,17 @@ class ADModule:
             self.logger.info(f"Reports saved to: {self.module_dir}")
         except Exception as e:
             self.logger.error(f"Error generating reports: {e}")
+            # See modules/network/network_module.py::_generate_reports() for
+            # the full rationale: a partial-write failure here previously
+            # left later artifacts silently unwritten while run() still
+            # returned a normal-looking success. Both call sites
+            # (reconforge/cli.py's top-level `except ReconForgeError`,
+            # WorkflowOrchestrator.run()'s per-step `except Exception`)
+            # already handle a raised error correctly.
+            raise ModuleError(
+                module=self.MODULE_NAME,
+                message=f"Report generation failed partway through — some artifacts may be missing: {e}",
+            ) from e
 
     # ------------------------------------------------------------------
     # Console summary

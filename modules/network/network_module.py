@@ -37,6 +37,7 @@ from core.profile_loader import ProfileLoader
 from core.telemetry import ModuleTelemetry
 from core.data_contracts import SCHEMA_VERSION, build_contract
 from core.version import __version__
+from core.exceptions import ModuleError
 
 from modules.network.tools.nmap import NmapTool
 from modules.network.tools.enum4linux import Enum4linuxTool
@@ -405,6 +406,21 @@ class NetworkModule:
 
         except Exception as e:
             self.logger.error(f"Error generating reports: {e}")
+            # A failure partway through this method (e.g. a JSON-serialization
+            # error, a full disk) silently leaves later artifacts unwritten
+            # while run() previously proceeded to print a normal-looking
+            # summary and return success — no operator-facing signal that
+            # some report files may be missing or incomplete. Re-raise as a
+            # typed error instead of swallowing: reconforge/cli.py's
+            # top-level `except ReconForgeError` already turns this into a
+            # clean CLI error, and WorkflowOrchestrator.run() already marks
+            # the step failed and continues rather than crashing the whole
+            # workflow — both call sites handle this correctly today, they
+            # just never got the chance to because it was never raised.
+            raise ModuleError(
+                module=self.MODULE_NAME,
+                message=f"Report generation failed partway through — some artifacts may be missing: {e}",
+            ) from e
 
     def _generate_quick_report(self, results: Dict):
         """Generate executive summary report."""

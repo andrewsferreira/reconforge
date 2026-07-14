@@ -38,6 +38,7 @@ from core.target_parser import parse_target
 from core.telemetry import ModuleTelemetry
 from core.data_contracts import SCHEMA_VERSION, build_contract
 from core.version import __version__
+from core.exceptions import ModuleError
 
 # Tool imports
 from modules.surface.tools.nmap_stealth import NmapStealthTool
@@ -411,6 +412,17 @@ class SurfaceModule:
 
         except Exception as e:
             self.logger.error(f"Error generating reports: {e}")
+            # See modules/network/network_module.py::_generate_reports() for
+            # the full rationale: a partial-write failure here previously
+            # left later artifacts silently unwritten while run() still
+            # returned a normal-looking success. Both call sites
+            # (reconforge/cli.py's top-level `except ReconForgeError`,
+            # WorkflowOrchestrator.run()'s per-step `except Exception`)
+            # already handle a raised error correctly.
+            raise ModuleError(
+                module=self.MODULE_NAME,
+                message=f"Report generation failed partway through — some artifacts may be missing: {e}",
+            ) from e
 
     def _generate_quick_report(self, results: Dict) -> None:
         """Generate executive summary report."""

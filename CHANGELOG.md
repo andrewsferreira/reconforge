@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.5.5] — 2026-07-13
+
+Phase 21 (Report-Generation Error Handling): closed the item deferred in Phase 15, unblocked now that Phase 17's `results["success"]`-honesty redesign has shipped. PATCH per `docs/VERSIONING.md` — reuses the existing `core/exceptions.py::ModuleError`, no new public surface.
+
+### Fixed
+
+- `network_module.py`/`ad_module.py`/`web_module.py`/`api_module.py`/`surface_module.py::_generate_reports()`: all 5 wrapped 9-10 independent report-file writes in an identical bare `except Exception as e: self.logger.error(...)` with no re-raise. A failure partway through (e.g. a disk-full error, a JSON-serialization error) silently left later artifacts — including the evidence manifest itself — un-written while the calling module's `run()` still returned a normal-looking success. All 5 now re-raise `ModuleError(module, message) from e` instead of swallowing. Confirmed both real call sites already handle this correctly: `reconforge/cli.py`'s top-level `except ReconForgeError` turns it into a clean CLI error, and `WorkflowOrchestrator.run()`'s per-step `except Exception` marks the step failed and continues rather than crashing the whole workflow — no caller-side changes needed.
+
+7 new tests added (852 → 859); full suite, ruff, mypy, and bandit all pass.
+
 ## [2.5.4] — 2026-07-13
 
 Phase 20 (CVE Enricher Hardening): closed the last open item from Phase 8's confidence-model audit. PATCH per `docs/VERSIONING.md` — internal reliability hardening, no new public surface.
