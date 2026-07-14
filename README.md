@@ -2,7 +2,7 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.11.1 • 1039/1039 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.11.2 • 1039/1039 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -173,6 +173,7 @@ outputs/<target>/<module>/
 | [ARTIFACT_POLICY.md](docs/ARTIFACT_POLICY.md) | Artifact retention, storage separation, and sensitive-data handling |
 | [OBSERVABILITY_AND_CONTRACTS.md](docs/OBSERVABILITY_AND_CONTRACTS.md) | Execution IDs, structured audit logs, env overlays, and versioned data contracts |
 | [BURP_MCP_INTEGRATION.md](docs/BURP_MCP_INTEGRATION.md) | `reconforge burp` subcommands, the Burp MCP provider, and the standalone [`mcp_validation/`](mcp_validation/README.md) connectivity-check tool |
+| [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md) | Connect Claude Desktop/Claude Code to `reconforge mcp serve` — setup, security model, tool reference, walkthroughs |
 
 ## Testing
 

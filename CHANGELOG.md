@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.11.2] — 2026-07-14
+
+Claude MCP Integration — Phase 10 (Claude Desktop/Code setup guide). PATCH per `docs/VERSIONING.md` — documentation only, no code change.
+
+### Added
+
+- `docs/CLAUDE_MCP_INTEGRATION.md`: the user-facing setup guide, distinct from `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`'s design rationale — how to actually connect a client. Covers the `mcp` extra install (`pip install -e ".[mcp]"`), Claude Desktop's `claude_desktop_config.json` `mcpServers` block, Claude Code's `claude mcp add`, a condensed security-model summary, a table of all 13 tools, a read-only exploration walkthrough, and a step-by-step walkthrough for authorizing real execution (scope YAML → `reconforge workflow --engagement` → the `reconforge_execute_approved_phase` call itself, cross-referencing the exact CLI flags `--enforce-scope`/`--scope-file`/`--approval-id` already use for parity).
+- README.md's Documentation table and `docs/DOCUMENTATION_INDEX.md` both link the new guide.
+
 ## [2.11.1] — 2026-07-14
 
 CI recovery + quality-gate scope widening. PATCH per `docs/VERSIONING.md` — a hardening pass, no new externally-visible capability.

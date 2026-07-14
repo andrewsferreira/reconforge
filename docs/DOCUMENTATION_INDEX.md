@@ -172,9 +172,17 @@ Diagram + narrative for the layer sitting above `WorkflowOrchestrator`: normaliz
 
 ### CLAUDE_MCP_IMPLEMENTATION_PLAN.md
 📍 **Location:** [`docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`](CLAUDE_MCP_IMPLEMENTATION_PLAN.md)
-**Status:** 🚧 Phases 1–5 done (13 tools: 12 read-only + 1 controlled-execution); CI recovery + quality-gate scope widening in v2.11.1; Phase 6 onward not started (updated 2026-07-14)
+**Status:** 🚧 Phases 1–5, 10 done (13 tools: 12 read-only + 1 controlled-execution, plus the user-facing setup guide); CI recovery + quality-gate scope widening in v2.11.1; Phases 6–9, 11–15 not started (updated 2026-07-14)
 
 The design for `reconforge/mcp/`, the package that lets Claude Desktop/Claude Code act as an MCP *client* against a ReconForge-hosted MCP *server* (the reverse relationship from `core/adapters/burp/`, where ReconForge is the MCP client). Covers the trust-boundary diagram, the `trusted_metadata`/`untrusted_evidence` response-shape split, the `SAFE_READ_ONLY → PROHIBITED` execution-tier policy table, the human-approval model, representative request/response schemas, and which existing primitives each planned tool reuses rather than duplicates. `reconforge/mcp/server.py` (Phase 2) builds a real `mcp` SDK `Server`, runnable via `reconforge mcp serve`. `reconforge/mcp/tools.py` + `services.py` + `schemas.py` (Phase 3) register all 12 read-only tools. `reconforge/mcp/sanitization.py` (Phase 4) centralizes untrusted-content handling; every response carries a `trust: "server_generated"` marker; a 26-payload adversarial test suite proves injection payloads stay inert. `reconforge/mcp/policy.py` (Phase 5) implements the tier taxonomy, and `reconforge_execute_approved_phase` (Phase 5) is the one tool that can trigger real execution — independently re-verified engagement/scope/confirmation, CREDENTIAL_USE phases (AD delegation/bloodhound) rejected outright, single process-wide execution lock. A real stdio-corruption bug (`ReconLogger` logging to `sys.stdout` unconditionally, breaking the JSON-RPC stream) was found via a genuine subprocess test — not the in-memory transport every other test in this package uses — and fixed in `server.py`.
+
+---
+
+### CLAUDE_MCP_INTEGRATION.md
+📍 **Location:** [`docs/CLAUDE_MCP_INTEGRATION.md`](CLAUDE_MCP_INTEGRATION.md)
+**Status:** ✅ Complete (Phase 10, 2026-07-14)
+
+The user-facing setup guide, distinct from the implementation plan above (design rationale) — this one is purely "how do I connect a client." Covers the `mcp` extra install (`pip install -e ".[mcp]"`), Claude Desktop's `claude_desktop_config.json` `mcpServers` block, Claude Code's `claude mcp add`, a condensed security-model summary, a table of all 13 tools, a read-only exploration walkthrough, and a step-by-step walkthrough for authorizing real execution (scope YAML → `reconforge workflow --engagement` → the `reconforge_execute_approved_phase` call itself), plus the two most user-relevant known limitations (no credentialed execution, one execution at a time per server process).
 
 ---
 
