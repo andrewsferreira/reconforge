@@ -6,6 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.8.0] — 2026-07-14
+
+Claude MCP Integration — Phase 3, part 1/2 (Read-Only MCP Capabilities: planning and dry-run tools). MINOR per `docs/VERSIONING.md` — 8 new read-only MCP tools, backward-compatible, no existing behavior changed.
+
+### Added
+
+- `reconforge/mcp/schemas.py`: pydantic request/response models for all 8 tools — the MCP Input Validation Layer boundary.
+- `reconforge/mcp/services.py`: the actual tool implementations, each wrapping a real ReconForge primitive rather than fabricating data — module introspection reads each of the 5 module classes' own `MODULE_NAME`/`VALID_PHASES` and their `modules/<name>/tools/*.py` directory; `reconforge_dry_run` instantiates the real module classes with `dry_run=True` and reads back `Runner.get_command_log()` (already secret-redacted); `reconforge_get_scope`/`reconforge_plan_workflow` reuse `ScopeAuthorization.from_file()` unchanged; engagement data is read from the same `<output_base>/workflow/engagement_*.json` files the CLI's `workflow` command already writes, via `EngagementManager.load()` unchanged.
+- `reconforge/mcp/errors.py`: a small typed error hierarchy (`InvalidMCPRequestError`, `UnknownPhaseError`, `EngagementNotFoundError`, `ScopeFileError`, `FindingNotFoundError`) used by the service layer.
+- `reconforge/mcp/tools.py`: registers the 8 tools on the Phase 2 `Server` — `reconforge_get_status`, `reconforge_list_modules`, `reconforge_get_module_details`, `reconforge_list_engagements`, `reconforge_get_engagement`, `reconforge_get_scope`, `reconforge_plan_workflow`, `reconforge_dry_run`. Each tool's `inputSchema` is generated from its pydantic model, so the `mcp` SDK's own `jsonschema.validate()` rejects malformed arguments (including invalid module-name enums) before `services.py` ever runs — verified by a protocol-level test, not assumed.
+- `tests/mcp/test_services.py` (20 tests) and `tests/mcp/test_read_only_tools.py` (11 tests): unit-level and protocol-level coverage. Notably, `test_dry_run_never_calls_subprocess` makes `subprocess.run` raise if called at all, proving dry-run genuinely never executes anything rather than just returning success.
+- `tests/mcp/test_server_foundation.py` updated: the Phase 2 assertions that zero tools were registered are now correctly assertions that `tools` capability *is* present while `resources`/`prompts` remain absent.
+
+31 new tests (900 → 931, `pytest -q`); ruff/mypy(CI-scoped)/bandit all pass. The new MCP package files also pass `mypy --disallow-untyped-defs --disallow-incomplete-defs --warn-return-any` (one narrow, comment-explained `type: ignore` in `tools.py` for a `--follow-imports=skip`-only false positive on `pydantic.BaseModel.model_dump()`'s return type).
+
+### Notes
+
+- The remaining 4 findings/reporting tools (`reconforge_get_findings`, `reconforge_get_finding`, `reconforge_summarize_findings`, `reconforge_generate_report`) are Phase 3 part 2/2, not implemented yet — findings evidence is target-controlled content and gets the `trusted_metadata`/`untrusted_evidence` treatment from `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md` §5 when it lands.
+- No controlled-execution tool exists. `reconforge_dry_run` never calls an external tool; `reconforge mcp serve`'s scope-gate carve-out from Phase 2 is unaffected.
+
 ## [2.7.0] — 2026-07-14
 
 Claude MCP Integration — Phase 2 (MCP Server Foundation): the connection/handshake foundation for `reconforge/mcp/`, the package that will let Claude Desktop/Claude Code act as an MCP client against ReconForge. MINOR per `docs/VERSIONING.md` — a new package and CLI subcommand, backward-compatible, no existing behavior changed. Deliberately foundation-only: zero tools, resources, or prompts are registered yet (that's Phase 3).
