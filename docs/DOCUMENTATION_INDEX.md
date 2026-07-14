@@ -170,6 +170,14 @@ Diagram + narrative for the layer sitting above `WorkflowOrchestrator`: normaliz
 
 ---
 
+### CLAUDE_MCP_IMPLEMENTATION_PLAN.md
+📍 **Location:** [`docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`](CLAUDE_MCP_IMPLEMENTATION_PLAN.md)
+**Status:** 🚧 Phase 1 deliverable — design only, no server code exists yet (added 2026-07-14)
+
+The design for a new `reconforge/mcp/` package that lets Claude Desktop/Claude Code act as an MCP *client* against a ReconForge-hosted MCP *server* (the reverse relationship from `core/adapters/burp/`, where ReconForge is the MCP client). Covers the trust-boundary diagram (Claude's tool arguments and target-controlled content are both untrusted), the `trusted_metadata`/`untrusted_evidence` response-shape split for prompt-injection resistance, the `SAFE_READ_ONLY → PROHIBITED` execution-tier policy table, the human-approval model (reuses `core/authorization_gate.py::ScopeAuthorization` unchanged), representative request/response schemas, and which existing primitives (`Runner(dry_run=True)`, `FindingsManager`, `EngagementManager`) each planned tool reuses rather than duplicates. Read-only tools (status/modules/engagements/scope/findings/reports/dry-run) are planned before any controlled-execution tool.
+
+---
+
 ## 3. Developer Documentation
 
 ### DEVELOPMENT.md

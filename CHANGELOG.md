@@ -6,6 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.6.3] — 2026-07-14
+
+Claude MCP Integration — Phase 1 (Repository Assessment): the first phase of a large, explicitly incremental effort to let Claude Desktop/Claude Code act as an MCP client against a new ReconForge-hosted MCP server, scoped read-only-first per the operator's own working rules. PATCH per `docs/VERSIONING.md` — planning documentation only, no `reconforge/mcp/` package or other code exists yet.
+
+### Added
+
+- `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`: architectural assessment, trust-boundary diagram, MCP threat model, the `trusted_metadata`/`untrusted_evidence` response-shape split for prompt-injection resistance, a `SAFE_READ_ONLY → PROHIBITED` execution-tier policy table, the human-approval model (reuses `core/authorization_gate.py::ScopeAuthorization` unchanged), representative request/response schemas, a testing strategy, a migration plan, and known limitations. Identifies `core/runner.py`'s existing `Runner(dry_run=True)` code path and `core/adapters/burp/`'s policy/normalization-boundary pattern as the primitives new MCP tools should wrap rather than duplicate.
+- `docs/DOCUMENTATION_INDEX.md`: new entry for the plan document under "Architecture & Design".
+
+### Notes
+
+- No code changes. `reconforge/mcp/` and the `mcp` SDK dependency are not yet added — that begins at Phase 2, pending explicit operator go-ahead, per this project's phase-checkpoint discipline and the operator's own instruction not to implement unrestricted active execution first.
+
 ## [2.6.2] — 2026-07-14
 
 Phase 30 (AI Orchestration Honesty Pass): triggered by a direct question about whether the project's "AI orchestration" claims reflect real integration or aspirational branding. PATCH per `docs/VERSIONING.md` — documentation correction and test coverage, no behavior change.
