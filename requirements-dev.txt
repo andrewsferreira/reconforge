@@ -5,7 +5,7 @@ ruff>=0.13.0
 mypy>=1.11.0
 bandit>=1.8.0
 pip-audit>=2.8.0
-types-PyYAML>=6.0.12
+types-PyYAML>=6.0.12.20260518
 
 # CI runner images pre-install setuptools independently of this project's
 # own [build-system] requires floor (pyproject.toml) — that floor only
