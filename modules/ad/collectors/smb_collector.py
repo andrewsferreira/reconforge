@@ -6,13 +6,13 @@ Collects share lists, access levels, null session status,
 and admin share accessibility via SMB.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from modules.ad.collectors.base import CollectorBase, CollectorResult
-from modules.ad.tools.smbclient import ADSmbclientTool
-from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
-from modules.ad.parsers.smb_parser import ADSmbParser
 from modules.ad.parsers.enum4linux_ng_parser import Enum4linuxNgParser
+from modules.ad.parsers.smb_parser import ADSmbParser
+from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
+from modules.ad.tools.smbclient import ADSmbclientTool
 
 
 class SmbCollector(CollectorBase):
@@ -55,7 +55,7 @@ class SmbCollector(CollectorBase):
         result.success = True
         return result
 
-    def collect_null_session(self, target: str) -> Dict[str, Any]:
+    def collect_null_session(self, target: str) -> dict[str, Any]:
         """Test SMB null session and return share list."""
         if not self.smbclient.is_available():
             return {"allowed": False, "shares": []}
@@ -78,14 +78,14 @@ class SmbCollector(CollectorBase):
     def collect_shares(
         self, target: str, username: str = "", password: str = "",
         domain: str = "", null_session: bool = False,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Enumerate and test access to SMB shares."""
         if not self.smbclient.is_available():
             return []
         if not self.opsec.check("smb_share_access"):
             return []
 
-        shares: List[Dict] = []
+        shares: list[dict] = []
 
         # Get share list
         if username and password:
@@ -134,7 +134,7 @@ class SmbCollector(CollectorBase):
 
     def collect_enum4linux(
         self, target: str, username: str = "", password: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run enum4linux-ng full enum and return structured data."""
         if not self.enum4linux_ng.is_available():
             return {}

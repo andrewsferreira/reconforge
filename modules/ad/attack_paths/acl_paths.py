@@ -6,9 +6,13 @@ Identifies ACL-based attack paths: GenericAll, WriteDacl,
 GenericWrite, ForceChangePassword, etc.
 """
 
-from typing import Any, Dict, List
+from typing import Any
+
 from modules.ad.attack_paths.base import (
-    AttackPathBuilderBase, AttackPathResult, AttackChain, NextStepSuggestion,
+    AttackChain,
+    AttackPathBuilderBase,
+    AttackPathResult,
+    NextStepSuggestion,
 )
 
 
@@ -18,7 +22,7 @@ class AclPathBuilder(AttackPathBuilderBase):
     BUILDER_NAME = "acl"
 
     def build(
-        self, analysis_data: Dict[str, Any],
+        self, analysis_data: dict[str, Any],
         target: str = "", domain: str = "", **kwargs,
     ) -> AttackPathResult:
         result = AttackPathResult(builder=self.BUILDER_NAME)

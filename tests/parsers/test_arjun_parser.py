@@ -1,7 +1,6 @@
 """Tests for modules.api.parsers.arjun_parser – ArjunParser."""
 
 import json
-from pathlib import Path
 
 import pytest
 

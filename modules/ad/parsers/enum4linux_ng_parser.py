@@ -14,7 +14,6 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
@@ -24,11 +23,11 @@ class Enum4linuxNgResult:
     workgroup: str = ""
     os_info: str = ""
     smb_signing: str = ""
-    users: List[Dict[str, str]] = field(default_factory=list)
-    groups: List[Dict[str, str]] = field(default_factory=list)
-    shares: List[Dict[str, str]] = field(default_factory=list)
-    password_policy: Dict[str, str] = field(default_factory=dict)
-    rid_users: List[Dict[str, str]] = field(default_factory=list)
+    users: list[dict[str, str]] = field(default_factory=list)
+    groups: list[dict[str, str]] = field(default_factory=list)
+    shares: list[dict[str, str]] = field(default_factory=list)
+    password_policy: dict[str, str] = field(default_factory=dict)
+    rid_users: list[dict[str, str]] = field(default_factory=list)
     domain_sid: str = ""
     null_session: bool = False
     raw: str = ""
@@ -165,9 +164,9 @@ class Enum4linuxNgParser:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _extract_password_policy(text: str) -> Dict[str, str]:
+    def _extract_password_policy(text: str) -> dict[str, str]:
         """Extract password policy fields from text."""
-        policy: Dict[str, str] = {}
+        policy: dict[str, str] = {}
         patterns = {
             "min_length": r"(?:Minimum password length|min\.?\s*password\s*length)[:\s]+(\d+)",
             "complexity": r"(?:Password Complexity|complexity)[:\s]+(\S+)",

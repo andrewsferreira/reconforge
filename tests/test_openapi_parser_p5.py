@@ -20,8 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from modules.api.parsers.openapi_parser import (
-    OpenApiParser, OpenApiSpec, OpenApiEndpoint, RefResolver,
-    OpenApiRequestBody, ResolvedSchema,
+    OpenApiParser,
 )
 
 

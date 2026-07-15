@@ -14,9 +14,9 @@ Author: Andrews Ferreira
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from core.runner import Runner, RunResult, RC_TOOL_NOT_FOUND
+from core.runner import RC_TOOL_NOT_FOUND, Runner, RunResult
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -30,15 +30,15 @@ class NetexecTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
         self.opsec_mode = opsec_mode
         self.tool_cfg = ToolConfig(config, "netexec")
-        self._resolved: Optional[str] = None
+        self._resolved: str | None = None
 
-    def _resolve_binary(self) -> Optional[str]:
+    def _resolve_binary(self) -> str | None:
         """Resolve the actual binary name."""
         if self._resolved is not None:
             return self._resolved
@@ -60,7 +60,7 @@ class NetexecTool:
 
     def smb_enum(self, target: str, username: str = "",
                  password: str = "", domain: str = "",
-                 options: Optional[List[str]] = None,
+                 options: list[str] | None = None,
                  timeout: int = 180) -> RunResult:
         """Run SMB enumeration with netexec.
 
@@ -80,7 +80,7 @@ class NetexecTool:
         self.logger.info(f"Running netexec SMB enum on {target}")
         out = self.output_dir / "netexec_smb.txt"
 
-        cmd: List[str] = [binary, "smb", target]
+        cmd: list[str] = [binary, "smb", target]
         if username and password:
             cmd += ["-u", username, "-p", password]
             if domain:
@@ -101,7 +101,7 @@ class NetexecTool:
     def ldap_enum(self, target: str, username: str = "",
                   password: str = "", domain: str = "",
                   module: str = "",
-                  options: Optional[List[str]] = None,
+                  options: list[str] | None = None,
                   timeout: int = 180) -> RunResult:
         """Run LDAP enumeration with netexec.
 
@@ -121,7 +121,7 @@ class NetexecTool:
         self.logger.info(f"Running netexec LDAP enum on {target}")
         out = self.output_dir / "netexec_ldap.txt"
 
-        cmd: List[str] = [binary, "ldap", target]
+        cmd: list[str] = [binary, "ldap", target]
         if username and password:
             cmd += ["-u", username, "-p", password]
             if domain:
@@ -151,7 +151,7 @@ class NetexecTool:
         out = self.output_dir / "netexec_signing.txt"
         relay_list = str(self.output_dir / "relay_targets.txt")
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             binary, "smb", target,
             "--gen-relay-list", relay_list,
         ]
@@ -173,7 +173,7 @@ class NetexecTool:
         self.logger.info(f"Running netexec bloodhound ingest on {target}")
         out = self.output_dir / "netexec_bloodhound.txt"
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             binary, "ldap", target,
             "-u", username, "-p", password,
         ]

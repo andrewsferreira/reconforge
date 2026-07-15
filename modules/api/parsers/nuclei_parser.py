@@ -12,7 +12,6 @@ Extracts:
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 from modules.web.parsers.severity import normalize_severity
 
@@ -24,9 +23,9 @@ class NucleiApiFinding:
     name: str = ""
     severity: str = "info"
     matched_at: str = ""
-    extracted: List[str] = field(default_factory=list)
-    references: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    extracted: list[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     remediation: str = ""
     raw_data: str = ""
     matcher_name: str = ""
@@ -36,18 +35,18 @@ class NucleiApiFinding:
 @dataclass
 class NucleiApiResult:
     """Complete Nuclei API scan result."""
-    findings: List[NucleiApiFinding] = field(default_factory=list)
+    findings: list[NucleiApiFinding] = field(default_factory=list)
     raw_output: str = ""
 
     @property
-    def by_severity(self) -> Dict[str, List[NucleiApiFinding]]:
-        groups: Dict[str, List[NucleiApiFinding]] = {}
+    def by_severity(self) -> dict[str, list[NucleiApiFinding]]:
+        groups: dict[str, list[NucleiApiFinding]] = {}
         for f in self.findings:
             groups.setdefault(f.severity, []).append(f)
         return groups
 
     @property
-    def api_specific(self) -> List[NucleiApiFinding]:
+    def api_specific(self) -> list[NucleiApiFinding]:
         """Return only API-specific findings."""
         api_tags = {"api", "graphql", "swagger", "openapi", "jwt",
                     "oauth", "idor", "bola", "token", "rest"}
@@ -90,8 +89,7 @@ class NucleiApiParser:
             info = entry.get("info", {})
             if not isinstance(info, dict):
                 info = {}
-            template_id = entry.get("template-id",
-                                    entry.get("templateID", "unknown"))
+            template_id = entry.get("template-id") or entry.get("templateID") or "unknown"
 
             refs = info.get("reference", [])
             if isinstance(refs, str):
@@ -103,10 +101,9 @@ class NucleiApiParser:
 
             finding = NucleiApiFinding(
                 template_id=template_id,
-                name=info.get("name", template_id),
+                name=info.get("name") or template_id,
                 severity=normalize_severity(info.get("severity")),
-                matched_at=entry.get("matched-at",
-                                     entry.get("matched", "")),
+                matched_at=entry.get("matched-at") or entry.get("matched") or "",
                 extracted=entry.get("extracted-results", [])[:10],
                 references=refs[:5] if refs else [],
                 tags=tags,

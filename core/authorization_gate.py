@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -22,7 +21,7 @@ class ScopeAuthorization:
     valid_until: datetime
 
     @classmethod
-    def from_file(cls, path: str | Path) -> "ScopeAuthorization":
+    def from_file(cls, path: str | Path) -> ScopeAuthorization:
         p = Path(path)
         if not p.exists():
             raise ValueError(f"Scope file not found: {p}")

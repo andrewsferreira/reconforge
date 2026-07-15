@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class SecretManager:
@@ -30,10 +30,10 @@ class SecretManager:
     def __init__(self, provider: str = "env", file_path: str = ""):
         self.provider = provider
         self.file_path = file_path
-        self._file_cache: Optional[Dict[str, Any]] = None
-        self._aws_cache: Dict[str, Dict[str, Any]] = {}
+        self._file_cache: dict[str, Any] | None = None
+        self._aws_cache: dict[str, dict[str, Any]] = {}
 
-    def _load_file(self) -> Dict[str, Any]:
+    def _load_file(self) -> dict[str, Any]:
         if self._file_cache is not None:
             return self._file_cache
         if not self.file_path:
@@ -70,7 +70,7 @@ class SecretManager:
             prod/reconforge:siem_token
         """
         try:  # optional dependency
-            import boto3  # type: ignore
+            import boto3
         except Exception:
             return os.getenv(key, default) or default
 

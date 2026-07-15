@@ -11,7 +11,6 @@ Extracts:
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
@@ -29,19 +28,19 @@ class FfufApiEntry:
 @dataclass
 class FfufApiResult:
     """Complete ffuf API scan result."""
-    entries: List[FfufApiEntry] = field(default_factory=list)
+    entries: list[FfufApiEntry] = field(default_factory=list)
     command_line: str = ""
     raw_output: str = ""
 
     @property
-    def by_status(self) -> Dict[int, List[FfufApiEntry]]:
-        groups: Dict[int, List[FfufApiEntry]] = {}
+    def by_status(self) -> dict[int, list[FfufApiEntry]]:
+        groups: dict[int, list[FfufApiEntry]] = {}
         for e in self.entries:
             groups.setdefault(e.status, []).append(e)
         return groups
 
     @property
-    def api_endpoints(self) -> List[FfufApiEntry]:
+    def api_endpoints(self) -> list[FfufApiEntry]:
         """Return only entries that look like API endpoints."""
         api_indicators = ("/api/", "/v1/", "/v2/", "/v3/", "/graphql",
                           "/rest/", "/json", "/xml", "/swagger", "/openapi")

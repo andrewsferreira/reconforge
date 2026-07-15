@@ -1,9 +1,7 @@
 """Tests for core.logger – sanitize_log."""
 
-import pytest
 
-from core.logger import sanitize_log, ReconLogger
-
+from core.logger import ReconLogger, sanitize_log
 
 # ── sanitize_log ──────────────────────────────────────────────────
 

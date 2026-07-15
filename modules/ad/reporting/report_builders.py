@@ -6,7 +6,7 @@ Helper functions that assemble data dictionaries for each reporter
 from the raw scan results, findings, workflow, and loot.
 """
 
-from typing import Dict, Any, List
+from typing import Any
 
 from modules.ad.attack_paths.base import AttackChain, NextStepSuggestion
 
@@ -14,7 +14,7 @@ from modules.ad.attack_paths.base import AttackChain, NextStepSuggestion
 def build_attack_surface_data(
     target: str, domain: str, dc_ip: str, opsec_mode: str,
     username: str, findings_mgr, loot, workflow,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build data dict for AttackSurfaceReporter."""
     severity_counts = findings_mgr.count_by_severity()
     critical_high = (
@@ -48,7 +48,7 @@ def build_attack_surface_data(
     }
 
 
-def build_hvt_data(results: Dict, domain: str, target: str) -> Dict[str, Any]:
+def build_hvt_data(results: dict, domain: str, target: str) -> dict[str, Any]:
     """Build data dict for HighValueTargetsReporter."""
     identity = results.get("phases", {}).get("identity", {})
     bh = results.get("phases", {}).get("bloodhound", {})
@@ -70,7 +70,7 @@ def build_hvt_data(results: Dict, domain: str, target: str) -> Dict[str, Any]:
     }
 
 
-def build_path_data(workflow, domain: str, target: str) -> Dict[str, Any]:
+def build_path_data(workflow, domain: str, target: str) -> dict[str, Any]:
     """Build data dict for AttackPathReporter."""
     chains = [
         AttackChain(
@@ -96,7 +96,7 @@ def build_path_data(workflow, domain: str, target: str) -> Dict[str, Any]:
 
 def build_remediation_data(
     findings_mgr, domain: str, target: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build data dict for RemediationReporter."""
     all_findings = []
     for sev in ["critical", "high", "medium", "low"]:
@@ -115,8 +115,8 @@ def build_remediation_data(
 
 
 def build_ad_summary_data(
-    results: Dict, domain: str, target: str, dc_ip: str, workflow,
-) -> Dict[str, Any]:
+    results: dict, domain: str, target: str, dc_ip: str, workflow,
+) -> dict[str, Any]:
     """Build data dict for ADSummaryReporter."""
     return {
         "domain": domain,

@@ -9,7 +9,6 @@ from types import SimpleNamespace
 from core.detection_map import DETECTION_LEVELS, get_detection_level, is_allowed
 from core.opsec_checks import OpsecChecker
 
-
 # ── is_allowed() mode/noise matrix ──────────────────────────────────
 
 def test_stealth_mode_allows_only_low_noise():

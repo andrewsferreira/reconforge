@@ -12,21 +12,18 @@ Refactored to delegate to collectors → analyzers → attack_paths pipeline.
 Author: Andrews Ferreira
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
-from modules.ad.tools.bloodhound import BloodhoundTool
-from modules.ad.tools.netexec import NetexecTool
-
+from modules.ad.analyzers.privilege_analyzer import PrivilegeAnalyzer
+from modules.ad.attack_paths.acl_paths import AclPathBuilder
+from modules.ad.attack_paths.asrep_paths import AsrepPathBuilder
+from modules.ad.attack_paths.kerberoast_paths import KerberoastPathBuilder
+from modules.ad.base import ADPhaseBase
+from modules.ad.collectors.bloodhound_collector import BloodhoundCollector
 from modules.ad.parsers.bloodhound_parser import BloodhoundParser
 from modules.ad.parsers.netexec_parser import NetexecParser
-
-from modules.ad.collectors.bloodhound_collector import BloodhoundCollector
-from modules.ad.analyzers.privilege_analyzer import PrivilegeAnalyzer
-from modules.ad.attack_paths.kerberoast_paths import KerberoastPathBuilder
-from modules.ad.attack_paths.asrep_paths import AsrepPathBuilder
-from modules.ad.attack_paths.acl_paths import AclPathBuilder
-
-from modules.ad.base import ADPhaseBase
+from modules.ad.tools.bloodhound import BloodhoundTool
+from modules.ad.tools.netexec import NetexecTool
 
 
 class BloodhoundCollectionPhase(ADPhaseBase):
@@ -51,11 +48,11 @@ class BloodhoundCollectionPhase(ADPhaseBase):
         self.netexec_parser = netexec_parser
 
         # Collector
-        collector_kwargs = dict(
-            logger=self.logger, runner=self.runner,
-            opsec=self.opsec, output_dir=self.output_dir,
-            opsec_mode=self.opsec_mode,
-        )
+        collector_kwargs = {
+            "logger": self.logger, "runner": self.runner,
+            "opsec": self.opsec, "output_dir": self.output_dir,
+            "opsec_mode": self.opsec_mode,
+        }
         self.bh_collector = BloodhoundCollector(
             bloodhound=bloodhound, netexec=netexec,
             bloodhound_parser=bloodhound_parser,
@@ -73,7 +70,11 @@ class BloodhoundCollectionPhase(ADPhaseBase):
     # Main entry point
     # ------------------------------------------------------------------
 
-    def run(
+    # ADPhaseBase.run() declares **kwargs: Any deliberately loosely; every
+    # real call site invokes this phase through its concrete type
+    # (ad_module.py), never through the base type, so this narrower,
+    # self-documenting signature carries no real substitutability risk.
+    def run(  # type: ignore[override]
         self,
         target: str,
         domain: str = "",
@@ -81,14 +82,14 @@ class BloodhoundCollectionPhase(ADPhaseBase):
         password: str = "",
         dc_ip: str = "",
         opsec_mode: str = "normal",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute bloodhound collection phase."""
         self.logger.info(f"{'='*60}")
         self.logger.info(f"=== AD Phase 5: Bloodhound Collection on {target} ===")
         self.logger.info(f"{'='*60}")
         self.notes.add_phase_start(self.PHASE_NAME)
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "target": target,
             "domain": domain,
@@ -264,9 +265,9 @@ class BloodhoundCollectionPhase(ADPhaseBase):
     # DA Path Identification
     # ------------------------------------------------------------------
 
-    def _identify_da_paths(self, collected: Dict, results: Dict) -> List[Dict]:
+    def _identify_da_paths(self, collected: dict, results: dict) -> list[dict]:
         """Identify potential paths to Domain Admin."""
-        paths: List[Dict] = []
+        paths: list[dict] = []
         bh_users = collected.get("users", [])
         bh_computers = collected.get("computers", [])
         # user.member_of holds BloodHound ObjectIdentifier SIDs, not readable

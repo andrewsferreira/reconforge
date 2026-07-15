@@ -21,7 +21,6 @@ from modules.network.phases.authentication_checks import AuthenticationChecksPha
 from modules.network.phases.port_scanning import PortScanningPhase
 from modules.network.phases.service_enumeration import ServiceEnumerationPhase
 
-
 # ── port_scanning.py ────────────────────────────────────────────────
 
 def _make_port_scanning_phase() -> PortScanningPhase:

@@ -9,17 +9,17 @@ normalization, deduplication, and confidence scoring.
 """
 
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 from modules.surface.base import SurfacePhaseBase
-from modules.surface.intelligence.service_intelligence import ServiceIntelligenceDB
-from modules.surface.intelligence.service_normalizer import ServiceNormalizer
+from modules.surface.intelligence.confidence_scorer import ConfidenceScorer
 from modules.surface.intelligence.correlation_engine import (
     AttackSurfaceMap,
     CorrelationEngine,
 )
 from modules.surface.intelligence.deduplicator import ServiceDeduplicator
-from modules.surface.intelligence.confidence_scorer import ConfidenceScorer
+from modules.surface.intelligence.service_intelligence import ServiceIntelligenceDB
+from modules.surface.intelligence.service_normalizer import ServiceNormalizer
 
 
 class VectorCorrelationPhase(SurfacePhaseBase):
@@ -41,7 +41,7 @@ class VectorCorrelationPhase(SurfacePhaseBase):
         self._deduplicator = ServiceDeduplicator()
         self._scorer = ConfidenceScorer(port_map=self._intel_db.port_map)
 
-    def run(self, target: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target: str, **kwargs) -> dict[str, Any]:
         """Execute intelligent vector correlation phase.
 
         Args:
@@ -55,7 +55,7 @@ class VectorCorrelationPhase(SurfacePhaseBase):
         services = kwargs.get("services", [])
         http_services = kwargs.get("http_services", [])
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "vectors": [],
             "surface_map": {},
@@ -106,12 +106,12 @@ class VectorCorrelationPhase(SurfacePhaseBase):
 
         # ── Step 4: Generate findings and vectors ────────────────────
         for name, svc in surface_map.services.items():
-            conf = confidence_results.get(name)
-            conf_label = conf.label if conf else "medium"
-            conf_score = conf.score if conf else 0.5
+            matched_conf = confidence_results.get(name)
+            conf_label = matched_conf.label if matched_conf else "medium"
+            conf_score = matched_conf.score if matched_conf else 0.5
 
             # Build vector entry (backward-compatible with old format)
-            vector = {
+            vector: dict[str, Any] = {
                 "service": svc.canonical_name,
                 "display_name": svc.display_name,
                 "ports": sorted(set(svc.ports)),

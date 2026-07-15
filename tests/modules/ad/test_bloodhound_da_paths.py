@@ -21,10 +21,10 @@ def _make_phase() -> BloodhoundCollectionPhase:
 
 
 def _user(**kwargs):
-    defaults = dict(
-        object_id="", sam_account_name="", enabled=True,
-        has_spn=False, dont_req_preauth=False, member_of=[],
-    )
+    defaults = {
+        "object_id": "", "sam_account_name": "", "enabled": True,
+        "has_spn": False, "dont_req_preauth": False, "member_of": [],
+    }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
 

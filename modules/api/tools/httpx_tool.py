@@ -12,7 +12,7 @@ read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult, validate_arg
 from core.tool_config import ToolConfig
@@ -28,7 +28,7 @@ class HttpxTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -48,8 +48,8 @@ class HttpxTool:
             self.opsec_mode, 100
         )
 
-    def probe(self, target_url: str, paths: Optional[List[str]] = None,
-              headers: Optional[List[str]] = None,
+    def probe(self, target_url: str, paths: list[str] | None = None,
+              headers: list[str] | None = None,
               timeout: int = 300) -> RunResult:
         """Probe a target URL for HTTP responses and technology info."""
         validate_arg(target_url, "target_url")
@@ -59,7 +59,7 @@ class HttpxTool:
         rate = self._rate()
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "httpx", "-u", target_url, "-json", "-o", str(json_path),
             "-threads", str(threads), "-silent",
             "-status-code", "-content-length", "-title", "-tech-detect",
@@ -82,7 +82,7 @@ class HttpxTool:
         return self.runner.run(cmd, timeout=effective_timeout)
 
     def probe_endpoints(self, endpoints_file: str,
-                        headers: Optional[List[str]] = None,
+                        headers: list[str] | None = None,
                         timeout: int = 300) -> RunResult:
         """Probe a list of endpoints from a file."""
         validate_arg(endpoints_file, "endpoints_file")
@@ -91,7 +91,7 @@ class HttpxTool:
         threads = self._threads()
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "httpx", "-l", endpoints_file, "-json", "-o", str(json_path),
             "-threads", str(threads), "-silent",
             "-status-code", "-content-length", "-title", "-tech-detect",

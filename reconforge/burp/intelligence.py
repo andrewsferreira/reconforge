@@ -6,7 +6,11 @@ import argparse
 import json
 import logging
 
-from reconforge.entrypoints.burp_intelligence import IntelligenceRunConfig, run_vulnerability_intelligence, save_validation_result
+from reconforge.entrypoints.burp_intelligence import (
+    IntelligenceRunConfig,
+    run_vulnerability_intelligence,
+    save_validation_result,
+)
 
 
 def main(argv: list[str] | None = None) -> int:

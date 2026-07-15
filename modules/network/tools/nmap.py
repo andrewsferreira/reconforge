@@ -13,7 +13,7 @@ scan profile arguments are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -30,8 +30,8 @@ class NmapTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 profile: Optional["ProfileLoader"] = None,
-                 config: Optional["ConfigLoader"] = None):
+                 profile: ProfileLoader | None = None,
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -43,10 +43,10 @@ class NmapTool:
         """Check if nmap is installed."""
         return self.runner.check_tool(self.TOOL_NAME)
 
-    def _base_cmd(self, extra_args: List[str], target: str,
-                  output_prefix: str, xml_output: bool = True) -> List[str]:
+    def _base_cmd(self, extra_args: list[str], target: str,
+                  output_prefix: str, xml_output: bool = True) -> list[str]:
         """Build the nmap command as a list."""
-        cmd: List[str] = ["nmap"] + extra_args
+        cmd: list[str] = ["nmap"] + extra_args
         if xml_output:
             xml_path = self.output_dir / f"{output_prefix}.xml"
             normal_path = self.output_dir / f"{output_prefix}.nmap"
@@ -64,9 +64,9 @@ class NmapTool:
             "aggressive": "-T4",
         }.get(self.opsec_mode, "-T3")
 
-    def _extra_timing_args(self) -> List[str]:
+    def _extra_timing_args(self) -> list[str]:
         """Return additional timing arguments from the profile."""
-        args: List[str] = []
+        args: list[str] = []
         if self.profile:
             delay = self.profile.scan_delay
             if delay and delay != "0":
@@ -127,7 +127,7 @@ class NmapTool:
         self.logger.info(f"Running version scan on {target}")
         timing = self._timing_flag()
         effective_timeout = self.tool_cfg.mode_timeout("version_scan", timeout)
-        args: List[str] = ["-sV"]
+        args: list[str] = ["-sV"]
         if ports:
             args += ["-p", ports]
         args += [timing, "--open", "--version-intensity", "5"]
@@ -145,7 +145,7 @@ class NmapTool:
         self.logger.info(f"Running script scan on {target} scripts={scripts}")
         timing = self._timing_flag()
         effective_timeout = self.tool_cfg.mode_timeout("script_scan", timeout)
-        args: List[str] = ["-sC", "-sV"]
+        args: list[str] = ["-sC", "-sV"]
         if ports:
             args += ["-p", ports]
         args += [timing, f"--script={scripts}"]
@@ -158,7 +158,7 @@ class NmapTool:
         """Aggressive scan with OS detection, versions, scripts, traceroute."""
         self.logger.info(f"Running aggressive scan on {target}")
         effective_timeout = self.tool_cfg.mode_timeout("aggressive_scan", timeout)
-        args: List[str] = ["-A"]
+        args: list[str] = ["-A"]
         if ports:
             args += ["-p", ports]
         args += ["-T4", "--open"]

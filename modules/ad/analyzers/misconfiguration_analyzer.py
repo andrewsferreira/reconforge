@@ -6,8 +6,9 @@ Analyzes password policies, delegation configs, Kerberos settings,
 and other common AD misconfigurations.
 """
 
-from typing import Any, Dict, List
-from modules.ad.analyzers.base import AnalyzerBase, AnalysisResult
+from typing import Any
+
+from modules.ad.analyzers.base import AnalysisResult, AnalyzerBase
 
 
 class MisconfigurationAnalyzer(AnalyzerBase):
@@ -15,7 +16,7 @@ class MisconfigurationAnalyzer(AnalyzerBase):
 
     ANALYZER_NAME = "misconfigurations"
 
-    def analyze(self, collected_data: Dict[str, Any], **kwargs) -> AnalysisResult:
+    def analyze(self, collected_data: dict[str, Any], **kwargs) -> AnalysisResult:
         """Analyze for misconfigurations.
 
         Expected keys:
@@ -40,7 +41,7 @@ class MisconfigurationAnalyzer(AnalyzerBase):
     # ── Password policy ───────────────────────────────────────────
 
     def _analyze_password_policy(
-        self, data: Dict, target: str, result: AnalysisResult,
+        self, data: dict, target: str, result: AnalysisResult,
     ) -> None:
         policy = data.get("password_policy", {})
         if not policy:
@@ -109,7 +110,7 @@ class MisconfigurationAnalyzer(AnalyzerBase):
     # ── Delegation ───────────────────────────────────────────────
 
     def _analyze_delegation(
-        self, data: Dict, target: str, result: AnalysisResult,
+        self, data: dict, target: str, result: AnalysisResult,
     ) -> None:
         # Unconstrained non-DC
         unconstrained = data.get("unconstrained_delegation", [])
@@ -175,7 +176,7 @@ class MisconfigurationAnalyzer(AnalyzerBase):
     # ── Kerberos ────────────────────────────────────────────────
 
     def _analyze_kerberos(
-        self, data: Dict, target: str, result: AnalysisResult,
+        self, data: dict, target: str, result: AnalysisResult,
     ) -> None:
         # SPN accounts (Kerberoasting)
         spn_accounts = data.get("spn_accounts", [])
@@ -223,7 +224,7 @@ class MisconfigurationAnalyzer(AnalyzerBase):
     # ── MachineAccountQuota ─────────────────────────────────────
 
     def _analyze_maq(
-        self, data: Dict, target: str, result: AnalysisResult,
+        self, data: dict, target: str, result: AnalysisResult,
     ) -> None:
         maq = data.get("machine_account_quota", -1)
         if maq > 0:

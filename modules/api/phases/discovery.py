@@ -10,15 +10,13 @@ PRIORITY 5 hardened discovery phase:
 """
 
 import json
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from modules.api.base import APIPhaseBase
-from modules.api.tools.ffuf_api import FfufApiTool
-from modules.api.tools.httpx_tool import HttpxTool
 from modules.api.parsers.ffuf_parser import FfufApiParser
 from modules.api.parsers.openapi_parser import OpenApiParser, OpenApiSpec
-
+from modules.api.tools.ffuf_api import FfufApiTool
+from modules.api.tools.httpx_tool import HttpxTool
 
 # Common API spec paths to probe
 SPEC_PATHS = [
@@ -60,7 +58,7 @@ class DiscoveryPhase(APIPhaseBase):
         self.ffuf_parser = ffuf_parser
         self.openapi_parser = openapi_parser
 
-    def run(self, target_url: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target_url: str, **kwargs) -> dict[str, Any]:
         """Execute API discovery phase.
 
         Args:
@@ -74,7 +72,7 @@ class DiscoveryPhase(APIPhaseBase):
         wordlist = kwargs.get("wordlist", "")
         headers = kwargs.get("headers", [])
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "endpoints": [],
             "spec_detected": False,
@@ -125,8 +123,8 @@ class DiscoveryPhase(APIPhaseBase):
             )
         return results
 
-    def _run_httpx_probe(self, target_url: str, headers: List[str],
-                         results: Dict) -> int:
+    def _run_httpx_probe(self, target_url: str, headers: list[str],
+                         results: dict) -> int:
         """Probe target with httpx for technology detection."""
         if not self.httpx.is_available():
             self.logger.warning("httpx not available, skipping HTTP probe")
@@ -160,8 +158,8 @@ class DiscoveryPhase(APIPhaseBase):
         self.notes.add(f"httpx probe completed for {target_url}", "command")
         return 0
 
-    def _detect_api_specs(self, target_url: str, headers: List[str],
-                          results: Dict) -> int:
+    def _detect_api_specs(self, target_url: str, headers: list[str],
+                          results: dict) -> int:
         """Probe for OpenAPI/Swagger specification files."""
         if not self.opsec.check("api_spec_detection"):
             return 0
@@ -223,7 +221,7 @@ class DiscoveryPhase(APIPhaseBase):
 
         return finding_count
 
-    def _parse_discovered_spec(self, results: Dict) -> None:
+    def _parse_discovered_spec(self, results: dict) -> None:
         """Attempt to parse any discovered OpenAPI spec.
 
         Downloads spec content and feeds it through the enhanced OpenApiParser
@@ -262,12 +260,12 @@ class DiscoveryPhase(APIPhaseBase):
             "general",
         )
 
-    def _enrich_from_spec(self, target_url: str, results: Dict) -> int:
+    def _enrich_from_spec(self, target_url: str, results: dict) -> int:
         """Enrich endpoint list from parsed OpenAPI spec.
 
         Adds endpoints from the spec that weren't already discovered by ffuf.
         """
-        spec: Optional[OpenApiSpec] = results.get("spec_data")
+        spec: OpenApiSpec | None = results.get("spec_data")
         if not spec or not isinstance(spec, OpenApiSpec):
             return 0
 
@@ -280,7 +278,7 @@ class DiscoveryPhase(APIPhaseBase):
 
         for ep in spec.endpoints:
             # Construct full URL
-            base = results.get("spec_data").servers[0] if spec.servers else target_url
+            base = spec.servers[0] if spec.servers else target_url
             full_url = f"{base.rstrip('/')}{ep.path}"
 
             if full_url.lower().rstrip("/") in existing_paths:
@@ -331,7 +329,7 @@ class DiscoveryPhase(APIPhaseBase):
         return finding_count
 
     def _run_ffuf_scan(self, target_url: str, wordlist: str,
-                       headers: List[str], results: Dict) -> int:
+                       headers: list[str], results: dict) -> int:
         """Run ffuf for API endpoint enumeration."""
         if not self.ffuf.is_available():
             self.logger.warning("ffuf not available, skipping endpoint enumeration")
@@ -400,8 +398,8 @@ class DiscoveryPhase(APIPhaseBase):
 
         return finding_count
 
-    def _detect_api_versions(self, target_url: str, headers: List[str],
-                             results: Dict) -> int:
+    def _detect_api_versions(self, target_url: str, headers: list[str],
+                             results: dict) -> int:
         """Detect API version patterns."""
         finding_count = 0
         detected_versions = set()

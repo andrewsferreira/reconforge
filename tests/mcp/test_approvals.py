@@ -25,21 +25,21 @@ from reconforge.mcp.errors import (
 
 
 def _create(**overrides) -> approvals.ApprovalRequest:
-    defaults = dict(
-        engagement_id="engagement_active",
-        target="10.10.10.1",
-        normalized_target="10.10.10.1",
-        module="surface",
-        phase="vector_correlation",
-        opsec_profile="normal",
-        tier="safe_read_only",
-        scope_reference="scope.yaml",
-        output_base="outputs",
-        domain="",
-        scope_file=None,
-        approval_id=None,
-        timeout=600,
-    )
+    defaults = {
+        "engagement_id": "engagement_active",
+        "target": "10.10.10.1",
+        "normalized_target": "10.10.10.1",
+        "module": "surface",
+        "phase": "vector_correlation",
+        "opsec_profile": "normal",
+        "tier": "safe_read_only",
+        "scope_reference": "scope.yaml",
+        "output_base": "outputs",
+        "domain": "",
+        "scope_file": None,
+        "approval_id": None,
+        "timeout": 600,
+    }
     defaults.update(overrides)
     return approvals.create_request(**defaults)
 
@@ -56,28 +56,28 @@ def _expire(record: approvals.ApprovalRequest) -> None:
 
 
 def test_canonical_request_hash_is_deterministic_for_identical_fields():
-    kwargs = dict(
-        engagement_id="e1",
-        normalized_target="10.10.10.1",
-        module="web",
-        phase="surface",
-        opsec_profile="normal",
-        tier="active_recon",
-        scope_reference="scope.yaml",
-    )
+    kwargs = {
+        "engagement_id": "e1",
+        "normalized_target": "10.10.10.1",
+        "module": "web",
+        "phase": "surface",
+        "opsec_profile": "normal",
+        "tier": "active_recon",
+        "scope_reference": "scope.yaml",
+    }
     assert approvals.canonical_request_hash(**kwargs) == approvals.canonical_request_hash(**kwargs)
 
 
 def test_canonical_request_hash_changes_when_any_field_changes():
-    base = dict(
-        engagement_id="e1",
-        normalized_target="10.10.10.1",
-        module="web",
-        phase="surface",
-        opsec_profile="normal",
-        tier="active_recon",
-        scope_reference="scope.yaml",
-    )
+    base = {
+        "engagement_id": "e1",
+        "normalized_target": "10.10.10.1",
+        "module": "web",
+        "phase": "surface",
+        "opsec_profile": "normal",
+        "tier": "active_recon",
+        "scope_reference": "scope.yaml",
+    }
     baseline = approvals.canonical_request_hash(**base)
     for key, new_value in [
         ("engagement_id", "e2"),

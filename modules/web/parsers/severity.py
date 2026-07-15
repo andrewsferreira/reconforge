@@ -1,7 +1,5 @@
 """Severity normalization helpers for web parsers."""
 
-from typing import Optional
-
 
 _SEVERITY_ALIASES = {
     "critical": "critical",
@@ -19,7 +17,7 @@ _SEVERITY_ALIASES = {
 }
 
 
-def normalize_severity(value: Optional[str], default: str = "info") -> str:
+def normalize_severity(value: str | None, default: str = "info") -> str:
     """Normalize severity labels into: critical/high/medium/low/info."""
     if value is None:
         return default

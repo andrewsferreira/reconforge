@@ -11,16 +11,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from modules.web.tools.whatweb import WhatwebTool
+from modules.api.tools.arjun_tool import ArjunTool
+from modules.api.tools.ffuf_api import FfufApiTool
+from modules.api.tools.httpx_tool import HttpxTool
+from modules.api.tools.nuclei_api import NucleiApiTool
 from modules.web.tools.ffuf import FfufTool
 from modules.web.tools.gobuster import GobusterTool
-from modules.web.tools.wpscan import WpscanTool
-from modules.web.tools.wafw00f import Wafw00fTool
 from modules.web.tools.nuclei import NucleiTool
-from modules.api.tools.ffuf_api import FfufApiTool
-from modules.api.tools.nuclei_api import NucleiApiTool
-from modules.api.tools.httpx_tool import HttpxTool
-from modules.api.tools.arjun_tool import ArjunTool
+from modules.web.tools.wafw00f import Wafw00fTool
+from modules.web.tools.whatweb import WhatwebTool
+from modules.web.tools.wpscan import WpscanTool
 
 
 def _runner():

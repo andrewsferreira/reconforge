@@ -1,7 +1,6 @@
 """Tests for modules.api.parsers.nuclei_parser – NucleiApiParser."""
 
 import json
-from pathlib import Path
 
 import pytest
 

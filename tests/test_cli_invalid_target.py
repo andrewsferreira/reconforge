@@ -19,9 +19,11 @@ def _load_cli_module():
 
 def test_main_exits_cleanly_on_invalid_target(capsys):
     cli = _load_cli_module()
-    with patch.object(sys, "argv", ["reconforge", "network", "--target", "10.10.10.1; rm -rf /", "--dry-run"]):
-        with pytest.raises(SystemExit) as exc:
-            cli.main()
+    with (
+        patch.object(sys, "argv", ["reconforge", "network", "--target", "10.10.10.1; rm -rf /", "--dry-run"]),
+        pytest.raises(SystemExit) as exc,
+    ):
+        cli.main()
 
     assert exc.value.code == 2
     captured = capsys.readouterr()

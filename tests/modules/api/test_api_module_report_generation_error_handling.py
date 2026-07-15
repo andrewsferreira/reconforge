@@ -5,8 +5,9 @@ ModuleError instead — see modules/network/network_module.py's equivalent
 test for the full rationale.
 """
 
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 from core.exceptions import ModuleError
 from core.findings_manager import FindingsManager

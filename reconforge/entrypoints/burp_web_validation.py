@@ -119,10 +119,7 @@ class HttpMutationEngine:
 
     @staticmethod
     def _mutations_for_value(value: str, *, extended: bool) -> list[str]:
-        if value.isdigit():
-            base = ["2", "999"]
-        else:
-            base = ["mutated", "A" * 64]
+        base = ["2", "999"] if value.isdigit() else ["mutated", "A" * 64]
         base.append("%")
         if extended:
             base.extend(["", "' OR '1'='1", "<script>alert(1)</script>"])
@@ -160,7 +157,7 @@ class HttpResponseAnalyzer:
 
     @staticmethod
     def _signature(observation: HTTPObservation) -> str:
-        payload = f"{observation.response_status}|{observation.response_length}|{observation.response_body}".encode("utf-8")
+        payload = f"{observation.response_status}|{observation.response_length}|{observation.response_body}".encode()
         return hashlib.sha256(payload).hexdigest()
 
     def _keyword_indicators(self, body: str) -> list[str]:

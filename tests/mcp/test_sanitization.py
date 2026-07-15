@@ -52,7 +52,7 @@ def test_truncates_oversized_text_by_byte_length():
     huge = "A" * (MAX_EVIDENCE_CHARS + 1000)
     text, truncated = sanitize_untrusted_text(huge)
     assert truncated is True
-    assert len(text.encode("utf-8")) <= MAX_EVIDENCE_CHARS + len("\n...[truncated]".encode())
+    assert len(text.encode("utf-8")) <= MAX_EVIDENCE_CHARS + len(b"\n...[truncated]")
 
 
 def test_truncates_text_with_too_many_lines():
@@ -73,7 +73,7 @@ def test_is_binary_content_true_for_invalid_utf8():
 
 
 def test_is_binary_content_false_for_valid_utf8():
-    assert is_binary_content("hello world".encode("utf-8")) is False
+    assert is_binary_content(b"hello world") is False
 
 
 def test_base64_encoded_payload_survives_as_opaque_text_not_decoded():

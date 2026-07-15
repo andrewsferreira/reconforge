@@ -219,7 +219,7 @@ class ObservedBurpBehaviorHandler(BaseHTTPRequestHandler):
             if self.sse_response_queue:
                 msg = self.sse_response_queue.pop(0)
                 self.wfile.write(b"event: message\n")
-                self.wfile.write(f"data: {msg}\n\n".encode("utf-8"))
+                self.wfile.write(f"data: {msg}\n\n".encode())
                 self.wfile.flush()
             time.sleep(0.01)
 

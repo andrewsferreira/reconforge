@@ -6,8 +6,9 @@ Analyzes access control: SMB signing, anonymous LDAP, null sessions,
 share permissions, admin share exposure.
 """
 
-from typing import Any, Dict, List
-from modules.ad.analyzers.base import AnalyzerBase, AnalysisResult
+from typing import Any
+
+from modules.ad.analyzers.base import AnalysisResult, AnalyzerBase
 
 
 class PermissionAnalyzer(AnalyzerBase):
@@ -15,7 +16,7 @@ class PermissionAnalyzer(AnalyzerBase):
 
     ANALYZER_NAME = "permissions"
 
-    def analyze(self, collected_data: Dict[str, Any], **kwargs) -> AnalysisResult:
+    def analyze(self, collected_data: dict[str, Any], **kwargs) -> AnalysisResult:
         """Analyze permission-related data.
 
         Expected keys in collected_data:

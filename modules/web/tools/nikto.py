@@ -12,7 +12,7 @@ mode arguments are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -28,7 +28,7 @@ class NiktoTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -67,7 +67,7 @@ class NiktoTool:
         tuning = self._tuning()
         effective_timeout = self.tool_cfg.effective_timeout("normal", timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "nikto", "-h", target_url,
             "-Format", "json", "-o", str(json_path),
             "-nointeractive",

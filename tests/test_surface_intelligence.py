@@ -9,16 +9,17 @@ Validates:
 6. Intelligent Prioritization
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from modules.surface.intelligence.service_intelligence import ServiceIntelligenceDB
-from modules.surface.intelligence.service_normalizer import ServiceNormalizer, NormalizedService
-from modules.surface.intelligence.correlation_engine import CorrelationEngine, AttackSurfaceMap
-from modules.surface.intelligence.deduplicator import ServiceDeduplicator
-from modules.surface.intelligence.confidence_scorer import ConfidenceScorer
 from modules.surface.intelligence.attack_prioritizer import AttackPrioritizer
+from modules.surface.intelligence.confidence_scorer import ConfidenceScorer
+from modules.surface.intelligence.correlation_engine import AttackSurfaceMap, CorrelationEngine
+from modules.surface.intelligence.deduplicator import ServiceDeduplicator
+from modules.surface.intelligence.service_intelligence import ServiceIntelligenceDB
+from modules.surface.intelligence.service_normalizer import ServiceNormalizer
 
 
 def test_intelligence_db():
@@ -273,7 +274,7 @@ def test_confidence_scorer():
 
 def test_attack_prioritizer():
     """Test Intelligent Attack Prioritizer."""
-    from modules.surface.intelligence.correlation_engine import CorrelatedService, AttackSurfaceMap
+    from modules.surface.intelligence.correlation_engine import AttackSurfaceMap, CorrelatedService
 
     db = ServiceIntelligenceDB()
     scorer = ConfidenceScorer(port_map=db.port_map)

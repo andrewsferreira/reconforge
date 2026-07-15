@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -21,12 +22,12 @@ class PhaseMetric:
 class ModuleTelemetry:
     """Collect execution metadata and per-phase metrics for a module run."""
 
-    def __init__(self, module_name: str, target: str, execution_id: Optional[str] = None):
+    def __init__(self, module_name: str, target: str, execution_id: str | None = None):
         self.module_name = module_name
         self.target = target
         self.execution_id = execution_id or f"run_{uuid.uuid4().hex[:12]}"
         self.started_at = datetime.utcnow().isoformat()
-        self.phase_metrics: Dict[str, PhaseMetric] = {}
+        self.phase_metrics: dict[str, PhaseMetric] = {}
 
     def run_phase(self, phase_name: str, fn: Callable[[], Any]) -> Any:
         start = datetime.utcnow()
@@ -45,7 +46,7 @@ class ModuleTelemetry:
             metric.end_time = end.isoformat()
             metric.duration_seconds = (end - start).total_seconds()
 
-    def to_dict(self, runner_metrics: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def to_dict(self, runner_metrics: dict[str, Any] | None = None) -> dict[str, Any]:
         runner_metrics = runner_metrics or {}
         total = runner_metrics.get("total_commands", 0)
         failed = runner_metrics.get("failed_commands", 0)

@@ -64,11 +64,10 @@ def _run_against_real_subprocess(
 
         async def _go() -> tuple[bool, dict]:
             params = StdioServerParameters(command="reconforge", args=["mcp", "serve"], cwd=cwd)
-            async with stdio_client(params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    result = await session.call_tool(tool_name, arguments)
-                    return bool(result.isError), (result.structuredContent or {})
+            async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(tool_name, arguments)
+                return bool(result.isError), (result.structuredContent or {})
 
         is_error, structured = anyio.run(_go)
         return is_error, capture.failures, structured
@@ -126,46 +125,45 @@ def test_start_execution_job_over_real_subprocess_does_not_corrupt_stdio(
             params = StdioServerParameters(
                 command="reconforge", args=["mcp", "serve"], cwd=str(tmp_path)
             )
-            async with stdio_client(params) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    created = await session.call_tool(
-                        "reconforge_request_execution",
-                        {
-                            "engagement_id": "irrelevant-for-safe-read-only",
-                            "target": "10.10.10.1",
-                            "module": "surface",
-                            "phase": "vector_correlation",
-                            "output_base": str(tmp_path),
-                        },
-                    )
-                    if created.isError:
-                        return True
-                    request_id = created.structuredContent["request_id"]
+            async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+                await session.initialize()
+                created = await session.call_tool(
+                    "reconforge_request_execution",
+                    {
+                        "engagement_id": "irrelevant-for-safe-read-only",
+                        "target": "10.10.10.1",
+                        "module": "surface",
+                        "phase": "vector_correlation",
+                        "output_base": str(tmp_path),
+                    },
+                )
+                if created.isError:
+                    return True
+                request_id = created.structuredContent["request_id"]
 
-                    # Out-of-band approval: the same operation
-                    # `reconforge mcp approvals approve` performs, done
-                    # here as a direct call since both this test process
-                    # and the subprocess have been pointed at the same
-                    # tmp_path-rooted approvals directory.
-                    approvals.approve(request_id)
+                # Out-of-band approval: the same operation
+                # `reconforge mcp approvals approve` performs, done
+                # here as a direct call since both this test process
+                # and the subprocess have been pointed at the same
+                # tmp_path-rooted approvals directory.
+                approvals.approve(request_id)
 
-                    start = await session.call_tool(
-                        "reconforge_start_execution", {"request_id": request_id}
+                start = await session.call_tool(
+                    "reconforge_start_execution", {"request_id": request_id}
+                )
+                if start.isError:
+                    return True
+                job_id = start.structuredContent["job_id"]
+                for _ in range(50):
+                    status = await session.call_tool(
+                        "reconforge_get_execution_status", {"job_id": job_id}
                     )
-                    if start.isError:
+                    if status.isError:
                         return True
-                    job_id = start.structuredContent["job_id"]
-                    for _ in range(50):
-                        status = await session.call_tool(
-                            "reconforge_get_execution_status", {"job_id": job_id}
-                        )
-                        if status.isError:
-                            return True
-                        if status.structuredContent["status"] in ("completed", "failed"):
-                            return status.structuredContent["status"] == "failed"
-                        await anyio.sleep(0.05)
-                    return True  # never completed within the poll budget
+                    if status.structuredContent["status"] in ("completed", "failed"):
+                        return status.structuredContent["status"] == "failed"
+                    await anyio.sleep(0.05)
+                return True  # never completed within the poll budget
 
         is_error = anyio.run(_go)
         assert is_error is False

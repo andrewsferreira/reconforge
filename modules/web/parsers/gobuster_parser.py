@@ -15,7 +15,6 @@ being routed through a parser at all today.
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
 
 
 @dataclass
@@ -30,7 +29,7 @@ class GobusterEntry:
 @dataclass
 class GobusterResult:
     """Complete gobuster scan result."""
-    entries: List[GobusterEntry] = field(default_factory=list)
+    entries: list[GobusterEntry] = field(default_factory=list)
     raw_output: str = ""
 
 
@@ -79,8 +78,8 @@ class GobusterParser:
 
         return result
 
-    def _parse_entries(self, text: str, base_url: str = "") -> List[GobusterEntry]:
-        entries: List[GobusterEntry] = []
+    def _parse_entries(self, text: str, base_url: str = "") -> list[GobusterEntry]:
+        entries: list[GobusterEntry] = []
         for line in text.splitlines():
             line = line.strip()
             if not line or line.startswith("#"):

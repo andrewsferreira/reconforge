@@ -14,7 +14,7 @@ Author: Andrews Ferreira
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -38,8 +38,8 @@ class ADNmapTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 profile: Optional["ProfileLoader"] = None,
-                 config: Optional["ConfigLoader"] = None):
+                 profile: ProfileLoader | None = None,
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -62,7 +62,7 @@ class ADNmapTool:
         out_xml = self.output_dir / "nmap_ad_services.xml"
         out_nmap = self.output_dir / "nmap_ad_services.nmap"
         effective_timeout = self.tool_cfg.mode_timeout("ad_service_scan", timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "nmap", "-sV", "-sC", "-p", ports, timing, "--open",
             "-oX", str(out_xml), "-oN", str(out_nmap), target,
         ]
@@ -74,7 +74,7 @@ class ADNmapTool:
         out_xml = self.output_dir / "nmap_ldap.xml"
         out_nmap = self.output_dir / "nmap_ldap.nmap"
         effective_timeout = self.tool_cfg.mode_timeout("ldap_scripts", timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "nmap", "-p", "389,636,3268,3269",
             f"--script={self.LDAP_SCRIPTS}",
             "-oX", str(out_xml), "-oN", str(out_nmap), target,
@@ -87,7 +87,7 @@ class ADNmapTool:
         out_xml = self.output_dir / "nmap_smb.xml"
         out_nmap = self.output_dir / "nmap_smb.nmap"
         effective_timeout = self.tool_cfg.mode_timeout("smb_scripts", timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "nmap", "-p", "139,445",
             f"--script={self.SMB_SCRIPTS}",
             "-oX", str(out_xml), "-oN", str(out_nmap), target,
@@ -100,7 +100,7 @@ class ADNmapTool:
         out_xml = self.output_dir / "nmap_kerberos.xml"
         out_nmap = self.output_dir / "nmap_kerberos.nmap"
         effective_timeout = self.tool_cfg.mode_timeout("kerberos_scan", timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "nmap", "-sV", "-p", "88", "--open",
             "-oX", str(out_xml), "-oN", str(out_nmap), target,
         ]
@@ -114,7 +114,7 @@ class ADNmapTool:
         out_xml = self.output_dir / "nmap_ad_full.xml"
         out_nmap = self.output_dir / "nmap_ad_full.nmap"
         effective_timeout = self.tool_cfg.mode_timeout("full_ad_scripts", timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "nmap", "-sV", "-p", ports, timing, "--open",
             f"--script={self.ALL_AD_SCRIPTS}",
             "-oX", str(out_xml), "-oN", str(out_nmap), target,
@@ -131,7 +131,7 @@ class ADNmapTool:
         self.logger.info(f"DNS SRV lookup for DCs in {domain} via {target}")
         out = self.output_dir / "dns_srv_dc.txt"
         effective_timeout = self.tool_cfg.mode_timeout("dns_srv", timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "dig", f"@{target}",
             f"_ldap._tcp.dc._msdcs.{domain}", "SRV", "+short",
         ]
@@ -150,9 +150,9 @@ class ADNmapTool:
             f"_kpasswd._tcp.{domain}",
         ]
         combined_stdout = ""
-        results: List[RunResult] = []
+        results: list[RunResult] = []
         for record in records:
-            cmd: List[str] = [
+            cmd: list[str] = [
                 "dig", f"@{target}", record, "SRV", "+short",
             ]
             result = self.runner.run(cmd, timeout=effective_timeout)
@@ -180,7 +180,7 @@ class ADNmapTool:
         last_result = results[-1]
         return RunResult(
             command="dig (dns_all_srv)",
-            returncode=last_result.returncode if all_succeeded else first_failure.returncode,
+            returncode=first_failure.returncode if first_failure is not None else last_result.returncode,
             stdout=combined_stdout,
             stderr="\n".join(r.stderr for r in results if r.stderr),
             duration=sum(r.duration for r in results),

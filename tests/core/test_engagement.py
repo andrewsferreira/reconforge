@@ -1,14 +1,12 @@
 """Tests for core.engagement – EngagementManager."""
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from core.engagement import EngagementManager
 from core.exceptions import EngagementError
-
 
 # ── lifecycle ───────────────────────────────────────────────────
 

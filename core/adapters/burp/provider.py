@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from core.adapters.burp.client import BurpMcpClient
 from core.adapters.burp.config import BurpMcpConfig
@@ -18,7 +18,10 @@ from core.adapters.burp.exceptions import (
     BurpUnsupportedCapabilityError,
 )
 from core.adapters.burp.models import BurpProviderState, BurpSessionState, NormalizedBurpHttpRecord
-from core.adapters.burp.normalizers import normalize_http_history_records, normalize_http_send_response
+from core.adapters.burp.normalizers import (
+    normalize_http_history_records,
+    normalize_http_send_response,
+)
 from core.adapters.burp.policy import BurpCapabilityPolicy
 from core.policy.target_scope import DomainScopeDecision, DomainScopePolicy, DomainScopeValidator
 
@@ -84,21 +87,21 @@ class BurpMcpProvider:
 
     # ---- Initial safe API surface ----
 
-    def send_http1_request(self, arguments: Dict[str, Any]) -> List[NormalizedBurpHttpRecord]:
+    def send_http1_request(self, arguments: dict[str, Any]) -> list[NormalizedBurpHttpRecord]:
         self._enforce_request_scope(arguments)
         return self._execute_and_normalize("send_http1_request", arguments)
 
-    def send_http2_request(self, arguments: Dict[str, Any]) -> List[NormalizedBurpHttpRecord]:
+    def send_http2_request(self, arguments: dict[str, Any]) -> list[NormalizedBurpHttpRecord]:
         self._enforce_request_scope(arguments)
         return self._execute_and_normalize("send_http2_request", arguments)
 
-    def get_proxy_http_history(self, arguments: Dict[str, Any]) -> List[NormalizedBurpHttpRecord]:
+    def get_proxy_http_history(self, arguments: dict[str, Any]) -> list[NormalizedBurpHttpRecord]:
         return self._execute_and_normalize("get_proxy_http_history", arguments)
 
-    def get_proxy_http_history_regex(self, arguments: Dict[str, Any]) -> List[NormalizedBurpHttpRecord]:
+    def get_proxy_http_history_regex(self, arguments: dict[str, Any]) -> list[NormalizedBurpHttpRecord]:
         return self._execute_and_normalize("get_proxy_http_history_regex", arguments)
 
-    def _execute_and_normalize(self, tool_name: str, arguments: Dict[str, Any]) -> List[NormalizedBurpHttpRecord]:
+    def _execute_and_normalize(self, tool_name: str, arguments: dict[str, Any]) -> list[NormalizedBurpHttpRecord]:
         self._require_allowed(tool_name)
         raw = self.client.call_tool(tool_name, arguments)
         evidence = f"burp:{tool_name}"
@@ -117,7 +120,7 @@ class BurpMcpProvider:
                 f"Tool '{tool_name}' is not available in discovered capabilities or disabled by server"
             )
 
-    def _enforce_request_scope(self, arguments: Dict[str, Any]) -> None:
+    def _enforce_request_scope(self, arguments: dict[str, Any]) -> None:
         target = _extract_target(arguments)
         self._last_scope_decision = self.scope_validator.validate_target(target, self.scope_policy)
 
@@ -142,7 +145,7 @@ class BurpMcpProvider:
         )
 
 
-def _extract_target(arguments: Dict[str, Any]) -> str:
+def _extract_target(arguments: dict[str, Any]) -> str:
     for key in ("url", "requestUrl", "target"):
         value = arguments.get(key)
         if isinstance(value, str) and value.strip():

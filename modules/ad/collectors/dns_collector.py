@@ -5,11 +5,11 @@ Author: Andrews Ferreira
 Collects DNS SRV records and zone information for AD services.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from modules.ad.collectors.base import CollectorBase, CollectorResult
-from modules.ad.tools.nmap import ADNmapTool
 from modules.ad.parsers.nmap_parser import ADNmapParser
+from modules.ad.tools.nmap import ADNmapTool
 
 
 class DnsCollector(CollectorBase):
@@ -42,7 +42,7 @@ class DnsCollector(CollectorBase):
         result.success = True
         return result
 
-    def collect_ad_services(self, target: str) -> Dict[str, Any]:
+    def collect_ad_services(self, target: str) -> dict[str, Any]:
         """Scan AD ports and extract domain intelligence."""
         if not self.nmap.is_available():
             return {}

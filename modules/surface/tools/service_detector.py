@@ -12,7 +12,7 @@ read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -29,7 +29,7 @@ class ServiceDetectorTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -45,7 +45,7 @@ class ServiceDetectorTool:
         """Probe target for HTTP services across discovered ports."""
         output_path = self.output_dir / "service_detection.json"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "httpx", "-u", target,
         ]
         if ports:

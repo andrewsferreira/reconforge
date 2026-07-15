@@ -7,8 +7,7 @@ and domain intelligence — preserves the legacy output format.
 """
 
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any
 
 from core.version import __version__
 from modules.ad.reporting.base import ReporterBase
@@ -17,7 +16,10 @@ from modules.ad.reporting.base import ReporterBase
 class ADSummaryReporter(ReporterBase):
     """Generates the legacy ad_summary.md output."""
 
-    def generate(self, data: Dict[str, Any]) -> str:
+    # ReporterBase.generate() declares **kwargs deliberately loosely; the
+    # only call site (ad_module.py) never passes any, and this reporter's
+    # concrete type is used directly, never dispatched through the base.
+    def generate(self, data: dict[str, Any]) -> str:  # type: ignore[override]
         domain = data.get("domain", "Not discovered")
         target = data.get("target", "unknown")
         dc_ip = data.get("dc_ip", target)
@@ -29,7 +31,7 @@ class ADSummaryReporter(ReporterBase):
             f"**Domain:** {domain or 'Not discovered'}",
             f"**Target DC:** {target} ({dc_ip})",
             f"**Scan Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"**Author:** Andrews Ferreira", "",
+            "**Author:** Andrews Ferreira", "",
         ]
 
         for phase_key, title in [

@@ -11,7 +11,6 @@ Author: Andrews Ferreira
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 
 @dataclass
@@ -28,7 +27,7 @@ class SmbShare:
 @dataclass
 class SmbResult:
     """Structured result from SMB enumeration."""
-    shares: List[SmbShare] = field(default_factory=list)
+    shares: list[SmbShare] = field(default_factory=list)
     null_session_allowed: bool = False
     smb_signing: str = ""
     os_info: str = ""
@@ -74,12 +73,12 @@ class ADSmbParser:
             result.shares.append(share)
 
         # Server / domain info
-        m = re.search(r"Domain=\[([^\]]+)\]", text)
-        if m:
-            result.domain = m.group(1)
-        m = re.search(r"OS=\[([^\]]+)\]", text)
-        if m:
-            result.os_info = m.group(1)
+        domain_match = re.search(r"Domain=\[([^\]]+)\]", text)
+        if domain_match:
+            result.domain = domain_match.group(1)
+        os_match = re.search(r"OS=\[([^\]]+)\]", text)
+        if os_match:
+            result.os_info = os_match.group(1)
 
         return result
 
@@ -103,7 +102,7 @@ class ADSmbParser:
 
         return share
 
-    def parse_admin_share_results(self, results: Dict[str, bool]) -> List[SmbShare]:
+    def parse_admin_share_results(self, results: dict[str, bool]) -> list[SmbShare]:
         """Parse admin share test results dict."""
         shares = []
         for name, accessible in results.items():

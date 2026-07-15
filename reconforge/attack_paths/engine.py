@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-import json
-import logging
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -13,7 +12,6 @@ from reconforge.collectors.http_collector import HttpCollector
 from reconforge.intelligence.engine import (
     CorrelationRelationship,
     IntelligenceReport,
-    PrioritizedFinding,
     VulnerabilityClassification,
 )
 
@@ -201,7 +199,7 @@ class AttackPathGenerationEngine:
         return [primitive_map[t] for t in used if t in primitive_map]
 
     def _generate_candidate_paths(self, report: IntelligenceReport) -> list[AttackPath]:
-        findings_by_endpoint: dict[str, list[PrioritizedFinding | VulnerabilityClassification]] = defaultdict(list)
+        findings_by_endpoint: dict[str, list[VulnerabilityClassification]] = defaultdict(list)
         for finding in report.classifications:
             findings_by_endpoint[finding.endpoint].append(finding)
 
@@ -250,9 +248,7 @@ class AttackPathGenerationEngine:
             "id", "user_identifier", "token", "auth", "role",
         }:
             return False
-        if left.type == "reflection_detected" and right.type == "reflection_detected":
-            return False
-        return True
+        return not (left.type == "reflection_detected" and right.type == "reflection_detected")
 
     def _build_steps(
         self,

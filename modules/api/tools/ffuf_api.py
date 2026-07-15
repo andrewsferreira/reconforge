@@ -12,9 +12,9 @@ mode arguments are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from core.runner import Runner, RunResult, validate_arg, RC_PRECONDITION_FAILED
+from core.runner import RC_PRECONDITION_FAILED, Runner, RunResult, validate_arg
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ class FfufApiTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -66,7 +66,7 @@ class FfufApiTool:
         return ""
 
     def endpoint_scan(self, target_url: str, wordlist: str = "",
-                      headers: Optional[List[str]] = None,
+                      headers: list[str] | None = None,
                       match_codes: str = "200,201,204,301,302,307,401,403,405,500",
                       timeout: int = 600) -> RunResult:
         """Discover API endpoints via directory fuzzing."""
@@ -84,7 +84,7 @@ class FfufApiTool:
         rate = self._rate()
         effective_timeout = self.tool_cfg.effective_timeout(self.opsec_mode, timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ffuf", "-u", f"{target_url}/FUZZ", "-w", wordlist,
             "-t", str(threads), "-mc", match_codes,
             "-o", str(json_path), "-of", "json", "-noninteractive",
@@ -105,7 +105,7 @@ class FfufApiTool:
 
     def param_fuzz(self, target_url: str, wordlist: str = "",
                    method: str = "GET",
-                   headers: Optional[List[str]] = None,
+                   headers: list[str] | None = None,
                    timeout: int = 600) -> RunResult:
         """Parameter fuzzing on a known endpoint."""
         validate_arg(target_url, "target_url")
@@ -123,7 +123,7 @@ class FfufApiTool:
         rate = self._rate()
         effective_timeout = self.tool_cfg.effective_timeout(self.opsec_mode, timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ffuf", "-u", target_url, "-w", wordlist,
             "-X", method, "-t", str(threads),
             "-o", str(json_path), "-of", "json",

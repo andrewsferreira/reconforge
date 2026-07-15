@@ -19,45 +19,44 @@ Usage:
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from core.authorization_gate import ScopeAuthorization
 
-from core.logger import ReconLogger
-from core.runner import Runner
-from core.config_loader import ConfigLoader
-from core.output_manager import OutputManager
 from core.attack_workflow import AttackWorkflow
-from core.loot_manager import LootManager
+from core.config_loader import ConfigLoader
+from core.data_contracts import SCHEMA_VERSION, build_contract
+from core.exceptions import ModuleError
 from core.findings_manager import FindingsManager
+from core.logger import ReconLogger
+from core.loot_manager import LootManager
 from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
+from core.output_manager import OutputManager
 from core.profile_loader import ProfileLoader
+from core.runner import Runner
 from core.telemetry import ModuleTelemetry
-from core.data_contracts import SCHEMA_VERSION, build_contract
 from core.validators import validate_url
 from core.version import __version__
-from core.exceptions import ModuleError
-
-# Tool imports
-from modules.api.tools.ffuf_api import FfufApiTool
-from modules.api.tools.arjun_tool import ArjunTool
-from modules.api.tools.nuclei_api import NucleiApiTool
-from modules.api.tools.httpx_tool import HttpxTool
+from modules.api.parsers.arjun_parser import ArjunParser
 
 # Parser imports
 from modules.api.parsers.ffuf_parser import FfufApiParser
-from modules.api.parsers.arjun_parser import ArjunParser
 from modules.api.parsers.nuclei_parser import NucleiApiParser
 from modules.api.parsers.openapi_parser import OpenApiParser
+from modules.api.phases.authentication import AuthenticationPhase
+from modules.api.phases.authorization import AuthorizationPhase
 
 # Phase imports
 from modules.api.phases.discovery import DiscoveryPhase
-from modules.api.phases.authentication import AuthenticationPhase
 from modules.api.phases.fuzzing import FuzzingPhase
-from modules.api.phases.authorization import AuthorizationPhase
+from modules.api.tools.arjun_tool import ArjunTool
+
+# Tool imports
+from modules.api.tools.ffuf_api import FfufApiTool
+from modules.api.tools.httpx_tool import HttpxTool
+from modules.api.tools.nuclei_api import NucleiApiTool
 
 
 class APIModule:
@@ -82,12 +81,12 @@ class APIModule:
         verbose: bool = False,
         dry_run: bool = False,
         timeout: int = 900,
-        config_dir: Optional[str] = None,
+        config_dir: str | None = None,
         encrypt_loot: bool = False,
-        headers: Optional[List[str]] = None,
-        auth_token: Optional[str] = None,
+        headers: list[str] | None = None,
+        auth_token: str | None = None,
         scope: Optional["ScopeAuthorization"] = None,
-        approval_id: Optional[str] = None,
+        approval_id: str | None = None,
     ) -> None:
         """Initialise the API module.
 
@@ -158,19 +157,19 @@ class APIModule:
         self.openapi_parser = OpenApiParser()
 
         # Shared keyword args for all phases
-        self._phase_kwargs = dict(
-            logger=self.logger,
-            runner=self.runner,
-            config=self.config,
-            output_dir=self.parsed_dir,
-            findings=self.findings_mgr,
-            loot=self.loot,
-            workflow=self.workflow,
-            notes=self.notes,
-            opsec=self.opsec,
-            opsec_mode=opsec_mode,
-            profile=self.profile,
-        )
+        self._phase_kwargs = {
+            "logger": self.logger,
+            "runner": self.runner,
+            "config": self.config,
+            "output_dir": self.parsed_dir,
+            "findings": self.findings_mgr,
+            "loot": self.loot,
+            "workflow": self.workflow,
+            "notes": self.notes,
+            "opsec": self.opsec,
+            "opsec_mode": opsec_mode,
+            "profile": self.profile,
+        }
 
         # Initialise phases
         self.phase_discovery = DiscoveryPhase(
@@ -203,9 +202,9 @@ class APIModule:
 
     def run(
         self,
-        phases: Optional[List[str]] = None,
+        phases: list[str] | None = None,
         opt_in: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute the API reconnaissance workflow.
 
         Args:
@@ -252,7 +251,7 @@ class APIModule:
         # Check tool availability
         self._check_tools()
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "target": self.target_url,
             "opsec_mode": self.opsec_mode,
             "schema_version": SCHEMA_VERSION,
@@ -363,7 +362,7 @@ class APIModule:
         target = target.rstrip("/")
         return validate_url(target)
 
-    def _check_tools(self) -> Dict[str, bool]:
+    def _check_tools(self) -> dict[str, bool]:
         """Check availability of API reconnaissance tools."""
         tools = {
             "ffuf": self.ffuf.is_available(),
@@ -388,7 +387,7 @@ class APIModule:
 
         return tools
 
-    def _generate_reports(self, results: Dict) -> None:
+    def _generate_reports(self, results: dict) -> None:
         """Generate all output reports."""
         self.logger.info("Generating reports...")
 
@@ -467,7 +466,7 @@ class APIModule:
                 message=f"Report generation failed partway through — some artifacts may be missing: {e}",
             ) from e
 
-    def _generate_quick_report(self, results: Dict) -> None:
+    def _generate_quick_report(self, results: dict) -> None:
         """Generate executive summary report."""
         report_path = self.output.report_file(self.MODULE_NAME)
 
@@ -480,7 +479,7 @@ class APIModule:
             f"**Target:** {self.target_url}",
             f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**OPSEC Mode:** {self.opsec_mode}",
-            f"**Author:** Andrews Ferreira",
+            "**Author:** Andrews Ferreira",
             "",
             "## Executive Summary\n",
             f"API reconnaissance of **{self.target_url}** identified "
@@ -551,7 +550,7 @@ class APIModule:
 
         report_path.write_text("\n".join(lines))
 
-    def _print_summary(self, results: Dict) -> None:
+    def _print_summary(self, results: dict) -> None:
         """Print a summary to console."""
         self.logger.info(f"\n{'='*60}")
         self.logger.info("API SCAN COMPLETE - Summary")

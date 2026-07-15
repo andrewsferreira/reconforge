@@ -1,7 +1,7 @@
 """ReconForge OPSEC Checks - Safety validation before executing actions."""
 
-from typing import Optional
-from core.detection_map import is_allowed, get_detection_level
+
+from core.detection_map import get_detection_level, is_allowed
 
 
 class OpsecChecker:
@@ -27,7 +27,7 @@ class OpsecChecker:
                 self.logger.warning(warning)
         return allowed
 
-    def warn(self, technique: str) -> Optional[str]:
+    def warn(self, technique: str) -> str | None:
         """Return a warning string if the technique is risky, else None."""
         level = get_detection_level(technique)
         if level and level.get("noise") in ("high", "very_high"):

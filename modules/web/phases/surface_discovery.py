@@ -8,15 +8,14 @@ and curl for baseline header collection.
 """
 
 import json
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from modules.web.base import WebPhaseBase
-from modules.web.tools.whatweb import WhatwebTool
-from modules.web.tools.wafw00f import Wafw00fTool
-from modules.web.tools.curl_tool import CurlTool
-from modules.web.parsers.whatweb_parser import WhatwebParser
 from modules.web.parsers.wafw00f_parser import Wafw00fParser
+from modules.web.parsers.whatweb_parser import WhatwebParser
+from modules.web.tools.curl_tool import CurlTool
+from modules.web.tools.wafw00f import Wafw00fTool
+from modules.web.tools.whatweb import WhatwebTool
 
 
 class SurfaceDiscoveryPhase(WebPhaseBase):
@@ -54,7 +53,7 @@ class SurfaceDiscoveryPhase(WebPhaseBase):
         self.whatweb_parser = whatweb_parser
         self.wafw00f_parser = wafw00f_parser
 
-    def run(self, target_url: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target_url: str, **kwargs) -> dict[str, Any]:
         """Execute surface discovery phase.
 
         Args:
@@ -63,7 +62,7 @@ class SurfaceDiscoveryPhase(WebPhaseBase):
         Returns:
             Dict with technologies, WAF info, header findings, and counts.
         """
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "technologies": [],
             "waf": None,
@@ -108,7 +107,7 @@ class SurfaceDiscoveryPhase(WebPhaseBase):
 
     # ── WhatWeb ────────────────────────────────────────────────────
 
-    def _run_whatweb(self, target_url: str, results: Dict) -> int:
+    def _run_whatweb(self, target_url: str, results: dict) -> int:
         """Run WhatWeb technology fingerprinting.
 
         Returns:
@@ -213,7 +212,7 @@ class SurfaceDiscoveryPhase(WebPhaseBase):
 
     # ── wafw00f ────────────────────────────────────────────────────
 
-    def _run_wafw00f(self, target_url: str, results: Dict) -> int:
+    def _run_wafw00f(self, target_url: str, results: dict) -> int:
         """Run WAF detection.
 
         Returns:
@@ -231,7 +230,7 @@ class SurfaceDiscoveryPhase(WebPhaseBase):
 
         self.workflow.add_step(
             phase=self.PHASE_NAME,
-            hypothesis=f"Target may be behind a WAF/CDN",
+            hypothesis="Target may be behind a WAF/CDN",
             command=f"wafw00f {target_url}",
             justification="WAF detection to inform evasion strategies",
         )
@@ -288,7 +287,7 @@ class SurfaceDiscoveryPhase(WebPhaseBase):
 
     # ── Header analysis ────────────────────────────────────────────
 
-    def _analyse_headers(self, target_url: str, results: Dict) -> int:
+    def _analyse_headers(self, target_url: str, results: dict) -> int:
         """Analyse HTTP response headers for security issues.
 
         Returns:

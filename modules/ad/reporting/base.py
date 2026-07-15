@@ -5,7 +5,7 @@ Author: Andrews Ferreira
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 
 class ReporterBase(ABC):
@@ -14,7 +14,7 @@ class ReporterBase(ABC):
     REPORTER_NAME: str = "base"
 
     @abstractmethod
-    def generate(self, data: Dict[str, Any], **kwargs) -> str:
+    def generate(self, data: dict[str, Any], **kwargs) -> str:
         """Generate a markdown report from analysis data.
 
         Returns:

@@ -14,46 +14,43 @@ Usage:
     module.run(brute_force=True)          # Enable hydra (opt-in)
 """
 
+import functools
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from core.authorization_gate import ScopeAuthorization
 
-from core.logger import ReconLogger
-from core.runner import Runner
-from core.config_loader import ConfigLoader
-from core.output_manager import OutputManager
 from core.attack_workflow import AttackWorkflow
-from core.loot_manager import LootManager
+from core.config_loader import ConfigLoader
+from core.data_contracts import SCHEMA_VERSION, build_contract
+from core.exceptions import ModuleError
 from core.findings_manager import FindingsManager
+from core.logger import ReconLogger
+from core.loot_manager import LootManager
 from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
-from core.target_parser import parse_target
+from core.output_manager import OutputManager
 from core.profile_loader import ProfileLoader
+from core.runner import Runner
+from core.target_parser import parse_target
 from core.telemetry import ModuleTelemetry
-from core.data_contracts import SCHEMA_VERSION, build_contract
 from core.version import __version__
-from core.exceptions import ModuleError
-
-from modules.network.tools.nmap import NmapTool
-from modules.network.tools.enum4linux import Enum4linuxTool
-from modules.network.tools.smbclient import SmbclientTool
-from modules.network.tools.ldapsearch import LdapsearchTool
-from modules.network.tools.hydra import HydraTool
-
-from modules.network.parsers.nmap_parser import NmapParser
 from modules.network.parsers.enum4linux_parser import Enum4linuxParser
-from modules.network.parsers.smb_parser import SmbParser
 from modules.network.parsers.ldap_parser import LdapParser
-
+from modules.network.parsers.nmap_parser import NmapParser
+from modules.network.parsers.smb_parser import SmbParser
+from modules.network.phases.authentication_checks import AuthenticationChecksPhase
 from modules.network.phases.host_discovery import HostDiscoveryPhase
 from modules.network.phases.port_scanning import PortScanningPhase
 from modules.network.phases.service_enumeration import ServiceEnumerationPhase
-from modules.network.phases.authentication_checks import AuthenticationChecksPhase
+from modules.network.tools.enum4linux import Enum4linuxTool
+from modules.network.tools.hydra import HydraTool
+from modules.network.tools.ldapsearch import LdapsearchTool
+from modules.network.tools.nmap import NmapTool
+from modules.network.tools.smbclient import SmbclientTool
 
 
 class NetworkModule:
@@ -74,10 +71,10 @@ class NetworkModule:
     def __init__(self, target: str, output_base: str = "outputs",
                  opsec_mode: str = "normal", verbose: bool = False,
                  dry_run: bool = False, timeout: int = 600,
-                 config_dir: Optional[str] = None,
+                 config_dir: str | None = None,
                  encrypt_loot: bool = False,
                  scope: Optional["ScopeAuthorization"] = None,
-                 approval_id: Optional[str] = None):
+                 approval_id: str | None = None):
         """Initialize the Network module.
 
         Args:
@@ -147,19 +144,19 @@ class NetworkModule:
         self.ldap_parser = LdapParser()
 
         # Shared keyword args for all phases (mirrors Web/API pattern)
-        self._phase_kwargs = dict(
-            logger=self.logger,
-            runner=self.runner,
-            config=self.config,
-            output_dir=self.parsed_dir,
-            findings=self.findings_mgr,
-            loot=self.loot,
-            workflow=self.workflow,
-            notes=self.notes,
-            opsec=self.opsec,
-            opsec_mode=opsec_mode,
-            profile=self.profile,
-        )
+        self._phase_kwargs = {
+            "logger": self.logger,
+            "runner": self.runner,
+            "config": self.config,
+            "output_dir": self.parsed_dir,
+            "findings": self.findings_mgr,
+            "loot": self.loot,
+            "workflow": self.workflow,
+            "notes": self.notes,
+            "opsec": self.opsec,
+            "opsec_mode": opsec_mode,
+            "profile": self.profile,
+        }
 
         # Initialize phases
         self.phase_discovery = HostDiscoveryPhase(
@@ -182,8 +179,8 @@ class NetworkModule:
             **self._phase_kwargs,
         )
 
-    def run(self, phases: Optional[List[str]] = None,
-            brute_force: bool = False) -> Dict[str, Any]:
+    def run(self, phases: list[str] | None = None,
+            brute_force: bool = False) -> dict[str, Any]:
         """Execute the network reconnaissance workflow.
 
         Phase selection priority:
@@ -205,8 +202,6 @@ class NetworkModule:
             phases_to_run = profile_phases if profile_phases else list(self.VALID_PHASES)
 
         # Technique toggles from the profile
-        scanning_cfg = self.profile.section("scanning")
-        enum_cfg = self.profile.section("enumeration")
         auth_cfg = self.profile.section("authentication")
 
         # Brute-force requires both opt-in flag AND profile permission
@@ -233,7 +228,7 @@ class NetworkModule:
         # Check tool availability
         self._check_tools()
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "target": self.target_str,
             "opsec_mode": self.opsec_mode,
             "schema_version": SCHEMA_VERSION,
@@ -281,7 +276,8 @@ class NetworkModule:
                 for host in live_hosts:
                     enum_results = self.telemetry.run_phase(
                         f"enumeration:{host}",
-                        lambda host=host: self.phase_enumeration.run(
+                        functools.partial(
+                            self.phase_enumeration.run,
                             target=host,
                             scan_results=scan_results,
                             opsec_mode=self.opsec_mode,
@@ -294,7 +290,8 @@ class NetworkModule:
                 for host in live_hosts:
                     auth_results = self.telemetry.run_phase(
                         f"authentication:{host}",
-                        lambda host=host: self.phase_auth.run(
+                        functools.partial(
+                            self.phase_auth.run,
                             target=host,
                             scan_results=scan_results,
                             brute_force=brute_force,
@@ -346,7 +343,7 @@ class NetworkModule:
             "general"
         )
 
-    def _generate_reports(self, results: Dict):
+    def _generate_reports(self, results: dict):
         """Generate all output reports."""
         self.logger.info("Generating reports...")
 
@@ -422,7 +419,7 @@ class NetworkModule:
                 message=f"Report generation failed partway through — some artifacts may be missing: {e}",
             ) from e
 
-    def _generate_quick_report(self, results: Dict):
+    def _generate_quick_report(self, results: dict):
         """Generate executive summary report."""
         report_path = self.output.report_file(self.MODULE_NAME)
 
@@ -435,7 +432,7 @@ class NetworkModule:
             f"**Target:** {self.target_str}",
             f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**OPSEC Mode:** {self.opsec_mode}",
-            f"**Author:** Andrews Ferreira",
+            "**Author:** Andrews Ferreira",
             "",
             "## Executive Summary\n",
             f"Network reconnaissance of **{self.target_str}** identified "
@@ -497,7 +494,7 @@ class NetworkModule:
 
         report_path.write_text("\n".join(lines))
 
-    def _print_summary(self, results: Dict):
+    def _print_summary(self, results: dict):
         """Print a summary to console."""
         self.logger.info(f"\n{'='*60}")
         self.logger.info("SCAN COMPLETE - Summary")

@@ -1,8 +1,6 @@
 """Tests for core.config_loader – ConfigLoader."""
 
-from pathlib import Path
 
-import pytest
 
 from core.config_loader import ConfigLoader
 

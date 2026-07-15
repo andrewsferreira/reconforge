@@ -11,9 +11,9 @@ was available for pure analysis paths that need no tool call at all.
 from types import SimpleNamespace
 
 from core.findings_manager import FindingsManager
-from modules.api.phases.discovery import DiscoveryPhase
 from modules.api.phases.authentication import AuthenticationPhase
 from modules.api.phases.authorization import AuthorizationPhase
+from modules.api.phases.discovery import DiscoveryPhase
 from modules.api.phases.fuzzing import FuzzingPhase
 
 

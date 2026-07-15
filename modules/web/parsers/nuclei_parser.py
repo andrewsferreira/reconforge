@@ -12,7 +12,6 @@ Extracts:
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 from modules.web.parsers.severity import normalize_severity
 
@@ -24,9 +23,9 @@ class NucleiFinding:
     name: str = ""
     severity: str = "info"
     matched_at: str = ""
-    extracted: List[str] = field(default_factory=list)
-    references: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    extracted: list[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     remediation: str = ""
     raw_data: str = ""
 
@@ -34,12 +33,12 @@ class NucleiFinding:
 @dataclass
 class NucleiResult:
     """Complete Nuclei scan result."""
-    findings: List[NucleiFinding] = field(default_factory=list)
+    findings: list[NucleiFinding] = field(default_factory=list)
     raw_output: str = ""
 
     @property
-    def by_severity(self) -> Dict[str, List[NucleiFinding]]:
-        groups: Dict[str, List[NucleiFinding]] = {}
+    def by_severity(self) -> dict[str, list[NucleiFinding]]:
+        groups: dict[str, list[NucleiFinding]] = {}
         for f in self.findings:
             groups.setdefault(f.severity, []).append(f)
         return groups
@@ -78,8 +77,7 @@ class NucleiParser:
             info = entry.get("info", {})
             if not isinstance(info, dict):
                 info = {}
-            template_id = entry.get("template-id",
-                                    entry.get("templateID", "unknown"))
+            template_id = entry.get("template-id") or entry.get("templateID") or "unknown"
 
             refs = info.get("reference", info.get("references", []))
             refs = self._as_list(refs)
@@ -92,10 +90,9 @@ class NucleiParser:
 
             finding = NucleiFinding(
                 template_id=template_id,
-                name=info.get("name", template_id),
+                name=info.get("name") or template_id,
                 severity=nuclei_sev,
-                matched_at=entry.get("matched-at",
-                                     entry.get("matched", "")),
+                matched_at=entry.get("matched-at") or entry.get("matched") or "",
                 extracted=extracted[:10],
                 references=refs[:5] if refs else [],
                 tags=tags,
@@ -107,11 +104,11 @@ class NucleiParser:
         return result
 
     @staticmethod
-    def _as_list(value, split_csv: bool = False) -> List[str]:
+    def _as_list(value, split_csv: bool = False) -> list[str]:
         if value is None:
             return []
         if isinstance(value, list):
-            items: List[str] = []
+            items: list[str] = []
             for v in value:
                 text = str(v).strip()
                 if not text:
@@ -122,13 +119,13 @@ class NucleiParser:
                     items.append(text)
             return items
         if isinstance(value, dict):
-            items: List[str] = []
+            dict_items: list[str] = []
             for v in value.values():
                 if isinstance(v, list):
-                    items.extend(str(i).strip() for i in v if str(i).strip())
+                    dict_items.extend(str(i).strip() for i in v if str(i).strip())
                 elif v:
-                    items.append(str(v).strip())
-            return items
+                    dict_items.append(str(v).strip())
+            return dict_items
         if isinstance(value, str):
             if split_csv:
                 return [v.strip() for v in value.split(",") if v.strip()]

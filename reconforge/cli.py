@@ -2,7 +2,7 @@
 """ReconForge - Modular Pentest Reconnaissance Framework.
 
 Author: Andrews Ferreira
-Version: 2.15.0
+Version: 2.15.1
 
 Usage (after `pip install -e .` or `pipx install .`):
     reconforge network --target <target> [options]
@@ -16,12 +16,20 @@ Without installing, from a repo checkout:
 import argparse
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 # Ensure the project root is on the path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.authorization_gate import ScopeAuthorization
 from core.exceptions import ReconForgeError
+
+if TYPE_CHECKING:
+    from modules.ad.ad_module import ADModule
+    from modules.api.api_module import APIModule
+    from modules.network.network_module import NetworkModule
+    from modules.surface.surface_module import SurfaceModule
+    from modules.web.web_module import WebModule
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -434,7 +442,7 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    scope: "ScopeAuthorization | None" = None
+    scope: ScopeAuthorization | None = None
     if args.module != "mcp":
         # Starting the MCP server is not itself an active scan against a
         # target — it has no --target — so this gate does not apply here.
@@ -456,6 +464,10 @@ def main():
 def _dispatch(args, parser, scope: "ScopeAuthorization | None" = None) -> None:
     """Run the module selected by ``args.module``. Exits the process on completion."""
     approval_id = getattr(args, "approval_id", None)
+    # Quoted deliberately (contra UP037): see the identical pattern's
+    # comment in core/workflow_orchestrator.py -- ruff's F823 false-flags
+    # the unquoted form for names only bound by later per-branch imports.
+    module: "NetworkModule | ADModule | WebModule | APIModule | SurfaceModule"  # noqa: UP037
     if args.module == "network":
         from modules.network.network_module import NetworkModule
 
@@ -566,9 +578,9 @@ def _dispatch(args, parser, scope: "ScopeAuthorization | None" = None) -> None:
         sys.exit(0 if results.get("success") else 1)
 
     elif args.module == "workflow":
-        from core.workflow_orchestrator import WorkflowOrchestrator
-        from core.engagement import EngagementManager
         from core.credential_vault import CredentialVault
+        from core.engagement import EngagementManager
+        from core.workflow_orchestrator import WorkflowOrchestrator
 
         # Resume or create engagement
         if args.resume:

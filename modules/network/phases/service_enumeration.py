@@ -6,18 +6,17 @@ services discovered during port scanning.
 """
 
 import json
-from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 from modules.network.base import NetworkPhaseBase
-from modules.network.tools.nmap import NmapTool
-from modules.network.tools.enum4linux import Enum4linuxTool
-from modules.network.tools.smbclient import SmbclientTool
-from modules.network.tools.ldapsearch import LdapsearchTool
-from modules.network.parsers.nmap_parser import NmapParser
 from modules.network.parsers.enum4linux_parser import Enum4linuxParser
-from modules.network.parsers.smb_parser import SmbParser
 from modules.network.parsers.ldap_parser import LdapParser
+from modules.network.parsers.nmap_parser import NmapParser
+from modules.network.parsers.smb_parser import SmbParser
+from modules.network.tools.enum4linux import Enum4linuxTool
+from modules.network.tools.ldapsearch import LdapsearchTool
+from modules.network.tools.nmap import NmapTool
+from modules.network.tools.smbclient import SmbclientTool
 
 
 class ServiceEnumerationPhase(NetworkPhaseBase):
@@ -49,8 +48,12 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
         self.smb_parser = smb_parser
         self.ldap_parser = ldap_parser
 
-    def run(self, target: str, scan_results: Dict[str, Any],
-            opsec_mode: str = "normal") -> Dict[str, Any]:
+    # NetworkPhaseBase.run() declares **kwargs: Any deliberately loosely;
+    # every real call site invokes this phase through its concrete type
+    # (network_module.py), never through the base type, so this narrower,
+    # self-documenting signature carries no real substitutability risk.
+    def run(self, target: str, scan_results: dict[str, Any],  # type: ignore[override]
+            opsec_mode: str = "normal") -> dict[str, Any]:
         """Execute service enumeration phase.
 
         Args:
@@ -87,9 +90,8 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
             results["ldap"] = self._enumerate_ldap(target)
 
         # NSE Script Scanning for deeper analysis
-        if open_ports and opsec_mode != "stealth":
-            if self.opsec.check("nmap_script_scan"):
-                results["nse_scripts"] = self._run_nse_scripts(target, port_numbers)
+        if open_ports and opsec_mode != "stealth" and self.opsec.check("nmap_script_scan"):
+            results["nse_scripts"] = self._run_nse_scripts(target, port_numbers)
 
         # Honest success signal: SMB/LDAP/NSE enumeration are each gated
         # on matching open ports being present — a target with none of
@@ -110,10 +112,10 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
 
         return results
 
-    def _enumerate_smb(self, target: str, opsec_mode: str) -> Dict[str, Any]:
+    def _enumerate_smb(self, target: str, opsec_mode: str) -> dict[str, Any]:
         """Perform comprehensive SMB enumeration."""
         self.logger.info(f"Enumerating SMB on {target}")
-        smb_results: Dict[str, Any] = {
+        smb_results: dict[str, Any] = {
             "shares": [],
             "users": [],
             "groups": [],
@@ -155,9 +157,11 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
                     )
 
                 # Test access to each share
-                interesting_shares = self.smb_parser.get_interesting_shares(parsed)
+                interesting_share_names = {
+                    s.name for s in self.smb_parser.get_interesting_shares(parsed)
+                }
                 for share in parsed.shares:
-                    share_info = {
+                    share_info: dict[str, Any] = {
                         "name": share.name,
                         "type": share.share_type,
                         "comment": share.comment,
@@ -184,7 +188,7 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
 
                         self.findings.add(
                             finding_type="misconfiguration",
-                            severity="high" if share.name not in ("IPC$",) else "low",
+                            severity="high" if share.name in interesting_share_names else "low",
                             confidence="confirmed",
                             target=f"{target}:445",
                             module="network",
@@ -309,10 +313,10 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
 
         return smb_results
 
-    def _enumerate_ldap(self, target: str) -> Dict[str, Any]:
+    def _enumerate_ldap(self, target: str) -> dict[str, Any]:
         """Perform LDAP enumeration."""
         self.logger.info(f"Enumerating LDAP on {target}")
-        ldap_results: Dict[str, Any] = {
+        ldap_results: dict[str, Any] = {
             "base_dn": "",
             "naming_contexts": [],
             "domain": "",
@@ -439,7 +443,7 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
                         module="network",
                         phase=self.PHASE_NAME,
                         description=f"Admin users identified: {', '.join(a['username'] for a in admins)}",
-                        evidence=f"Admin users with group memberships visible via anonymous LDAP",
+                        evidence="Admin users with group memberships visible via anonymous LDAP",
                         recommendation="Restrict LDAP access to authenticated users",
                     )
 
@@ -467,9 +471,9 @@ class ServiceEnumerationPhase(NetworkPhaseBase):
 
         return ldap_results
 
-    def _run_nse_scripts(self, target: str, ports: List[int]) -> Dict[str, Any]:
+    def _run_nse_scripts(self, target: str, ports: list[int]) -> dict[str, Any]:
         """Run NSE scripts for deeper enumeration."""
-        nse_results: Dict[str, Any] = {}
+        nse_results: dict[str, Any] = {}
 
         # SMB scripts
         if 445 in ports or 139 in ports:

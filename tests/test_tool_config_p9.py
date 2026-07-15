@@ -11,13 +11,13 @@ Validates that:
 8. All 5 orchestrators pass config to tool constructors.
 """
 
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 
 from core.config_loader import ConfigLoader
 from core.tool_config import ToolConfig
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

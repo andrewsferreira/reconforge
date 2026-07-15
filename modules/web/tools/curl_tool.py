@@ -12,7 +12,7 @@ read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -27,7 +27,7 @@ class CurlTool:
     TOOL_NAME = "curl"
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -40,7 +40,7 @@ class CurlTool:
         """Fetch HTTP response headers only."""
         out_path = self.output_dir / "headers.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "curl", "-sI", "-o", str(out_path),
             "-m", "15", "--connect-timeout", "10",
             target_url,
@@ -56,7 +56,7 @@ class CurlTool:
         """Fetch full HTTP response (headers + body)."""
         out_path = self.output_dir / "response.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "curl", "-si", "-o", str(out_path),
             "-m", "15", "--connect-timeout", "10",
             target_url,

@@ -1,7 +1,6 @@
 """ReconForge Attack Workflow - Kill chain tracking and hypothesis management."""
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
 from datetime import datetime
 
 
@@ -12,7 +11,7 @@ class WorkflowStep:
     hypothesis: str
     command: str
     justification: str
-    alternatives: List[str] = field(default_factory=list)
+    alternatives: list[str] = field(default_factory=list)
     result: str = ""
     timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
@@ -22,28 +21,28 @@ class AttackPath:
     """An identified attack path."""
     name: str
     description: str
-    steps: List[str]
+    steps: list[str]
     risk: str  # critical, high, medium, low
-    prerequisites: List[str] = field(default_factory=list)
-    references: List[str] = field(default_factory=list)
-    tactic: Optional[str] = None
-    technique_id: Optional[str] = None
+    prerequisites: list[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
+    tactic: str | None = None
+    technique_id: str | None = None
 
 
 class AttackWorkflow:
     """Track attack workflow progression and hypotheses."""
 
     def __init__(self):
-        self.steps: List[WorkflowStep] = []
-        self.attack_paths: List[AttackPath] = []
+        self.steps: list[WorkflowStep] = []
+        self.attack_paths: list[AttackPath] = []
         self.current_phase: str = "discovery"
-        self.rabbit_holes: List[str] = []
-        self._next_commands: List[Dict] = []
-        self._seen_attack_paths: Dict[str, AttackPath] = {}
+        self.rabbit_holes: list[str] = []
+        self._next_commands: list[dict] = []
+        self._seen_attack_paths: dict[str, AttackPath] = {}
         self._duplicate_attack_path_count = 0
 
     def add_step(self, phase: str, hypothesis: str, command: str,
-                 justification: str, alternatives: Optional[List[str]] = None) -> WorkflowStep:
+                 justification: str, alternatives: list[str] | None = None) -> WorkflowStep:
         """Record a workflow step."""
         step = WorkflowStep(
             phase=phase, hypothesis=hypothesis, command=command,
@@ -58,11 +57,11 @@ class AttackWorkflow:
         if self.steps:
             self.steps[-1].result = result
 
-    def add_attack_path(self, name: str, description: str, steps: List[str],
-                        risk: str, prerequisites: Optional[List[str]] = None,
-                        references: Optional[List[str]] = None,
-                        tactic: Optional[str] = None,
-                        technique_id: Optional[str] = None) -> AttackPath:
+    def add_attack_path(self, name: str, description: str, steps: list[str],
+                        risk: str, prerequisites: list[str] | None = None,
+                        references: list[str] | None = None,
+                        tactic: str | None = None,
+                        technique_id: str | None = None) -> AttackPath:
         """Record an identified attack path.
 
         Exact-match dedup by name: independent phases/builders commonly
@@ -114,7 +113,7 @@ class AttackWorkflow:
             "priority": normalized_priority,
         })
 
-    def get_suggestions(self) -> List[Dict]:
+    def get_suggestions(self) -> list[dict]:
         """Get suggested next commands, sorted by priority."""
         priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         return sorted(self._next_commands, key=lambda x: priority_order.get(x["priority"], 99))

@@ -39,6 +39,7 @@ client name, read, or write to this directory.
 
 from __future__ import annotations
 
+import contextlib
 import getpass
 import hashlib
 import json
@@ -51,7 +52,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 from core.config_loader import ConfigLoader
-
 from reconforge.mcp.errors import (
     ApprovalExpiredError,
     ApprovalNotApprovedError,
@@ -222,10 +222,8 @@ class _RequestLock:
                 time.sleep(_LOCK_RETRY_INTERVAL_S)
 
     def __exit__(self, *exc_info: object) -> None:
-        try:
+        with contextlib.suppress(OSError):
             self._path.unlink(missing_ok=True)
-        except OSError:
-            pass
 
 
 def create_request(

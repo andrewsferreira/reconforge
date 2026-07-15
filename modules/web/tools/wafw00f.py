@@ -12,7 +12,7 @@ read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -28,7 +28,7 @@ class Wafw00fTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -42,7 +42,7 @@ class Wafw00fTool:
         """Detect WAF/CDN in front of target."""
         out_path = self.output_dir / "wafw00f.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = ["wafw00f", target_url, "-o", str(out_path)]
+        cmd: list[str] = ["wafw00f", target_url, "-o", str(out_path)]
         self.logger.info(f"Running wafw00f on {target_url}")
         # wafw00f's own -o already writes out_path; its stdout includes a
         # banner and live detection progress distinct from the file

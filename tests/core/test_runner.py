@@ -1,13 +1,11 @@
 """Tests for core.runner – Runner, quote_args, validate_arg."""
 
-import subprocess
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from core.exceptions import ExecutionError
-from core.runner import Runner, RunResult, quote_args, validate_arg
-
+from core.runner import Runner, quote_args, validate_arg
 
 # ── quote_args / validate_arg ─────────────────────────────────────
 
@@ -287,11 +285,10 @@ def test_run_or_raise_raises_policy_blocked(runner, monkeypatch):
 def test_run_or_raise_raises_invalid_command(runner):
     from core.exceptions import InvalidCommandError
 
-    with pytest.raises(InvalidCommandError):
-        # Unbalanced quote — shlex.split raises ValueError on this string
-        # command (deprecated string form; still supported for back-compat).
-        with pytest.warns(DeprecationWarning):
-            runner.run_or_raise('echo "unterminated')
+    # Unbalanced quote — shlex.split raises ValueError on this string
+    # command (deprecated string form; still supported for back-compat).
+    with pytest.raises(InvalidCommandError), pytest.warns(DeprecationWarning):
+        runner.run_or_raise('echo "unterminated')
 
 
 def test_run_or_raise_raises_generic_execution_error_on_nonzero_exit(runner):

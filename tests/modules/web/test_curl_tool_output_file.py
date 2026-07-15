@@ -11,7 +11,6 @@ inside Runner.run()'s interaction with actual subprocess stdout capture.
 
 import http.server
 import threading
-from pathlib import Path
 
 import pytest
 

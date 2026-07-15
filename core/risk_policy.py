@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import os
 import shlex
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
-
 
 _TIER_RANK = {"low": 0, "medium": 1, "high": 2}
 

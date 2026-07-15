@@ -7,8 +7,9 @@ itself) un-written while run() still returned a normal-looking success.
 Fixed to re-raise a typed ModuleError instead of swallowing.
 """
 
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 from core.exceptions import ModuleError
 from core.findings_manager import FindingsManager

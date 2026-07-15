@@ -26,13 +26,13 @@ Rules:
 import json
 import uuid
 import warnings
-from dataclasses import dataclass, field, asdict
-from typing import List, Optional, Dict
-from pathlib import Path
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from pathlib import Path
 
-from core.data_contracts import build_contract
 from core.cve_enricher import enrich_references
+from core.data_contracts import build_contract
+
 
 @dataclass
 class Finding:
@@ -48,14 +48,14 @@ class Finding:
     description: str = ""
     evidence: str = ""
     recommendation: str = ""
-    references: List[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
 # ── Severity validation rules ───────────────────────────────────────
 # Maps confidence levels to the maximum allowed severity.
 # "heuristic" findings are capped at "low", preventing false high/critical.
-_CONFIDENCE_SEVERITY_CAP: Dict[str, str] = {
+_CONFIDENCE_SEVERITY_CAP: dict[str, str] = {
     "confirmed": "critical",   # No cap
     "high":      "critical",   # No cap
     "medium":    "high",       # Medium confidence allows up to high
@@ -101,16 +101,16 @@ class FindingsManager:
                     validation rules. Findings with heuristic confidence
                     will be capped at 'low' severity.
         """
-        self._findings: List[Finding] = []
+        self._findings: list[Finding] = []
         self._strict = strict
         self._clamped_count = 0
         self._duplicate_count = 0
-        self._seen: Dict[str, Finding] = {}  # fingerprint -> first-seen Finding
+        self._seen: dict[str, Finding] = {}  # fingerprint -> first-seen Finding
 
     def add(self, finding_type: str, severity: str, confidence: str,
             target: str, module: str, description: str,
             evidence: str = "", recommendation: str = "",
-            phase: str = "", references: Optional[List[str]] = None,
+            phase: str = "", references: list[str] | None = None,
             confidence_reason: str = "") -> Finding:
         """Add a finding with automatic severity validation.
 
@@ -147,10 +147,10 @@ class FindingsManager:
 
         # Validate
         if severity not in self.VALID_SEVERITIES:
-            warnings.warn(f"Unknown severity '{severity}', defaulting to 'info'")
+            warnings.warn(f"Unknown severity '{severity}', defaulting to 'info'", stacklevel=2)
             severity = "info"
         if confidence not in self.VALID_CONFIDENCES:
-            warnings.warn(f"Unknown confidence '{confidence}', defaulting to 'low'")
+            warnings.warn(f"Unknown confidence '{confidence}', defaulting to 'low'", stacklevel=2)
             confidence = "low"
 
         # Apply strict clamping
@@ -238,33 +238,33 @@ class FindingsManager:
         """Number of add() calls that matched an already-recorded finding."""
         return self._duplicate_count
 
-    def get_all(self) -> List[Finding]:
+    def get_all(self) -> list[Finding]:
         """Get all findings sorted by severity."""
         return sorted(self._findings, key=lambda f: self.SEVERITY_ORDER.get(f.severity, 99))
 
-    def get_by_severity(self, severity: str) -> List[Finding]:
+    def get_by_severity(self, severity: str) -> list[Finding]:
         return [f for f in self._findings if f.severity == severity]
 
-    def get_by_confidence(self, confidence: str) -> List[Finding]:
+    def get_by_confidence(self, confidence: str) -> list[Finding]:
         """Get findings filtered by confidence level."""
         return [f for f in self._findings if f.confidence == confidence]
 
-    def get_by_module(self, module: str) -> List[Finding]:
+    def get_by_module(self, module: str) -> list[Finding]:
         return [f for f in self._findings if f.module == module]
 
-    def get_heuristic_findings(self) -> List[Finding]:
+    def get_heuristic_findings(self) -> list[Finding]:
         """Get all findings with heuristic confidence (pattern-only detections)."""
         return [f for f in self._findings if f.confidence == "heuristic"]
 
-    def count_by_severity(self) -> Dict[str, int]:
-        counts: Dict[str, int] = {}
+    def count_by_severity(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
         for f in self._findings:
             counts[f.severity] = counts.get(f.severity, 0) + 1
         return counts
 
-    def count_by_confidence(self) -> Dict[str, int]:
+    def count_by_confidence(self) -> dict[str, int]:
         """Count findings grouped by confidence level."""
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for f in self._findings:
             counts[f.confidence] = counts.get(f.confidence, 0) + 1
         return counts

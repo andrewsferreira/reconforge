@@ -9,7 +9,6 @@ from dataclasses import asdict
 from typing import Any
 
 from core.adapters.burp.provider import BurpMcpProvider
-
 from reconforge.normalizers.http import HTTPObservation, HttpObservationNormalizer
 
 LOGGER = logging.getLogger(__name__)

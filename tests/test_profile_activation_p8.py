@@ -8,13 +8,13 @@ Validates that:
 5. Backward compatibility: everything still works when profile is None.
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from core.config_loader import ConfigLoader
 from core.profile_loader import ProfileLoader
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -202,46 +202,51 @@ class TestBaseClassProfileParam:
 
     def _make_kwargs(self, profile=None):
         """Build standard phase kwargs."""
-        return dict(
-            logger=MagicMock(), runner=MagicMock(), config=MagicMock(),
-            output_dir=Path("/tmp"), findings=MagicMock(),
-            loot=MagicMock(), workflow=MagicMock(), notes=MagicMock(),
-            opsec=MagicMock(), opsec_mode="normal", profile=profile,
-        )
+        return {
+            "logger": MagicMock(), "runner": MagicMock(), "config": MagicMock(),
+            "output_dir": Path("/tmp"), "findings": MagicMock(),
+            "loot": MagicMock(), "workflow": MagicMock(), "notes": MagicMock(),
+            "opsec": MagicMock(), "opsec_mode": "normal", "profile": profile,
+        }
 
     def test_network_base_stores_profile(self, stealth_profile):
         """NetworkPhaseBase stores profile attribute."""
-        from modules.network.base import NetworkPhaseBase
         # Can't instantiate ABC directly, check __init__ signature
         import inspect
+
+        from modules.network.base import NetworkPhaseBase
         sig = inspect.signature(NetworkPhaseBase.__init__)
         assert "profile" in sig.parameters
 
     def test_ad_base_stores_profile(self, stealth_profile):
         """ADPhaseBase stores profile attribute."""
-        from modules.ad.base import ADPhaseBase
         import inspect
+
+        from modules.ad.base import ADPhaseBase
         sig = inspect.signature(ADPhaseBase.__init__)
         assert "profile" in sig.parameters
 
     def test_web_base_stores_profile(self, stealth_profile):
         """WebPhaseBase stores profile attribute."""
-        from modules.web.base import WebPhaseBase
         import inspect
+
+        from modules.web.base import WebPhaseBase
         sig = inspect.signature(WebPhaseBase.__init__)
         assert "profile" in sig.parameters
 
     def test_api_base_stores_profile(self, stealth_profile):
         """APIPhaseBase stores profile attribute."""
-        from modules.api.base import APIPhaseBase
         import inspect
+
+        from modules.api.base import APIPhaseBase
         sig = inspect.signature(APIPhaseBase.__init__)
         assert "profile" in sig.parameters
 
     def test_surface_base_stores_profile(self, stealth_profile):
         """SurfacePhaseBase stores profile attribute."""
-        from modules.surface.base import SurfacePhaseBase
         import inspect
+
+        from modules.surface.base import SurfacePhaseBase
         sig = inspect.signature(SurfacePhaseBase.__init__)
         assert "profile" in sig.parameters
 

@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 
 class OutputManager:
@@ -84,7 +84,7 @@ class OutputManager:
         """
         root = self.module_dir(module)
         manifest_path = self.evidence_manifest_file(module)
-        entries: List[Dict[str, str]] = []
+        entries: list[dict[str, str]] = []
         previous_chain_hash = ""
 
         for file_path in sorted(p for p in root.rglob("*") if p.is_file()):
@@ -93,7 +93,7 @@ class OutputManager:
             rel = file_path.relative_to(root).as_posix()
             digest = hashlib.sha256(file_path.read_bytes()).hexdigest()
             chain_hash = hashlib.sha256(
-                f"{previous_chain_hash}:{rel}:{digest}".encode("utf-8")
+                f"{previous_chain_hash}:{rel}:{digest}".encode()
             ).hexdigest()
             entries.append(
                 {
@@ -104,7 +104,7 @@ class OutputManager:
             )
             previous_chain_hash = chain_hash
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "version": "1.0",
             "execution_id": execution_id,
             "module": module,

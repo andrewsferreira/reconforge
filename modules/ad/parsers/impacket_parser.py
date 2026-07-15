@@ -11,7 +11,6 @@ Author: Andrews Ferreira
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 
 @dataclass
@@ -45,7 +44,7 @@ class RPCEndpoint:
     """An RPC endpoint from rpcdump."""
     uuid: str = ""
     annotation: str = ""
-    bindings: List[str] = field(default_factory=list)
+    bindings: list[str] = field(default_factory=list)
 
 
 class ImpacketParser:
@@ -55,13 +54,13 @@ class ImpacketParser:
     # GetADUsers.py
     # ------------------------------------------------------------------
 
-    def parse_getadusers(self, text: str) -> List[ImpacketUser]:
+    def parse_getadusers(self, text: str) -> list[ImpacketUser]:
         """Parse GetADUsers.py output.
 
         Expected format (tab / multi-space delimited table):
         Name   Email  PasswordLastSet  LastLogon  ...
         """
-        users: List[ImpacketUser] = []
+        users: list[ImpacketUser] = []
         lines = text.strip().splitlines()
 
         # Find the header line
@@ -101,12 +100,12 @@ class ImpacketParser:
     # GetNPUsers.py (AS-REP)
     # ------------------------------------------------------------------
 
-    def parse_getnpusers(self, text: str) -> List[ASREPHash]:
+    def parse_getnpusers(self, text: str) -> list[ASREPHash]:
         """Parse GetNPUsers.py output for AS-REP hashes.
 
         Hashes look like: $krb5asrep$23$user@DOMAIN:...
         """
-        hashes: List[ASREPHash] = []
+        hashes: list[ASREPHash] = []
 
         for line in text.splitlines():
             line = line.strip()
@@ -120,9 +119,9 @@ class ImpacketParser:
         # or "[-] User ... doesn't require pre-auth" messages
         return hashes
 
-    def parse_getnpusers_vulnerable(self, text: str) -> List[str]:
+    def parse_getnpusers_vulnerable(self, text: str) -> list[str]:
         """Extract usernames that are AS-REP roastable (even without hash capture)."""
-        vulnerable: List[str] = []
+        vulnerable: list[str] = []
         for line in text.splitlines():
             if "$krb5asrep$" in line:
                 m = re.match(r"\$krb5asrep\$\d+\$([^@:]+)", line.strip())
@@ -134,12 +133,12 @@ class ImpacketParser:
     # lookupsid.py (RID cycling)
     # ------------------------------------------------------------------
 
-    def parse_lookupsid(self, text: str) -> List[RIDEntry]:
+    def parse_lookupsid(self, text: str) -> list[RIDEntry]:
         """Parse lookupsid.py output.
 
         Format:  500: CORP\\Administrator (SidTypeUser)
         """
-        entries: List[RIDEntry] = []
+        entries: list[RIDEntry] = []
 
         for line in text.splitlines():
             m = re.match(
@@ -155,11 +154,11 @@ class ImpacketParser:
 
         return entries
 
-    def extract_users_from_rid(self, entries: List[RIDEntry]) -> List[str]:
+    def extract_users_from_rid(self, entries: list[RIDEntry]) -> list[str]:
         """Filter RID entries to return only usernames."""
         return [e.name for e in entries if e.sid_type == "SidTypeUser"]
 
-    def extract_groups_from_rid(self, entries: List[RIDEntry]) -> List[str]:
+    def extract_groups_from_rid(self, entries: list[RIDEntry]) -> list[str]:
         """Filter RID entries to return only group names."""
         return [e.name for e in entries if e.sid_type in ("SidTypeGroup", "SidTypeAlias")]
 
@@ -167,10 +166,10 @@ class ImpacketParser:
     # rpcdump.py
     # ------------------------------------------------------------------
 
-    def parse_rpcdump(self, text: str) -> List[RPCEndpoint]:
+    def parse_rpcdump(self, text: str) -> list[RPCEndpoint]:
         """Parse rpcdump.py output."""
-        endpoints: List[RPCEndpoint] = []
-        current: Optional[RPCEndpoint] = None
+        endpoints: list[RPCEndpoint] = []
+        current: RPCEndpoint | None = None
 
         for line in text.splitlines():
             line = line.rstrip()

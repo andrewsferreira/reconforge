@@ -7,30 +7,33 @@ will emit a deprecation warning.
 Author: Andrews Ferreira
 """
 
+import os
 import re
-import subprocess  # nosec B404 - this is the framework's sole, audited execution layer (list[str] args, shell=False always; see Runner.run)
 import shlex
 import shutil
-import os
+import subprocess  # nosec B404 - this is the framework's sole, audited execution layer (list[str] args, shell=False always; see Runner.run)
 import time
 import uuid
 import warnings
-from dataclasses import dataclass, field
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 from core.exceptions import (
     ExecutionError,
-    ToolNotFoundError,
-    TimeoutError as ReconTimeoutError,
-    ScopeViolationError,
-    KillSwitchBlockedError,
-    PolicyBlockedError,
     InvalidCommandError,
     InvalidToolArgumentError,
+    KillSwitchBlockedError,
+    PolicyBlockedError,
+    ScopeViolationError,
+    ToolNotFoundError,
 )
-from core.risk_policy import RiskPolicyEngine
+from core.exceptions import (
+    TimeoutError as ReconTimeoutError,
+)
 from core.logger import sanitize_log
+from core.risk_policy import RiskPolicyEngine
 
 if TYPE_CHECKING:
     from core.authorization_gate import ScopeAuthorization
@@ -101,7 +104,7 @@ class RunResult:
     stderr: str
     duration: float
     success: bool
-    output_file: Optional[str] = None
+    output_file: str | None = None
     execution_id: str = ""
 
 
@@ -123,10 +126,10 @@ class Runner:
     DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024  # 10 MB
 
     def __init__(self, logger, timeout: int = 300, dry_run: bool = False,
-                 target: Optional[str] = None,
+                 target: str | None = None,
                  scope: Optional["ScopeAuthorization"] = None,
-                 approval_id: Optional[str] = None,
-                 max_output_bytes: Optional[int] = None):
+                 approval_id: str | None = None,
+                 max_output_bytes: int | None = None):
         """
         Args:
             target: The primary target this runner executes commands against.
@@ -150,8 +153,8 @@ class Runner:
         self.max_output_bytes = (
             self.DEFAULT_MAX_OUTPUT_BYTES if max_output_bytes is None else max_output_bytes
         )
-        self._command_log: List[str] = []
-        self._metrics: Dict[str, Any] = {
+        self._command_log: list[str] = []
+        self._metrics: dict[str, Any] = {
             "total_commands": 0,
             "failed_commands": 0,
             "total_duration_seconds": 0.0,
@@ -179,7 +182,7 @@ class Runner:
         return shutil.which(tool_name) is not None
 
     def get_tool_version(self, tool_name: str, version_flag: str = "--version",
-                          timeout: int = 10) -> Optional[str]:
+                          timeout: int = 10) -> str | None:
         """Best-effort capture of an external tool's version string.
 
         Runs ``tool_name version_flag`` through the normal run() path (same
@@ -240,13 +243,13 @@ class Runner:
     )
 
     @classmethod
-    def _safe_base_env(cls) -> Dict[str, str]:
+    def _safe_base_env(cls) -> dict[str, str]:
         """Build a minimal child-process environment (see _ENV_ALLOWLIST)."""
         return {k: v for k, v in os.environ.items() if k in cls._ENV_ALLOWLIST}
 
-    def run(self, command: Union[str, Sequence[str]], timeout: Optional[int] = None,
-            output_file: Optional[Path] = None, env: Optional[dict] = None,
-            stdin_data: Optional[str] = None, cwd: Optional[Path] = None) -> RunResult:
+    def run(self, command: str | Sequence[str], timeout: int | None = None,
+            output_file: Path | None = None, env: dict | None = None,
+            stdin_data: str | None = None, cwd: Path | None = None) -> RunResult:
         """Execute a command and return structured result.
 
         Args:
@@ -417,7 +420,7 @@ class Runner:
 
     def _finish(self, command_execution_id: str, tool_name: str, cmd_display: str, *,
                 returncode: int, stdout: str, stderr: str, duration: float,
-                success: bool, output_file: Optional[str] = None) -> RunResult:
+                success: bool, output_file: str | None = None) -> RunResult:
         """Build the RunResult, emit its structured audit event, and record metrics.
 
         The single point every run() exit path funnels through, so the
@@ -459,12 +462,12 @@ class Runner:
         content = p.read_text(encoding="utf-8").strip().lower()
         return content in {"1", "true", "on", "stop", "blocked"}
 
-    def run_or_raise(self, command: Union[str, Sequence[str]],
-                     timeout: Optional[int] = None,
-                     output_file: Optional[Path] = None,
-                     env: Optional[dict] = None,
-                     stdin_data: Optional[str] = None,
-                     cwd: Optional[Path] = None) -> RunResult:
+    def run_or_raise(self, command: str | Sequence[str],
+                     timeout: int | None = None,
+                     output_file: Path | None = None,
+                     env: dict | None = None,
+                     stdin_data: str | None = None,
+                     cwd: Path | None = None) -> RunResult:
         """Execute a command and raise on failure.
 
         Same interface as :meth:`run`, but raises structured exceptions
@@ -516,7 +519,7 @@ class Runner:
             raise ToolNotFoundError(tool_name)
         return True
 
-    def get_command_log(self) -> List[str]:
+    def get_command_log(self) -> list[str]:
         """Return all commands executed in this session."""
         return list(self._command_log)
 

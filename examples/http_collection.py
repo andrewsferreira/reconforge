@@ -10,7 +10,6 @@ from core.adapters.burp.config import BurpMcpConfig
 from core.adapters.burp.provider import BurpMcpProvider
 from reconforge.collectors.http_collector import HttpCollector, observations_to_dict
 
-
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 

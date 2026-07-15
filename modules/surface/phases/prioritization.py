@@ -8,19 +8,18 @@ Replaces the old flat numeric scoring with intelligent prioritization.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from modules.surface.base import SurfacePhaseBase
-from modules.surface.intelligence.service_intelligence import ServiceIntelligenceDB
-from modules.surface.intelligence.correlation_engine import (
-    AttackSurfaceMap,
-    CorrelationEngine,
-)
-from modules.surface.intelligence.confidence_scorer import ConfidenceScorer, ConfidenceResult
 from modules.surface.intelligence.attack_prioritizer import (
     AttackPrioritizer,
     PrioritizationResult,
 )
+from modules.surface.intelligence.confidence_scorer import ConfidenceResult, ConfidenceScorer
+from modules.surface.intelligence.correlation_engine import (
+    AttackSurfaceMap,
+)
+from modules.surface.intelligence.service_intelligence import ServiceIntelligenceDB
 
 
 class PrioritizationPhase(SurfacePhaseBase):
@@ -44,7 +43,7 @@ class PrioritizationPhase(SurfacePhaseBase):
         self._scorer = ConfidenceScorer(port_map=self._intel_db.port_map)
         self._prioritizer = AttackPrioritizer(confidence_scorer=self._scorer)
 
-    def run(self, target: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target: str, **kwargs) -> dict[str, Any]:
         """Execute intelligent prioritization phase.
 
         Args:
@@ -62,7 +61,7 @@ class PrioritizationPhase(SurfacePhaseBase):
         surface_map_data = kwargs.get("surface_map", {})
         confidence_data = kwargs.get("confidence_scores", {})
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "prioritised_actions": [],
             "category_groups": [],
@@ -84,7 +83,7 @@ class PrioritizationPhase(SurfacePhaseBase):
             surface_map = self._build_surface_map_from_vectors(target, vectors)
 
         # Reconstruct confidence results
-        confidence_results: Dict[str, ConfidenceResult] = {}
+        confidence_results: dict[str, ConfidenceResult] = {}
         if confidence_data:
             for name, cd in confidence_data.items():
                 confidence_results[name] = ConfidenceResult(
@@ -183,7 +182,7 @@ class PrioritizationPhase(SurfacePhaseBase):
         results["executive_summary"] = prio_result.executive_summary
 
         # Summary statistics (backward compatible)
-        priority_counts: Dict[str, int] = {}
+        priority_counts: dict[str, int] = {}
         for t in prio_result.ranked_targets:
             priority_counts[t.priority_level] = priority_counts.get(t.priority_level, 0) + 1
 
@@ -274,7 +273,7 @@ class PrioritizationPhase(SurfacePhaseBase):
         }
         return mapping.get(priority, "info")
 
-    def _reconstruct_surface_map(self, data: Dict) -> AttackSurfaceMap:
+    def _reconstruct_surface_map(self, data: dict) -> AttackSurfaceMap:
         """Reconstruct an AttackSurfaceMap from serialized Phase 3 data."""
         from modules.surface.intelligence.correlation_engine import (
             AttackSurfaceMap,
@@ -313,7 +312,7 @@ class PrioritizationPhase(SurfacePhaseBase):
 
         return surface
 
-    def _build_surface_map_from_vectors(self, target: str, vectors: List[Dict]) -> AttackSurfaceMap:
+    def _build_surface_map_from_vectors(self, target: str, vectors: list[dict]) -> AttackSurfaceMap:
         """Build an AttackSurfaceMap from old-style vector dicts (backward compat)."""
         from modules.surface.intelligence.correlation_engine import (
             AttackSurfaceMap,

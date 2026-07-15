@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List
+from typing import Any
 from urllib.parse import urlparse
 
 from core.adapters.burp.models import NormalizedBurpHttpRecord
 
 
-def normalize_http_history_records(payload: Dict[str, Any], *, tool_name: str, evidence_source: str) -> List[NormalizedBurpHttpRecord]:
+def normalize_http_history_records(payload: dict[str, Any], *, tool_name: str, evidence_source: str) -> list[NormalizedBurpHttpRecord]:
     records = payload.get("records")
     if not isinstance(records, list):
         # Common MCP content style fallback.
@@ -18,17 +18,17 @@ def normalize_http_history_records(payload: Dict[str, Any], *, tool_name: str, e
         else:
             records = []
 
-    normalized: List[NormalizedBurpHttpRecord] = []
+    normalized: list[NormalizedBurpHttpRecord] = []
     for item in records:
         normalized.append(_normalize_single_record(item, tool_name=tool_name, evidence_source=evidence_source))
     return normalized
 
 
-def normalize_http_send_response(payload: Dict[str, Any], *, tool_name: str, evidence_source: str) -> List[NormalizedBurpHttpRecord]:
+def normalize_http_send_response(payload: dict[str, Any], *, tool_name: str, evidence_source: str) -> list[NormalizedBurpHttpRecord]:
     return [_normalize_single_record(payload, tool_name=tool_name, evidence_source=evidence_source)]
 
 
-def _normalize_single_record(item: Dict[str, Any], *, tool_name: str, evidence_source: str) -> NormalizedBurpHttpRecord:
+def _normalize_single_record(item: dict[str, Any], *, tool_name: str, evidence_source: str) -> NormalizedBurpHttpRecord:
     url = str(item.get("url", "") or item.get("requestUrl", "")).strip()
     host = str(item.get("host", "")).strip()
     method = str(item.get("method", "") or item.get("requestMethod", "")).upper()
@@ -52,7 +52,7 @@ def _normalize_single_record(item: Dict[str, Any], *, tool_name: str, evidence_s
     )
 
 
-def _as_headers(value: Any) -> Dict[str, str]:
+def _as_headers(value: Any) -> dict[str, str]:
     if isinstance(value, dict):
         return {str(k): str(v) for k, v in value.items()}
     return {}

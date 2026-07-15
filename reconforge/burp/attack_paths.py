@@ -7,7 +7,11 @@ import argparse
 import json
 import logging
 
-from reconforge.entrypoints.attack_paths import AttackPathRunConfig, run_attack_path_generation, save_attack_path_report
+from reconforge.entrypoints.attack_paths import (
+    AttackPathRunConfig,
+    run_attack_path_generation,
+    save_attack_path_report,
+)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -1,11 +1,10 @@
 """Tests for modules.web.parsers.ffuf_parser – FfufParser."""
 
 import json
-from pathlib import Path
 
 import pytest
 
-from modules.web.parsers.ffuf_parser import FfufParser, FfufResult
+from modules.web.parsers.ffuf_parser import FfufParser
 
 
 @pytest.fixture

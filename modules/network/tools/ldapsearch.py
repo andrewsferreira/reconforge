@@ -10,7 +10,7 @@ read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -25,7 +25,7 @@ class LdapsearchTool:
     TOOL_NAME = "ldapsearch"
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -40,7 +40,7 @@ class LdapsearchTool:
         self.logger.info(f"Querying rootDSE on {target}")
         output_file = self.output_dir / "ldap_rootdse.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ldapsearch", "-x", "-H", f"ldap://{target}",
             "-s", "base", "(objectClass=*)",
             "namingContexts", "defaultNamingContext",
@@ -53,7 +53,7 @@ class LdapsearchTool:
         self.logger.info(f"Enumerating LDAP users on {target}")
         output_file = self.output_dir / "ldap_users.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ldapsearch", "-x", "-H", f"ldap://{target}",
             "-b", base_dn,
             "(&(objectClass=user)(objectCategory=person))",
@@ -67,7 +67,7 @@ class LdapsearchTool:
         self.logger.info(f"Enumerating LDAP groups on {target}")
         output_file = self.output_dir / "ldap_groups.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ldapsearch", "-x", "-H", f"ldap://{target}",
             "-b", base_dn,
             "(objectClass=group)",
@@ -81,7 +81,7 @@ class LdapsearchTool:
         self.logger.info(f"Enumerating LDAP computers on {target}")
         output_file = self.output_dir / "ldap_computers.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ldapsearch", "-x", "-H", f"ldap://{target}",
             "-b", base_dn,
             "(objectClass=computer)",
@@ -95,7 +95,7 @@ class LdapsearchTool:
         self.logger.info(f"Full LDAP dump on {target}")
         output_file = self.output_dir / "ldap_full_dump.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ldapsearch", "-x", "-H", f"ldap://{target}",
             "-b", base_dn,
             "(objectClass=*)", "*",
@@ -111,7 +111,7 @@ class LdapsearchTool:
         self.logger.info(f"Authenticated LDAP search on {target}")
         output_file = self.output_dir / "ldap_auth_search.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ldapsearch", "-x", "-H", f"ldap://{target}",
             "-b", base_dn,
             "-D", username, "-w", password,

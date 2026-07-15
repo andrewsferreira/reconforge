@@ -7,14 +7,13 @@ plus MachineAccountQuota for RBCD feasibility.
 """
 
 import re
-from typing import Any, Dict, List, Tuple
 
 from modules.ad.collectors.base import CollectorBase, CollectorResult
-from modules.ad.tools.ldapsearch import ADLdapsearchTool
-from modules.ad.tools.advanced_impacket import AdvancedImpacketTool
-from modules.ad.tools.netexec import NetexecTool
-from modules.ad.parsers.ldap_parser import ADLdapParser
 from modules.ad.parsers.delegation_parser import DelegationParser
+from modules.ad.parsers.ldap_parser import ADLdapParser
+from modules.ad.tools.advanced_impacket import AdvancedImpacketTool
+from modules.ad.tools.ldapsearch import ADLdapsearchTool
+from modules.ad.tools.netexec import NetexecTool
 
 
 class DelegationCollector(CollectorBase):
@@ -109,7 +108,7 @@ class DelegationCollector(CollectorBase):
     # ── LDAP queries ───────────────────────────────────────────────
 
     def _query_unconstrained(self, target: str, base_dn: str,
-                             username: str, password: str) -> Tuple[List, bool]:
+                             username: str, password: str) -> tuple[list, bool]:
         if not self.ldapsearch.is_available() or not base_dn:
             return [], False
         if not self.opsec.check("ldapsearch"):
@@ -130,7 +129,7 @@ class DelegationCollector(CollectorBase):
         return self.delegation_parser.parse_unconstrained(run.stdout), True
 
     def _query_constrained(self, target: str, base_dn: str,
-                           username: str, password: str) -> Tuple[List, bool]:
+                           username: str, password: str) -> tuple[list, bool]:
         if not self.ldapsearch.is_available() or not base_dn:
             return [], False
         if not self.opsec.check("ldapsearch"):
@@ -152,7 +151,7 @@ class DelegationCollector(CollectorBase):
         return self.delegation_parser.parse_constrained(run.stdout), True
 
     def _query_rbcd(self, target: str, base_dn: str,
-                    username: str, password: str) -> Tuple[List, bool]:
+                    username: str, password: str) -> tuple[list, bool]:
         if not self.ldapsearch.is_available() or not base_dn:
             return [], False
         if not self.opsec.check("ldapsearch"):
@@ -174,7 +173,7 @@ class DelegationCollector(CollectorBase):
         return self.delegation_parser.parse_rbcd(run.stdout), True
 
     def _run_find_delegation(self, target: str, domain: str,
-                             username: str, password: str) -> Tuple[Dict, bool]:
+                             username: str, password: str) -> tuple[dict, bool]:
         if not self.advanced_impacket.is_available("finddelegation"):
             return {}, False
         if not username or not password:
@@ -210,7 +209,7 @@ class DelegationCollector(CollectorBase):
         return int(match.group(1)) if match else -1
 
     @staticmethod
-    def _merge_unique(existing: List, new: List, key: str) -> List:
+    def _merge_unique(existing: list, new: list, key: str) -> list:
         """Merge two lists of objects deduplicating by attribute name."""
         seen = {getattr(e, key, None) for e in existing}
         for item in new:

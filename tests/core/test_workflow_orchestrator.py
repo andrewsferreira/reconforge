@@ -1,17 +1,15 @@
 """Tests for core.workflow_orchestrator – WorkflowOrchestrator & WorkflowContext."""
 
-import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
+from core.exceptions import WorkflowError
 from core.workflow_orchestrator import (
-    WorkflowOrchestrator,
     WorkflowContext,
+    WorkflowOrchestrator,
     _derive_autonomous_next_steps,
 )
-from core.exceptions import WorkflowError
-
 
 # ── WorkflowContext ─────────────────────────────────────────────
 

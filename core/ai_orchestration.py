@@ -10,15 +10,14 @@ and recommends next actions.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Set, Tuple
-
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 _SEVERITY_SCORE = {"critical": 10, "high": 8, "medium": 5, "low": 2, "info": 1}
 _CONFIDENCE_SCORE = {"confirmed": 1.0, "high": 0.9, "medium": 0.7, "low": 0.5, "heuristic": 0.3}
 
 # Lightweight mapping for immediate hypotheses without external lookups.
-_BANNER_CVE_HINTS: Dict[str, List[str]] = {
+_BANNER_CVE_HINTS: dict[str, list[str]] = {
     "openssh 7": ["CVE-2018-15473"],
     "apache 2.4.49": ["CVE-2021-41773"],
     "samba 3": ["CVE-2017-7494"],
@@ -39,8 +38,8 @@ class CorrelatedSignal:
     exploit_likelihood: float = 0.1
     reachability: float = 0.1
     asset_criticality: float = 0.5
-    references: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
 
     def risk_score(self) -> float:
         sev = _SEVERITY_SCORE.get(self.severity, 1) / 10.0
@@ -55,8 +54,8 @@ class CorrelatedSignal:
 
 @dataclass
 class AttackGraph:
-    nodes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    edges: List[Dict[str, Any]] = field(default_factory=list)
+    nodes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    edges: list[dict[str, Any]] = field(default_factory=list)
 
     def add_node(self, node_id: str, node_type: str, **attrs: Any) -> None:
         current = self.nodes.setdefault(node_id, {"id": node_id, "type": node_type})
@@ -77,13 +76,13 @@ class AIOrchestrationLayer:
     """Central intelligence, context builder, and adaptive decision engine."""
 
     def __init__(self):
-        self.signals: List[CorrelatedSignal] = []
+        self.signals: list[CorrelatedSignal] = []
         self.graph = AttackGraph()
-        self.hypotheses: List[Dict[str, Any]] = []
+        self.hypotheses: list[dict[str, Any]] = []
 
     # ---- ingestion (tool/module adapters) ---------------------------------
 
-    def ingest_module_result(self, module_name: str, result: Dict[str, Any]) -> List[CorrelatedSignal]:
+    def ingest_module_result(self, module_name: str, result: dict[str, Any]) -> list[CorrelatedSignal]:
         parsers = {
             "network": self._ingest_network,
             "surface": self._ingest_surface,
@@ -98,16 +97,16 @@ class AIOrchestrationLayer:
         self.signals.extend(created)
         return created
 
-    def ingest_nmap_scan(self, hosts_data: Dict[str, Any]) -> List[CorrelatedSignal]:
+    def ingest_nmap_scan(self, hosts_data: dict[str, Any]) -> list[CorrelatedSignal]:
         """Direct Nmap ingestion for parsed structures from nmap parser/output."""
         result = {"phases": {"scanning": {"hosts": hosts_data}}}
         created = self._ingest_network(result)
         self.signals.extend(created)
         return created
 
-    def ingest_proxy_logs(self, proxy_events: List[Dict[str, Any]]) -> List[CorrelatedSignal]:
+    def ingest_proxy_logs(self, proxy_events: list[dict[str, Any]]) -> list[CorrelatedSignal]:
         """Burp/proxy log ingestion for request-response security signals."""
-        created: List[CorrelatedSignal] = []
+        created: list[CorrelatedSignal] = []
         for event in proxy_events:
             host = str(event.get("host", "unknown"))
             path = str(event.get("path", "/"))
@@ -146,9 +145,9 @@ class AIOrchestrationLayer:
         self.signals.extend(created)
         return created
 
-    def ingest_http_scan(self, scan_events: List[Dict[str, Any]]) -> List[CorrelatedSignal]:
+    def ingest_http_scan(self, scan_events: list[dict[str, Any]]) -> list[CorrelatedSignal]:
         """HTTP scanner ingestion for behavior-level hypotheses."""
-        created: List[CorrelatedSignal] = []
+        created: list[CorrelatedSignal] = []
         for event in scan_events:
             url = str(event.get("url", ""))
             issue = str(event.get("issue", ""))
@@ -172,8 +171,8 @@ class AIOrchestrationLayer:
 
     # ---- context builder ----------------------------------------------------
 
-    def build_context_snapshot(self) -> Dict[str, Any]:
-        by_target: Dict[str, List[Dict[str, Any]]] = {}
+    def build_context_snapshot(self) -> dict[str, Any]:
+        by_target: dict[str, list[dict[str, Any]]] = {}
         for sig in self.signals:
             by_target.setdefault(sig.target, []).append(asdict(sig))
 
@@ -203,12 +202,12 @@ class AIOrchestrationLayer:
 
     # ---- decision engine ----------------------------------------------------
 
-    def decide_next_actions(self, already_planned: Optional[Set[str]] = None) -> List[Dict[str, Any]]:
+    def decide_next_actions(self, already_planned: set[str] | None = None) -> list[dict[str, Any]]:
         already_planned = already_planned or set()
-        recommendations: List[Dict[str, Any]] = []
+        recommendations: list[dict[str, Any]] = []
 
         # Port/service derived hypotheses.
-        services_seen: Set[str] = set()
+        services_seen: set[str] = set()
         for node in self.graph.nodes.values():
             if node.get("type") == "service":
                 services_seen.add(str(node.get("name", "")).lower())
@@ -247,8 +246,8 @@ class AIOrchestrationLayer:
 
         return recommendations
 
-    def top_attack_paths(self, limit: int = 5) -> List[Dict[str, Any]]:
-        paths: List[Dict[str, Any]] = []
+    def top_attack_paths(self, limit: int = 5) -> list[dict[str, Any]]:
+        paths: list[dict[str, Any]] = []
         for sig in self.signals:
             score = sig.risk_score()
             if score < 30:
@@ -269,7 +268,7 @@ class AIOrchestrationLayer:
         paths.sort(key=lambda x: x["score"], reverse=True)
         return paths[:limit]
 
-    def generate_ai_report(self) -> Dict[str, Any]:
+    def generate_ai_report(self) -> dict[str, Any]:
         top_paths = self.top_attack_paths(limit=5)
         recommendations = self._recommendations_from_paths(top_paths)
         return {
@@ -282,8 +281,8 @@ class AIOrchestrationLayer:
 
     # ---- internals ----------------------------------------------------------
 
-    def _ingest_network(self, result: Dict[str, Any]) -> List[CorrelatedSignal]:
-        created: List[CorrelatedSignal] = []
+    def _ingest_network(self, result: dict[str, Any]) -> list[CorrelatedSignal]:
+        created: list[CorrelatedSignal] = []
         hosts = result.get("phases", {}).get("scanning", {}).get("hosts", {})
         for host, details in hosts.items():
             self.graph.add_node(host, "host")
@@ -320,12 +319,12 @@ class AIOrchestrationLayer:
                 ))
         return created
 
-    def _ingest_surface(self, result: Dict[str, Any]) -> List[CorrelatedSignal]:
+    def _ingest_surface(self, result: dict[str, Any]) -> list[CorrelatedSignal]:
         hosts = result.get("phases", {}).get("port_discovery", {}).get("hosts", {})
         return self._ingest_network({"phases": {"scanning": {"hosts": hosts}}})
 
-    def _ingest_web(self, result: Dict[str, Any]) -> List[CorrelatedSignal]:
-        created: List[CorrelatedSignal] = []
+    def _ingest_web(self, result: dict[str, Any]) -> list[CorrelatedSignal]:
+        created: list[CorrelatedSignal] = []
         target = str(result.get("target", ""))
         if target:
             self.graph.add_node(target, "endpoint")
@@ -348,7 +347,7 @@ class AIOrchestrationLayer:
             created.append(signal)
         return created
 
-    def _ingest_api(self, result: Dict[str, Any]) -> List[CorrelatedSignal]:
+    def _ingest_api(self, result: dict[str, Any]) -> list[CorrelatedSignal]:
         created = self._ingest_web(result)
         for signal in created:
             signal.source_module = "api"
@@ -356,8 +355,8 @@ class AIOrchestrationLayer:
             signal.exploit_likelihood = min(0.95, signal.exploit_likelihood + 0.1)
         return created
 
-    def _ingest_ad(self, result: Dict[str, Any]) -> List[CorrelatedSignal]:
-        created: List[CorrelatedSignal] = []
+    def _ingest_ad(self, result: dict[str, Any]) -> list[CorrelatedSignal]:
+        created: list[CorrelatedSignal] = []
         domain = str(result.get("domain", ""))
         if domain:
             self.graph.add_node(domain, "domain")
@@ -374,15 +373,15 @@ class AIOrchestrationLayer:
             ))
         return created
 
-    def _cve_hints(self, banner: str) -> List[str]:
+    def _cve_hints(self, banner: str) -> list[str]:
         low_banner = (banner or "").lower()
-        refs: List[str] = []
+        refs: list[str] = []
         for token, cves in _BANNER_CVE_HINTS.items():
             if token in low_banner:
                 refs.extend(cves)
         return sorted(set(refs))
 
-    def _executive_summary(self, paths: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _executive_summary(self, paths: list[dict[str, Any]]) -> dict[str, Any]:
         highest = paths[0]["score"] if paths else 0
         return {
             "signals": len(self.signals),
@@ -396,7 +395,7 @@ class AIOrchestrationLayer:
             ),
         }
 
-    def _technical_finding(self, signal: CorrelatedSignal) -> Dict[str, Any]:
+    def _technical_finding(self, signal: CorrelatedSignal) -> dict[str, Any]:
         return {
             "target": signal.target,
             "type": signal.signal_type,
@@ -408,8 +407,8 @@ class AIOrchestrationLayer:
             "references": signal.references,
         }
 
-    def _recommendations_from_paths(self, paths: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        recs: List[Dict[str, Any]] = []
+    def _recommendations_from_paths(self, paths: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        recs: list[dict[str, Any]] = []
         for p in paths:
             priority = "P1" if p["score"] >= 75 else "P2" if p["score"] >= 55 else "P3"
             recs.append({
@@ -419,8 +418,8 @@ class AIOrchestrationLayer:
             })
         return recs
 
-    def _triage_snapshot(self) -> List[Dict[str, Any]]:
-        triage_rows: List[Dict[str, Any]] = []
+    def _triage_snapshot(self) -> list[dict[str, Any]]:
+        triage_rows: list[dict[str, Any]] = []
         for sig in sorted(self.signals, key=lambda s: s.risk_score(), reverse=True):
             triage_rows.append({
                 "target": sig.target,

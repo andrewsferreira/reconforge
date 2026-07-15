@@ -145,7 +145,7 @@ def test_jwt_sensitive_claims():
     """Test sensitive data detection in payload."""
     payload = {"sub": "test", "password": "secret123"}
     sensitive_keys = ("password", "secret", "credit_card", "ssn")
-    exposed = [k for k in payload.keys() if k.lower() in sensitive_keys]
+    exposed = [k for k in payload if k.lower() in sensitive_keys]
     assert "password" in exposed
     print("✅ test_jwt_sensitive_claims PASSED")
 

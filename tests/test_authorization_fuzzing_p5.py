@@ -6,12 +6,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from modules.api.phases.authorization import (
-    AuthorizationPhase, _RESOURCE_PATH_PATTERNS,
-    _METHOD_SCORES, _IDOR_REPORT_THRESHOLD,
+    _IDOR_REPORT_THRESHOLD,
+    _METHOD_SCORES,
+    _RESOURCE_PATH_PATTERNS,
+    AuthorizationPhase,
 )
 from modules.api.phases.fuzzing import (
-    _SQL_ERROR_PATTERNS, _STACK_TRACE_PATTERNS,
-    _COMMAND_INJECTION_PATTERNS, _TEMPLATE_INJECTION_PATTERNS,
+    _COMMAND_INJECTION_PATTERNS,
+    _SQL_ERROR_PATTERNS,
+    _STACK_TRACE_PATTERNS,
 )
 
 

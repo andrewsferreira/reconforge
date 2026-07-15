@@ -3,7 +3,7 @@
 import pytest
 
 from core.exceptions import TargetValidationError
-from core.target_parser import parse_target, parse_targets, Target
+from core.target_parser import Target, parse_target, parse_targets
 
 
 def test_parse_single_ip():

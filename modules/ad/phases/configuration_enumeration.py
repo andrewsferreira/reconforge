@@ -12,25 +12,22 @@ Refactored to delegate to collectors → analyzers → attack_paths pipeline.
 Author: Andrews Ferreira
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
-from modules.ad.tools.ldapsearch import ADLdapsearchTool
-from modules.ad.tools.smbclient import ADSmbclientTool
-from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
-
-from modules.ad.parsers.ldap_parser import ADLdapParser, LdapPasswordPolicy
-from modules.ad.parsers.smb_parser import ADSmbParser
-from modules.ad.parsers.enum4linux_ng_parser import Enum4linuxNgParser
-
-from modules.ad.collectors.ldap_collector import LdapCollector
-from modules.ad.collectors.smb_collector import SmbCollector
 from modules.ad.analyzers.misconfiguration_analyzer import MisconfigurationAnalyzer
 from modules.ad.analyzers.permission_analyzer import PermissionAnalyzer
 from modules.ad.analyzers.trust_analyzer import TrustAnalyzer
 from modules.ad.attack_paths.gpo_paths import GpoPathBuilder
 from modules.ad.attack_paths.privilege_escalation_paths import PrivilegeEscalationPathBuilder
-
 from modules.ad.base import ADPhaseBase
+from modules.ad.collectors.ldap_collector import LdapCollector
+from modules.ad.collectors.smb_collector import SmbCollector
+from modules.ad.parsers.enum4linux_ng_parser import Enum4linuxNgParser
+from modules.ad.parsers.ldap_parser import ADLdapParser
+from modules.ad.parsers.smb_parser import ADSmbParser
+from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
+from modules.ad.tools.ldapsearch import ADLdapsearchTool
+from modules.ad.tools.smbclient import ADSmbclientTool
 
 
 class ConfigurationEnumerationPhase(ADPhaseBase):
@@ -59,11 +56,11 @@ class ConfigurationEnumerationPhase(ADPhaseBase):
         self.enum_parser = enum4linux_ng_parser
 
         # Collectors
-        collector_kwargs = dict(
-            logger=self.logger, runner=self.runner,
-            opsec=self.opsec, output_dir=self.output_dir,
-            opsec_mode=self.opsec_mode,
-        )
+        collector_kwargs = {
+            "logger": self.logger, "runner": self.runner,
+            "opsec": self.opsec, "output_dir": self.output_dir,
+            "opsec_mode": self.opsec_mode,
+        }
         self.ldap_collector = LdapCollector(
             ldapsearch=ldapsearch, ldap_parser=ldap_parser, **collector_kwargs,
         )
@@ -86,7 +83,11 @@ class ConfigurationEnumerationPhase(ADPhaseBase):
     # Main entry point
     # ------------------------------------------------------------------
 
-    def run(
+    # ADPhaseBase.run() declares **kwargs: Any deliberately loosely; every
+    # real call site invokes this phase through its concrete type
+    # (ad_module.py), never through the base type, so this narrower,
+    # self-documenting signature carries no real substitutability risk.
+    def run(  # type: ignore[override]
         self,
         target: str,
         domain: str = "",
@@ -96,14 +97,14 @@ class ConfigurationEnumerationPhase(ADPhaseBase):
         username: str = "",
         password: str = "",
         opsec_mode: str = "normal",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute configuration enumeration phase."""
         self.logger.info(f"{'='*60}")
         self.logger.info(f"=== AD Phase 3: Configuration Enumeration on {target} ===")
         self.logger.info(f"{'='*60}")
         self.notes.add_phase_start(self.PHASE_NAME)
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "target": target,
             "domain": domain,
@@ -291,7 +292,7 @@ class ConfigurationEnumerationPhase(ADPhaseBase):
     # Fallback: SMB password policy
     # ------------------------------------------------------------------
 
-    def _enum_password_policy_smb(self, target: str, results: Dict,
+    def _enum_password_policy_smb(self, target: str, results: dict,
                                   username: str, password: str) -> None:
         """Extract password policy via enum4linux-ng (SMB/RPC)."""
         run_result = self.enum4linux_ng.enum_password_policy(

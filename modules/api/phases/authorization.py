@@ -11,15 +11,12 @@ PRIORITY 5 hardened authorization phase:
 - All heuristic findings clearly marked (caps at low via FindingsManager)
 """
 
-import json
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from modules.api.base import APIPhaseBase
-from modules.api.tools.nuclei_api import NucleiApiTool
-from modules.api.tools.httpx_tool import HttpxTool
 from modules.api.parsers.nuclei_parser import NucleiApiParser
-
+from modules.api.tools.httpx_tool import HttpxTool
+from modules.api.tools.nuclei_api import NucleiApiTool
 
 # ── IDOR Candidate Scoring ──────────────────────────────────────────
 # Instead of flat pattern lists, we use a scoring system.  Each signal
@@ -28,7 +25,7 @@ from modules.api.parsers.nuclei_parser import NucleiApiParser
 # matching.
 
 # Structural signals (endpoint shape) — stronger evidence
-_RESOURCE_PATH_PATTERNS: Dict[str, float] = {
+_RESOURCE_PATH_PATTERNS: dict[str, float] = {
     # Pattern => score contribution
     # Only multi-segment resource paths (avoid matching bare "/" prefix)
     "/users/": 0.5,
@@ -56,7 +53,7 @@ _RESOURCE_PATH_PATTERNS: Dict[str, float] = {
 }
 
 # Method signals — mutating methods on resource endpoints are riskier
-_METHOD_SCORES: Dict[str, float] = {
+_METHOD_SCORES: dict[str, float] = {
     "GET": 0.1,
     "PUT": 0.3,
     "PATCH": 0.3,
@@ -87,7 +84,7 @@ class AuthorizationPhase(APIPhaseBase):
         self.httpx = httpx
         self.nuclei_parser = nuclei_parser
 
-    def run(self, target_url: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target_url: str, **kwargs) -> dict[str, Any]:
         """Execute authorization testing phase.
 
         Args:
@@ -107,7 +104,7 @@ class AuthorizationPhase(APIPhaseBase):
         auth_token = kwargs.get("auth_token", "")
         headers = kwargs.get("headers", [])
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "idor_candidates": [],
             "idor_test_cases": [],
@@ -163,9 +160,9 @@ class AuthorizationPhase(APIPhaseBase):
     # ── Scoring-Based IDOR Detection ────────────────────────────────
 
     def _score_idor_candidates(
-        self, target_url: str, endpoints: List[Dict],
-        discovered_params: List[Dict], spec_data: Any,
-        results: Dict,
+        self, target_url: str, endpoints: list[dict],
+        discovered_params: list[dict], spec_data: Any,
+        results: dict,
     ) -> int:
         """Score endpoints for BOLA/IDOR risk using structural analysis.
 
@@ -179,7 +176,7 @@ class AuthorizationPhase(APIPhaseBase):
         Only candidates above threshold are reported, reducing noise.
         """
         finding_count = 0
-        scored_candidates: List[Dict[str, Any]] = []
+        scored_candidates: list[dict[str, Any]] = []
 
         for ep in endpoints:
             url = ep.get("url", "") if isinstance(ep, dict) else str(ep)
@@ -188,7 +185,7 @@ class AuthorizationPhase(APIPhaseBase):
             url_lower = url.lower()
 
             score = 0.0
-            signals: List[str] = []
+            signals: list[str] = []
 
             # Signal 1: Resource path structure
             for pattern, pattern_score in _RESOURCE_PATH_PATTERNS.items():
@@ -292,8 +289,8 @@ class AuthorizationPhase(APIPhaseBase):
         return finding_count
 
     def _score_param_candidates(
-        self, target_url: str, discovered_params: List[Dict],
-        results: Dict,
+        self, target_url: str, discovered_params: list[dict],
+        results: dict,
     ) -> int:
         """Score discovered parameters for IDOR potential.
 
@@ -362,11 +359,11 @@ class AuthorizationPhase(APIPhaseBase):
         return finding_count
 
     def _generate_idor_test_case(self, url: str, method: str,
-                                  signals: List[str]) -> Dict[str, Any]:
+                                  signals: list[str]) -> dict[str, Any]:
         """Generate a specific manual test case for an IDOR candidate."""
         steps = [
             f"1. Authenticate as User A, note the resource ID in: {url}",
-            f"2. Authenticate as User B (different role or account)",
+            "2. Authenticate as User B (different role or account)",
             f"3. Send {method} request to the same URL as User B",
             "4. Compare response: if User B gets User A's data, IDOR confirmed",
         ]
@@ -398,7 +395,7 @@ class AuthorizationPhase(APIPhaseBase):
     # ── Response-Based Auth Pattern Analysis ────────────────────────
 
     def _analyze_response_auth_patterns(
-        self, target_url: str, endpoints: List[Dict], results: Dict,
+        self, target_url: str, endpoints: list[dict], results: dict,
     ) -> int:
         """Analyze response patterns for authorization indicators.
 
@@ -411,7 +408,7 @@ class AuthorizationPhase(APIPhaseBase):
         finding_count = 0
 
         # Group endpoints by path pattern (strip IDs)
-        path_groups: Dict[str, List[Dict]] = {}
+        path_groups: dict[str, list[dict]] = {}
         for ep in endpoints:
             if not isinstance(ep, dict):
                 continue
@@ -452,8 +449,8 @@ class AuthorizationPhase(APIPhaseBase):
 
     # ── Nuclei Authorization Scan ───────────────────────────────────
 
-    def _run_nuclei_authz_scan(self, target_url: str, headers: List[str],
-                                results: Dict) -> int:
+    def _run_nuclei_authz_scan(self, target_url: str, headers: list[str],
+                                results: dict) -> int:
         """Run Nuclei with authorization-focused templates."""
         if not self.nuclei.is_available():
             self.logger.warning("Nuclei not available, skipping authz vuln scan")
@@ -498,9 +495,9 @@ class AuthorizationPhase(APIPhaseBase):
 
     # ── Access Control Checks ───────────────────────────────────────
 
-    def _check_access_control(self, target_url: str, endpoints: List[Dict],
-                               headers: List[str], auth_token: str,
-                               results: Dict) -> int:
+    def _check_access_control(self, target_url: str, endpoints: list[dict],
+                               headers: list[str], auth_token: str,
+                               results: dict) -> int:
         """Check for broken access control patterns.
 
         Requires HTTP 200 + admin-pattern match for medium confidence.
@@ -550,8 +547,8 @@ class AuthorizationPhase(APIPhaseBase):
 
     # ── Rate Limiting ───────────────────────────────────────────────
 
-    def _check_rate_limiting(self, target_url: str, headers: List[str],
-                              results: Dict) -> int:
+    def _check_rate_limiting(self, target_url: str, headers: list[str],
+                              results: dict) -> int:
         """Check for rate limiting on API endpoints."""
         if not self.opsec.check("api_rate_limit_check"):
             return 0
@@ -612,9 +609,7 @@ class AuthorizationPhase(APIPhaseBase):
         if len(segment) in (12, 24, 32) and all(c in "0123456789abcdef" for c in segment.lower()):
             return True
         # Slug with digits (e.g., "user-123")
-        if any(c.isdigit() for c in segment) and "-" in segment:
-            return True
-        return False
+        return bool(any(c.isdigit() for c in segment) and "-" in segment)
 
     @staticmethod
     def _normalize_path(url: str) -> str:

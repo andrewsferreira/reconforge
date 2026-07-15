@@ -12,9 +12,9 @@ mode arguments are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from core.runner import Runner, RunResult, RC_PRECONDITION_FAILED
+from core.runner import RC_PRECONDITION_FAILED, Runner, RunResult
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ class FfufTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -81,7 +81,7 @@ class FfufTool:
         rate = self._rate()
         effective_timeout = self.tool_cfg.effective_timeout(self.opsec_mode, timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ffuf", "-u", f"{target_url}/FUZZ", "-w", wordlist,
             "-t", str(threads), "-mc", match_codes,
             "-o", str(json_path), "-of", "json", "-noninteractive",
@@ -112,7 +112,7 @@ class FfufTool:
         threads = self._threads()
         effective_timeout = self.tool_cfg.effective_timeout(self.opsec_mode, timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ffuf", "-u", target_url,
             "-H", "Host: FUZZ.target",
             "-w", wordlist, "-t", str(threads),

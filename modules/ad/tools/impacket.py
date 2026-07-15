@@ -18,9 +18,9 @@ Author: Andrews Ferreira
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from core.runner import Runner, RunResult, RC_TOOL_NOT_FOUND
+from core.runner import RC_TOOL_NOT_FOUND, Runner, RunResult
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -56,15 +56,15 @@ class ImpacketTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
         self.opsec_mode = opsec_mode
         self._config = config
-        self._resolved: Dict[str, str] = {}
+        self._resolved: dict[str, str] = {}
 
-    def _resolve_binary(self, key: str) -> Optional[str]:
+    def _resolve_binary(self, key: str) -> str | None:
         """Resolve the actual binary name for a tool."""
         if key in self._resolved:
             return self._resolved[key]
@@ -104,7 +104,7 @@ class ImpacketTool:
         out = self.output_dir / "impacket_getadusers.txt"
 
         cred = self._build_identity(domain, username, password)
-        cmd: List[str] = [binary, "-all"]
+        cmd: list[str] = [binary, "-all"]
         if dc_ip:
             cmd += ["-dc-ip", dc_ip]
         cmd.append(cred)
@@ -128,7 +128,7 @@ class ImpacketTool:
         out = self.output_dir / "impacket_getnpusers.txt"
 
         cred = self._build_identity(domain, username, password)
-        cmd: List[str] = [binary]
+        cmd: list[str] = [binary]
         if dc_ip:
             cmd += ["-dc-ip", dc_ip]
         if usersfile:
@@ -161,7 +161,7 @@ class ImpacketTool:
         else:
             identity = f"anonymous@{target}"
 
-        cmd: List[str] = [binary, identity, str(max_rid)]
+        cmd: list[str] = [binary, identity, str(max_rid)]
         effective_timeout = self._tool_cfg("lookupsid").effective_timeout(None, timeout)
         return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
@@ -178,7 +178,7 @@ class ImpacketTool:
 
         self.logger.info(f"Running rpcdump on {target}:{port}")
         out = self.output_dir / "impacket_rpcdump.txt"
-        cmd: List[str] = [binary, target, "-port", str(port)]
+        cmd: list[str] = [binary, target, "-port", str(port)]
         effective_timeout = self._tool_cfg("rpcdump").effective_timeout(None, timeout)
         return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 

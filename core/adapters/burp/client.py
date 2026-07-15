@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from core.adapters.burp.capabilities import build_capability_map, classify_capabilities
 from core.adapters.burp.config import BurpMcpConfig
@@ -23,7 +23,7 @@ class BurpMcpClient:
         self.policy = policy
         self.connection = BurpSseConnection(config)
         self.rpc = BurpJsonRpcClient(self.connection)
-        self._capabilities: Dict[str, BurpCapability] = {}
+        self._capabilities: dict[str, BurpCapability] = {}
 
     def connect(self) -> None:
         self.connection.connect()
@@ -31,7 +31,7 @@ class BurpMcpClient:
     def close(self) -> None:
         self.connection.close()
 
-    def discover_capabilities(self) -> List[BurpCapability]:
+    def discover_capabilities(self) -> list[BurpCapability]:
         payload = self.rpc.tools_list()
         raw_tools = payload.get("tools", [])
         if not isinstance(raw_tools, list):
@@ -50,9 +50,9 @@ class BurpMcpClient:
         cap = self._capabilities.get(tool_name)
         return bool(cap and cap.enabled)
 
-    def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         return self.rpc.tools_call(tool_name, arguments)
 
     @property
-    def capability_map(self) -> Dict[str, BurpCapability]:
+    def capability_map(self) -> dict[str, BurpCapability]:
         return dict(self._capabilities)

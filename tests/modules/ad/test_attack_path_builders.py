@@ -14,7 +14,6 @@ from modules.ad.attack_paths.gpo_paths import GpoPathBuilder
 from modules.ad.attack_paths.kerberoast_paths import KerberoastPathBuilder
 from modules.ad.attack_paths.privilege_escalation_paths import PrivilegeEscalationPathBuilder
 
-
 # ── AclPathBuilder ──────────────────────────────────────────────────
 
 def test_acl_builder_empty_input_produces_no_chains():

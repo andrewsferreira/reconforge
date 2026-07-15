@@ -15,7 +15,7 @@ scan profile arguments are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -33,8 +33,8 @@ class NmapStealthTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 profile: Optional["ProfileLoader"] = None,
-                 config: Optional["ConfigLoader"] = None):
+                 profile: ProfileLoader | None = None,
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -56,9 +56,9 @@ class NmapStealthTool:
             "aggressive": "-T4",
         }.get(self.opsec_mode, "-T3")
 
-    def _extra_timing_args(self) -> List[str]:
+    def _extra_timing_args(self) -> list[str]:
         """Return additional timing arguments from the profile."""
-        args: List[str] = []
+        args: list[str] = []
         if self.profile:
             delay = self.profile.scan_delay
             if delay and delay != "0":
@@ -76,12 +76,12 @@ class NmapStealthTool:
                 return str(pr)
         return "--top-ports 1000"
 
-    def _base_cmd(self, extra_args: List[str], target: str,
-                  output_prefix: str) -> List[str]:
+    def _base_cmd(self, extra_args: list[str], target: str,
+                  output_prefix: str) -> list[str]:
         """Build the nmap command as a list."""
         xml_path = self.output_dir / f"{output_prefix}.xml"
         normal_path = self.output_dir / f"{output_prefix}.nmap"
-        cmd: List[str] = ["nmap"] + extra_args
+        cmd: list[str] = ["nmap"] + extra_args
         cmd += ["-oX", str(xml_path), "-oN", str(normal_path), target]
         return cmd
 
@@ -97,7 +97,7 @@ class NmapStealthTool:
         timing = self._timing_flag()
         # Parse ports argument: could be "--top-ports 1000" or "-p 22,80"
         port_args = effective_ports.split()
-        args: List[str] = ["-sS", timing] + port_args + ["-Pn", "--open"]
+        args: list[str] = ["-sS", timing] + port_args + ["-Pn", "--open"]
         args += self._extra_timing_args()
         cmd = self._base_cmd(args, target, "stealth_syn")
         effective_timeout = self.tool_cfg.mode_timeout("stealth_syn", timeout)
@@ -107,7 +107,7 @@ class NmapStealthTool:
                              timeout: int = 600) -> RunResult:
         """Run a service/version detection scan."""
         timing = self._timing_flag()
-        args: List[str] = ["-sV", timing]
+        args: list[str] = ["-sV", timing]
         if ports:
             args += ports.split()
         args += ["-Pn", "--open"]

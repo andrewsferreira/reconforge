@@ -24,7 +24,7 @@ import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 logger = logging.getLogger("reconforge.openapi_parser")
 
@@ -36,17 +36,17 @@ logger = logging.getLogger("reconforge.openapi_parser")
 class ResolvedSchema:
     """A fully resolved schema from $ref traversal."""
     schema_type: str = ""          # object, array, string, integer, etc.
-    properties: Dict[str, Any] = field(default_factory=dict)
-    required_fields: List[str] = field(default_factory=list)
+    properties: dict[str, Any] = field(default_factory=dict)
+    required_fields: list[str] = field(default_factory=list)
     items_type: str = ""           # For array types
-    enum_values: List[Any] = field(default_factory=list)
+    enum_values: list[Any] = field(default_factory=list)
     format_hint: str = ""          # date-time, email, uri, uuid, etc.
     description: str = ""
     example: Any = None
     composition: str = ""          # oneOf, anyOf, allOf
-    composition_schemas: List["ResolvedSchema"] = field(default_factory=list)
+    composition_schemas: list["ResolvedSchema"] = field(default_factory=list)
     nullable: bool = False
-    raw: Dict = field(default_factory=dict)
+    raw: dict = field(default_factory=dict)
 
     @property
     def is_complex(self) -> bool:
@@ -54,7 +54,7 @@ class ResolvedSchema:
         return bool(self.properties or self.composition_schemas)
 
     @property
-    def field_names(self) -> List[str]:
+    def field_names(self) -> list[str]:
         """All property/field names (including from composed schemas)."""
         names = list(self.properties.keys())
         for sub in self.composition_schemas:
@@ -72,21 +72,21 @@ class OpenApiParameter:
     format_hint: str = ""    # date-time, email, uuid, etc.
     description: str = ""
     example: Any = None
-    enum_values: List[Any] = field(default_factory=list)
-    schema: Optional[ResolvedSchema] = None
+    enum_values: list[Any] = field(default_factory=list)
+    schema: ResolvedSchema | None = None
 
 
 @dataclass
 class OpenApiRequestBody:
     """A parsed requestBody definition."""
     required: bool = False
-    content_types: List[str] = field(default_factory=list)
-    schema: Optional[ResolvedSchema] = None
+    content_types: list[str] = field(default_factory=list)
+    schema: ResolvedSchema | None = None
     description: str = ""
-    examples: Dict[str, Any] = field(default_factory=dict)
+    examples: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def fields(self) -> List[str]:
+    def fields(self) -> list[str]:
         """Extract field names from request body schema."""
         if self.schema:
             return self.schema.field_names
@@ -101,16 +101,16 @@ class OpenApiEndpoint:
     summary: str = ""
     description: str = ""
     operation_id: str = ""
-    parameters: List[OpenApiParameter] = field(default_factory=list)
-    request_body: Optional[OpenApiRequestBody] = None
-    security: List[Dict] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
-    responses: Dict[str, Any] = field(default_factory=dict)
+    parameters: list[OpenApiParameter] = field(default_factory=list)
+    request_body: OpenApiRequestBody | None = None
+    security: list[dict] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    responses: dict[str, Any] = field(default_factory=dict)
     requires_auth: bool = False
     deprecated: bool = False
 
     @property
-    def all_parameter_names(self) -> List[str]:
+    def all_parameter_names(self) -> list[str]:
         """All parameter names including request body fields."""
         names = [p.name for p in self.parameters]
         if self.request_body and self.request_body.schema:
@@ -122,14 +122,8 @@ class OpenApiEndpoint:
         """Whether this endpoint accepts any user input."""
         return bool(self.parameters or self.request_body)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain dict for backward compatibility."""
-        d: Dict[str, Any] = {
-            "name": "",
-            "in": "",
-            "required": False,
-            "type": "",
-        }
         # Flatten parameters for legacy consumers
         params = []
         for p in self.parameters:
@@ -172,7 +166,7 @@ class OpenApiAuthScheme:
     param_name: str = ""      # e.g., "Authorization", "X-API-Key"
     bearer_format: str = ""   # JWT, opaque, etc.
     # OAuth2 specifics
-    oauth_flows: Dict[str, Any] = field(default_factory=dict)
+    oauth_flows: dict[str, Any] = field(default_factory=dict)
     openid_connect_url: str = ""
 
     @property
@@ -197,41 +191,41 @@ class OpenApiSpec:
     version: str = ""
     spec_version: str = ""       # "openapi_3.0.3" or "swagger_2.0"
     description: str = ""
-    servers: List[str] = field(default_factory=list)
-    endpoints: List[OpenApiEndpoint] = field(default_factory=list)
-    auth_schemes: List[OpenApiAuthScheme] = field(default_factory=list)
-    global_security: List[Dict] = field(default_factory=list)
-    raw_spec: Dict = field(default_factory=dict)
-    parse_errors: List[str] = field(default_factory=list)
-    parse_warnings: List[str] = field(default_factory=list)
+    servers: list[str] = field(default_factory=list)
+    endpoints: list[OpenApiEndpoint] = field(default_factory=list)
+    auth_schemes: list[OpenApiAuthScheme] = field(default_factory=list)
+    global_security: list[dict] = field(default_factory=list)
+    raw_spec: dict = field(default_factory=dict)
+    parse_errors: list[str] = field(default_factory=list)
+    parse_warnings: list[str] = field(default_factory=list)
 
     @property
-    def by_tag(self) -> Dict[str, List[OpenApiEndpoint]]:
-        groups: Dict[str, List[OpenApiEndpoint]] = {}
+    def by_tag(self) -> dict[str, list[OpenApiEndpoint]]:
+        groups: dict[str, list[OpenApiEndpoint]] = {}
         for ep in self.endpoints:
             for tag in (ep.tags or ["untagged"]):
                 groups.setdefault(tag, []).append(ep)
         return groups
 
     @property
-    def authenticated_endpoints(self) -> List[OpenApiEndpoint]:
+    def authenticated_endpoints(self) -> list[OpenApiEndpoint]:
         return [ep for ep in self.endpoints if ep.requires_auth]
 
     @property
-    def unauthenticated_endpoints(self) -> List[OpenApiEndpoint]:
+    def unauthenticated_endpoints(self) -> list[OpenApiEndpoint]:
         return [ep for ep in self.endpoints if not ep.requires_auth]
 
     @property
-    def endpoints_with_body(self) -> List[OpenApiEndpoint]:
+    def endpoints_with_body(self) -> list[OpenApiEndpoint]:
         """Endpoints that accept a request body."""
         return [ep for ep in self.endpoints if ep.request_body is not None]
 
     @property
-    def deprecated_endpoints(self) -> List[OpenApiEndpoint]:
+    def deprecated_endpoints(self) -> list[OpenApiEndpoint]:
         return [ep for ep in self.endpoints if ep.deprecated]
 
     @property
-    def input_endpoints(self) -> List[OpenApiEndpoint]:
+    def input_endpoints(self) -> list[OpenApiEndpoint]:
         """Endpoints accepting any user input (params or body)."""
         return [ep for ep in self.endpoints if ep.accepts_input]
 
@@ -239,7 +233,7 @@ class OpenApiSpec:
     def endpoint_count(self) -> int:
         return len(self.endpoints)
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         """Generate a compact summary of the spec."""
         return {
             "title": self.title,
@@ -274,10 +268,10 @@ class RefResolver:
 
     MAX_DEPTH = 20  # Guard against infinite recursion
 
-    def __init__(self, spec: Dict) -> None:
+    def __init__(self, spec: dict) -> None:
         self._spec = spec
-        self._cache: Dict[str, Any] = {}
-        self._resolving: Set[str] = set()  # Circular ref guard
+        self._cache: dict[str, Any] = {}
+        self._resolving: set[str] = set()  # Circular ref guard
 
     def resolve(self, obj: Any, depth: int = 0) -> Any:
         """Recursively resolve $ref pointers in *obj*.
@@ -320,7 +314,7 @@ class RefResolver:
         finally:
             self._resolving.discard(ref)
 
-    def _lookup(self, ref: str) -> Optional[Any]:
+    def _lookup(self, ref: str) -> Any | None:
         """Walk the spec tree following a JSON pointer."""
         if not ref.startswith("#/"):
             # External refs not supported
@@ -392,7 +386,7 @@ class OpenApiParser:
         result.raw_spec = data
         return self._parse_spec(data, result)
 
-    def parse_dict(self, data: Dict) -> OpenApiSpec:
+    def parse_dict(self, data: dict) -> OpenApiSpec:
         """Parse an OpenAPI spec from a dictionary.
 
         Args:
@@ -428,7 +422,7 @@ class OpenApiParser:
 
     # ── Internal parsing ────────────────────────────────────────────
 
-    def _load_content(self, raw: str, suffix: str, result: OpenApiSpec) -> Optional[Dict]:
+    def _load_content(self, raw: str, suffix: str, result: OpenApiSpec) -> dict | None:
         """Load raw text into a dict (JSON or YAML)."""
         try:
             if suffix in (".yaml", ".yml"):
@@ -453,7 +447,7 @@ class OpenApiParser:
 
         return data
 
-    def _parse_spec(self, data: Dict, result: OpenApiSpec) -> OpenApiSpec:
+    def _parse_spec(self, data: dict, result: OpenApiSpec) -> OpenApiSpec:
         """Internal spec parsing logic with full $ref resolution."""
 
         # Detect spec type
@@ -490,7 +484,7 @@ class OpenApiParser:
 
         return result
 
-    def _parse_servers(self, data: Dict, result: OpenApiSpec) -> None:
+    def _parse_servers(self, data: dict, result: OpenApiSpec) -> None:
         """Parse servers (3.x) or host (2.x)."""
         if "servers" in data:
             servers = data.get("servers", [])
@@ -509,7 +503,7 @@ class OpenApiParser:
             base_path = data.get("basePath", "")
             result.servers = [f"{scheme}://{data['host']}{base_path}"]
 
-    def _parse_security_schemes(self, data: Dict, resolver: RefResolver,
+    def _parse_security_schemes(self, data: dict, resolver: RefResolver,
                                  result: OpenApiSpec) -> None:
         """Extract security schemes from components or securityDefinitions."""
         security_defs = (
@@ -534,7 +528,7 @@ class OpenApiParser:
             auth_type = str(scheme_data.get("type", ""))
 
             # Extract OAuth2 flows
-            oauth_flows: Dict[str, Any] = {}
+            oauth_flows: dict[str, Any] = {}
             if auth_type == "oauth2":
                 flows_raw = scheme_data.get("flows", scheme_data.get("flow", {}))
                 if isinstance(flows_raw, dict):
@@ -566,8 +560,8 @@ class OpenApiParser:
             )
             result.auth_schemes.append(scheme)
 
-    def _parse_paths(self, data: Dict, resolver: RefResolver,
-                      global_security: List, result: OpenApiSpec) -> None:
+    def _parse_paths(self, data: dict, resolver: RefResolver,
+                      global_security: list, result: OpenApiSpec) -> None:
         """Parse all path items and operations."""
         paths = data.get("paths", {})
         if not isinstance(paths, dict):
@@ -601,15 +595,15 @@ class OpenApiParser:
                     )
 
     def _parse_operation(
-        self, path: str, method: str, operation: Dict,
-        path_params: List[OpenApiParameter],
-        global_security: List, resolver: RefResolver,
+        self, path: str, method: str, operation: dict,
+        path_params: list[OpenApiParameter],
+        global_security: list, resolver: RefResolver,
         result: OpenApiSpec,
     ) -> OpenApiEndpoint:
         """Parse a single operation (method on a path)."""
 
         # ── Security ────────────────────────────────────────────────
-        op_security = operation.get("security", None)
+        op_security = operation.get("security")
         if op_security is None:
             # Inherit global security
             effective_security = global_security
@@ -676,12 +670,12 @@ class OpenApiParser:
         )
 
     def _parse_parameters(self, params_raw: Any, resolver: RefResolver,
-                           result: OpenApiSpec) -> List[OpenApiParameter]:
+                           result: OpenApiSpec) -> list[OpenApiParameter]:
         """Parse a list of parameter objects, resolving $refs."""
         if not isinstance(params_raw, list):
             return []
 
-        params: List[OpenApiParameter] = []
+        params: list[OpenApiParameter] = []
         for p_raw in params_raw:
             if not isinstance(p_raw, dict):
                 continue
@@ -728,7 +722,7 @@ class OpenApiParser:
         return params
 
     def _parse_request_body(self, rb_raw: Any, resolver: RefResolver,
-                             result: OpenApiSpec) -> Optional[OpenApiRequestBody]:
+                             result: OpenApiSpec) -> OpenApiRequestBody | None:
         """Parse an OpenAPI 3.x requestBody."""
         if not isinstance(rb_raw, dict):
             return None
@@ -744,8 +738,8 @@ class OpenApiParser:
             return None
 
         content_types = list(content.keys())
-        schema: Optional[ResolvedSchema] = None
-        examples: Dict[str, Any] = {}
+        schema: ResolvedSchema | None = None
+        examples: dict[str, Any] = {}
 
         # Prefer application/json, then first available
         preferred = ["application/json", "application/xml", "multipart/form-data"]
@@ -781,7 +775,7 @@ class OpenApiParser:
             examples=examples,
         )
 
-    def _build_schema(self, schema_data: Dict, resolver: RefResolver,
+    def _build_schema(self, schema_data: dict, resolver: RefResolver,
                        depth: int = 0) -> ResolvedSchema:
         """Build a ResolvedSchema from a (resolved) schema dict.
 
@@ -795,7 +789,7 @@ class OpenApiParser:
 
         # ── Composition schemas ─────────────────────────────────────
         composition = ""
-        composition_schemas: List[ResolvedSchema] = []
+        composition_schemas: list[ResolvedSchema] = []
         for comp_key in ("oneOf", "anyOf", "allOf"):
             comp_list = schema_data.get(comp_key)
             if isinstance(comp_list, list):
@@ -810,8 +804,8 @@ class OpenApiParser:
                 break
 
         # ── Object properties ───────────────────────────────────────
-        properties: Dict[str, Any] = {}
-        required_fields: List[str] = []
+        properties: dict[str, Any] = {}
+        required_fields: list[str] = []
 
         if schema_type == "object" or "properties" in schema_data:
             schema_type = schema_type or "object"
@@ -864,15 +858,15 @@ class OpenApiParser:
         )
 
     @staticmethod
-    def _merge_parameters(path_params: List[OpenApiParameter],
-                           op_params: List[OpenApiParameter]) -> List[OpenApiParameter]:
+    def _merge_parameters(path_params: list[OpenApiParameter],
+                           op_params: list[OpenApiParameter]) -> list[OpenApiParameter]:
         """Merge path-level and operation-level parameters.
 
         Operation params override path params when they share
         the same ``(name, location)`` key.
         """
         key_fn = lambda p: (p.name, p.location)
-        merged: Dict[Tuple[str, str], OpenApiParameter] = {}
+        merged: dict[tuple[str, str], OpenApiParameter] = {}
         for p in path_params:
             merged[key_fn(p)] = p
         for p in op_params:
@@ -880,7 +874,7 @@ class OpenApiParser:
         return list(merged.values())
 
     @staticmethod
-    def detect_spec_type(data: Dict) -> str:
+    def detect_spec_type(data: dict) -> str:
         """Detect if spec is OpenAPI 3.x or Swagger 2.x."""
         if "openapi" in data:
             return f"openapi_{data['openapi']}"

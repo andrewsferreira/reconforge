@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 SCHEMA_VERSION = "1.1"
 SUPPORTED_SCHEMA_VERSIONS = {"1.0", "1.1"}
@@ -15,19 +15,19 @@ SUPPORTED_SCHEMA_VERSIONS = {"1.0", "1.1"}
 @dataclass(frozen=True)
 class ContractSpec:
     kind: str
-    required_keys: List[str]
+    required_keys: list[str]
 
 
-SPECS: Dict[str, ContractSpec] = {
+SPECS: dict[str, ContractSpec] = {
     "results": ContractSpec("results", ["target", "phases"]),
     "findings": ContractSpec("findings", []),
     "loot": ContractSpec("loot", []),
 }
 
 
-def _normalize_findings(payload: Any) -> List[Dict[str, Any]]:
+def _normalize_findings(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, list):
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for item in payload:
             if not isinstance(item, dict):
                 continue
@@ -42,13 +42,13 @@ def _normalize_findings(payload: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def _normalize_loot(payload: Any) -> List[Dict[str, Any]]:
+def _normalize_loot(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, list):
         return [dict(i) for i in payload if isinstance(i, dict)]
     return []
 
 
-def _normalize_results(payload: Any) -> Dict[str, Any]:
+def _normalize_results(payload: Any) -> dict[str, Any]:
     if isinstance(payload, dict):
         fixed = dict(payload)
         fixed.setdefault("target", "")
@@ -84,7 +84,7 @@ def validate_payload(kind: str, payload: Any) -> None:
                 raise ValueError(f"results payload missing required key: {key}")
 
 
-def build_contract(kind: str, payload: Any, *, execution_id: str = "", module: str = "") -> Dict[str, Any]:
+def build_contract(kind: str, payload: Any, *, execution_id: str = "", module: str = "") -> dict[str, Any]:
     normalized = normalize_payload(kind, payload)
     validate_payload(kind, normalized)
     return {
@@ -97,7 +97,7 @@ def build_contract(kind: str, payload: Any, *, execution_id: str = "", module: s
     }
 
 
-def migrate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
+def migrate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     """Migrate legacy contract versions to current schema version.
 
     Backward compatibility:
@@ -117,7 +117,7 @@ def migrate_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
     return migrated
 
 
-def validate_contract(contract: Dict[str, Any]) -> None:
+def validate_contract(contract: dict[str, Any]) -> None:
     """Validate full contract envelope and inner payload."""
     if not isinstance(contract, dict):
         raise ValueError("contract must be a dict")
@@ -129,7 +129,7 @@ def validate_contract(contract: Dict[str, Any]) -> None:
     validate_payload(kind, normalize_payload(kind, contract["data"]))
 
 
-def load_contract(path: Path) -> Dict[str, Any]:
+def load_contract(path: Path) -> dict[str, Any]:
     """Load, migrate and validate contract from disk."""
     p = Path(path)
     raw = json.loads(p.read_text())

@@ -14,9 +14,9 @@ Author: Andrews Ferreira
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from core.runner import Runner, RunResult, RC_TOOL_NOT_FOUND
+from core.runner import RC_TOOL_NOT_FOUND, Runner, RunResult
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -31,15 +31,15 @@ class BloodhoundTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
         self.opsec_mode = opsec_mode
         self.tool_cfg = ToolConfig(config, self.TOOL_CONFIG_KEY)
-        self._resolved: Optional[str] = None
+        self._resolved: str | None = None
 
-    def _resolve_binary(self) -> Optional[str]:
+    def _resolve_binary(self) -> str | None:
         """Resolve the actual binary name."""
         if self._resolved is not None:
             return self._resolved
@@ -152,7 +152,7 @@ class BloodhoundTool:
         bh_output_dir = self.output_dir / "bloodhound"
         bh_output_dir.mkdir(parents=True, exist_ok=True)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             binary,
             "-d", domain,
             "-u", username,

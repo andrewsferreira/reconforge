@@ -3,9 +3,13 @@
 Author: Andrews Ferreira
 """
 
-from typing import Any, Dict, List
+from typing import Any
+
 from modules.ad.attack_paths.base import (
-    AttackPathBuilderBase, AttackPathResult, AttackChain, NextStepSuggestion,
+    AttackChain,
+    AttackPathBuilderBase,
+    AttackPathResult,
+    NextStepSuggestion,
 )
 
 
@@ -15,7 +19,7 @@ class DelegationPathBuilder(AttackPathBuilderBase):
     BUILDER_NAME = "delegation"
 
     def build(
-        self, analysis_data: Dict[str, Any],
+        self, analysis_data: dict[str, Any],
         target: str = "", domain: str = "", **kwargs,
     ) -> AttackPathResult:
         result = AttackPathResult(builder=self.BUILDER_NAME)
@@ -27,7 +31,7 @@ class DelegationPathBuilder(AttackPathBuilderBase):
         return result
 
     def _build_unconstrained(
-        self, data: Dict, target: str, domain: str, result: AttackPathResult,
+        self, data: dict, target: str, domain: str, result: AttackPathResult,
     ) -> None:
         unconstrained = data.get("unconstrained_delegation", [])
         non_dc = [e for e in unconstrained if not getattr(e, "is_dc", False)]
@@ -61,7 +65,7 @@ class DelegationPathBuilder(AttackPathBuilderBase):
             ))
 
     def _build_constrained(
-        self, data: Dict, target: str, domain: str, result: AttackPathResult,
+        self, data: dict, target: str, domain: str, result: AttackPathResult,
     ) -> None:
         constrained = data.get("constrained_delegation", [])
         proto_trans = [e for e in constrained if getattr(e, "protocol_transition", False)]
@@ -100,7 +104,7 @@ class DelegationPathBuilder(AttackPathBuilderBase):
             ))
 
     def _build_rbcd(
-        self, data: Dict, target: str, domain: str, result: AttackPathResult,
+        self, data: dict, target: str, domain: str, result: AttackPathResult,
     ) -> None:
         rbcd = data.get("rbcd", [])
         maq = data.get("machine_account_quota", -1)

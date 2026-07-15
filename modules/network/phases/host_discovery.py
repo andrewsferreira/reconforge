@@ -5,12 +5,11 @@ Uses nmap ping sweep to discover live hosts, then records findings
 and updates the attack workflow with next steps.
 """
 
-from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 from modules.network.base import NetworkPhaseBase
+from modules.network.parsers.nmap_parser import NmapParser
 from modules.network.tools.nmap import NmapTool
-from modules.network.parsers.nmap_parser import NmapParser, NmapResult
 
 
 class HostDiscoveryPhase(NetworkPhaseBase):
@@ -25,7 +24,11 @@ class HostDiscoveryPhase(NetworkPhaseBase):
         self.nmap = nmap
         self.parser = parser
 
-    def run(self, target: str, is_network: bool = False) -> Dict[str, Any]:
+    # NetworkPhaseBase.run() declares **kwargs: Any deliberately loosely;
+    # every real call site invokes this phase through its concrete type
+    # (network_module.py), never through the base type, so this narrower,
+    # self-documenting signature carries no real substitutability risk.
+    def run(self, target: str, is_network: bool = False) -> dict[str, Any]:  # type: ignore[override]
         """Execute host discovery phase.
 
         Args:
@@ -66,7 +69,7 @@ class HostDiscoveryPhase(NetworkPhaseBase):
             self.workflow.record_result(f"1 host targeted: {target}")
 
             self._suggest_next_steps(results)
-            self.notes.add_phase_end(self.PHASE_NAME, f"1 host targeted")
+            self.notes.add_phase_end(self.PHASE_NAME, "1 host targeted")
             return results
 
         # OPSEC check for ping sweep
@@ -151,7 +154,7 @@ class HostDiscoveryPhase(NetworkPhaseBase):
 
         return results
 
-    def _suggest_next_steps(self, results: Dict):
+    def _suggest_next_steps(self, results: dict):
         """Add suggested next commands to the workflow."""
         for host in results["live_hosts"][:5]:  # Limit suggestions
             self.workflow.suggest_next(

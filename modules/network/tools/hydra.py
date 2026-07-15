@@ -13,9 +13,9 @@ safety settings are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from core.runner import Runner, RunResult, RC_POLICY_BLOCKED
+from core.runner import RC_POLICY_BLOCKED, Runner, RunResult
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ class HydraTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  authorized: bool = False,
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -76,14 +76,14 @@ class HydraTool:
         return int(self.tool_cfg.safety("wait_time", 3))
 
     def _build_cmd(self, target: str, service: str,
-                   port: Optional[int] = None,
-                   userlist: Optional[str] = None,
-                   passlist: Optional[str] = None,
-                   username: Optional[str] = None,
-                   password: Optional[str] = None,
-                   extra_args: Optional[List[str]] = None) -> List[str]:
+                   port: int | None = None,
+                   userlist: str | None = None,
+                   passlist: str | None = None,
+                   username: str | None = None,
+                   password: str | None = None,
+                   extra_args: list[str] | None = None) -> list[str]:
         """Build hydra command as a list."""
-        cmd: List[str] = ["hydra"]
+        cmd: list[str] = ["hydra"]
 
         if username:
             cmd += ["-l", username]
@@ -114,7 +114,7 @@ class HydraTool:
         return cmd
 
     def test_default_creds(self, target: str, service: str,
-                           port: Optional[int] = None,
+                           port: int | None = None,
                            timeout: int = 120) -> RunResult:
         """Test common default credentials."""
         if not self._check_authorization():
@@ -131,8 +131,8 @@ class HydraTool:
         user_file = self.output_dir / f"hydra_{service}_users.txt"
         pass_file = self.output_dir / f"hydra_{service}_passwords.txt"
 
-        users = sorted(set(u for u, _ in self.DEFAULT_CREDS))
-        passwords = sorted(set(p for _, p in self.DEFAULT_CREDS))
+        users = sorted({u for u, _ in self.DEFAULT_CREDS})
+        passwords = sorted({p for _, p in self.DEFAULT_CREDS})
 
         user_file.write_text("\n".join(users) + "\n")
         pass_file.write_text("\n".join(passwords) + "\n")
@@ -145,7 +145,7 @@ class HydraTool:
 
     def test_credentials(self, target: str, service: str,
                          userlist: str, passlist: str,
-                         port: Optional[int] = None,
+                         port: int | None = None,
                          timeout: int = 300) -> RunResult:
         """Test credentials from custom wordlists."""
         if not self._check_authorization():
@@ -165,7 +165,7 @@ class HydraTool:
 
     def test_single_cred(self, target: str, service: str,
                          username: str, password: str,
-                         port: Optional[int] = None,
+                         port: int | None = None,
                          timeout: int = 30) -> RunResult:
         """Test a single credential pair."""
         if not self._check_authorization():

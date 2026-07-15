@@ -12,11 +12,11 @@ Author: Andrews Ferreira
 
 import re
 import xml.etree.ElementTree as ET  # nosec B405 - only used for type hints (Element, ParseError); parsing itself goes through defusedxml below
-import defusedxml.ElementTree as DefusedET
-from defusedxml.common import DefusedXmlException
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 
 
 @dataclass
@@ -28,7 +28,7 @@ class ADServiceInfo:
     product: str = ""
     version: str = ""
     state: str = ""
-    scripts: Dict[str, str] = field(default_factory=dict)
+    scripts: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -36,7 +36,7 @@ class ADNmapResult:
     """AD-specific nmap scan result."""
     target: str = ""
     hostname: str = ""
-    services: List[ADServiceInfo] = field(default_factory=list)
+    services: list[ADServiceInfo] = field(default_factory=list)
     # Extracted AD intelligence
     domain_name: str = ""
     forest_name: str = ""
@@ -63,7 +63,7 @@ class ADNmapResult:
         )
 
     @property
-    def open_ports(self) -> List[int]:
+    def open_ports(self) -> list[int]:
         return [s.port for s in self.services if s.state == "open"]
 
 
@@ -107,7 +107,7 @@ class ADNmapParser:
         self._extract_ad_intel(result)
         return result
 
-    def _parse_port_xml(self, port_elem: ET.Element) -> Optional[ADServiceInfo]:
+    def _parse_port_xml(self, port_elem: ET.Element) -> ADServiceInfo | None:
         state_elem = port_elem.find("state")
         if state_elem is None:
             return None

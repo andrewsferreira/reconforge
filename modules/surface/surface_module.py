@@ -18,40 +18,39 @@ Usage:
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from core.authorization_gate import ScopeAuthorization
 
-from core.logger import ReconLogger
-from core.runner import Runner
-from core.config_loader import ConfigLoader
-from core.output_manager import OutputManager
 from core.attack_workflow import AttackWorkflow
-from core.loot_manager import LootManager
+from core.config_loader import ConfigLoader
+from core.data_contracts import SCHEMA_VERSION, build_contract
+from core.exceptions import ModuleError
 from core.findings_manager import FindingsManager
+from core.logger import ReconLogger
+from core.loot_manager import LootManager
 from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
+from core.output_manager import OutputManager
 from core.profile_loader import ProfileLoader
+from core.runner import Runner
 from core.target_parser import parse_target
 from core.telemetry import ModuleTelemetry
-from core.data_contracts import SCHEMA_VERSION, build_contract
 from core.version import __version__
-from core.exceptions import ModuleError
-
-# Tool imports
-from modules.surface.tools.nmap_stealth import NmapStealthTool
-from modules.surface.tools.service_detector import ServiceDetectorTool
 
 # Parser imports
 from modules.surface.parsers.surface_parser import SurfaceParser
 
 # Phase imports
 from modules.surface.phases.port_discovery import PortDiscoveryPhase
+from modules.surface.phases.prioritization import PrioritizationPhase
 from modules.surface.phases.service_fingerprint import ServiceFingerprintPhase
 from modules.surface.phases.vector_correlation import VectorCorrelationPhase
-from modules.surface.phases.prioritization import PrioritizationPhase
+
+# Tool imports
+from modules.surface.tools.nmap_stealth import NmapStealthTool
+from modules.surface.tools.service_detector import ServiceDetectorTool
 
 
 class SurfaceModule:
@@ -77,10 +76,10 @@ class SurfaceModule:
         verbose: bool = False,
         dry_run: bool = False,
         timeout: int = 900,
-        config_dir: Optional[str] = None,
+        config_dir: str | None = None,
         encrypt_loot: bool = False,
         scope: Optional["ScopeAuthorization"] = None,
-        approval_id: Optional[str] = None,
+        approval_id: str | None = None,
     ) -> None:
         """Initialise the Surface module.
 
@@ -143,19 +142,19 @@ class SurfaceModule:
         self.surface_parser = SurfaceParser()
 
         # Shared keyword args for all phases
-        self._phase_kwargs = dict(
-            logger=self.logger,
-            runner=self.runner,
-            config=self.config,
-            output_dir=self.parsed_dir,
-            findings=self.findings_mgr,
-            loot=self.loot,
-            workflow=self.workflow,
-            notes=self.notes,
-            opsec=self.opsec,
-            opsec_mode=opsec_mode,
-            profile=self.profile,
-        )
+        self._phase_kwargs = {
+            "logger": self.logger,
+            "runner": self.runner,
+            "config": self.config,
+            "output_dir": self.parsed_dir,
+            "findings": self.findings_mgr,
+            "loot": self.loot,
+            "workflow": self.workflow,
+            "notes": self.notes,
+            "opsec": self.opsec,
+            "opsec_mode": opsec_mode,
+            "profile": self.profile,
+        }
 
         # Initialise phases
         self.phase_port_discovery = PortDiscoveryPhase(
@@ -178,8 +177,8 @@ class SurfaceModule:
 
     def run(
         self,
-        phases: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        phases: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Execute the attack-surface reconnaissance workflow.
 
         Args:
@@ -221,7 +220,7 @@ class SurfaceModule:
         # Check tool availability
         self._check_tools()
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "target": str(self.target),
             "opsec_mode": self.opsec_mode,
             "schema_version": SCHEMA_VERSION,
@@ -320,7 +319,7 @@ class SurfaceModule:
 
     # \u2500\u2500 Internal helpers \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-    def _check_tools(self) -> Dict[str, bool]:
+    def _check_tools(self) -> dict[str, bool]:
         """Check availability of surface reconnaissance tools."""
         tools = {
             "nmap": self.nmap.is_available(),
@@ -345,7 +344,7 @@ class SurfaceModule:
 
         return tools
 
-    def _generate_reports(self, results: Dict) -> None:
+    def _generate_reports(self, results: dict) -> None:
         """Generate all output reports."""
         self.logger.info("Generating reports...")
 
@@ -424,7 +423,7 @@ class SurfaceModule:
                 message=f"Report generation failed partway through — some artifacts may be missing: {e}",
             ) from e
 
-    def _generate_quick_report(self, results: Dict) -> None:
+    def _generate_quick_report(self, results: dict) -> None:
         """Generate executive summary report."""
         report_path = self.output.report_file(self.MODULE_NAME)
 
@@ -437,7 +436,7 @@ class SurfaceModule:
             f"**Target:** {self.target}",
             f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**OPSEC Mode:** {self.opsec_mode}",
-            f"**Author:** Andrews Ferreira",
+            "**Author:** Andrews Ferreira",
             "",
             "## Executive Summary\n",
             f"Attack-surface reconnaissance of **{self.target}** identified "
@@ -532,7 +531,7 @@ class SurfaceModule:
 
         report_path.write_text("\n".join(lines))
 
-    def _print_summary(self, results: Dict) -> None:
+    def _print_summary(self, results: dict) -> None:
         """Print a summary to console."""
         self.logger.info(f"\n{'='*60}")
         self.logger.info("SURFACE SCAN COMPLETE - Summary")

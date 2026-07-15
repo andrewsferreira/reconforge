@@ -7,11 +7,11 @@ Uses nmap SYN stealth scans with OPSEC-aware timing.
 """
 
 import json
-from typing import Any, Dict
+from typing import Any
 
 from modules.surface.base import SurfacePhaseBase
-from modules.surface.tools.nmap_stealth import NmapStealthTool
 from modules.surface.parsers.surface_parser import SurfaceParser
+from modules.surface.tools.nmap_stealth import NmapStealthTool
 
 
 class PortDiscoveryPhase(SurfacePhaseBase):
@@ -31,7 +31,7 @@ class PortDiscoveryPhase(SurfacePhaseBase):
         self.nmap = nmap
         self.parser = parser
 
-    def run(self, target: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target: str, **kwargs) -> dict[str, Any]:
         """Execute port discovery phase.
 
         Args:
@@ -40,7 +40,7 @@ class PortDiscoveryPhase(SurfacePhaseBase):
         Returns:
             Dict with discovered ports, finding count, and success flag.
         """
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "ports": [],
             "finding_count": 0,

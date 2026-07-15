@@ -5,8 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from core.credential_vault import CredentialVault, Credential
-
+from core.credential_vault import CredentialVault
 
 # ── basic add / get ─────────────────────────────────────────────
 
@@ -258,6 +257,7 @@ def test_load_wrong_encryption_key_raises_credential_vault_error(tmp_path):
     """A vault decrypted with the wrong key must raise a typed error,
     not let cryptography.fernet.InvalidToken propagate raw."""
     from cryptography.fernet import Fernet
+
     from core.exceptions import CredentialVaultError
 
     key_path = tmp_path / "vault.key"

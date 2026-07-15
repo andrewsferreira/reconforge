@@ -9,7 +9,6 @@ Extracts:
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Dict
 
 
 @dataclass
@@ -21,20 +20,20 @@ class SmbShare:
     accessible: bool = False
     anonymous: bool = False
     permissions: str = ""
-    files: List[Dict[str, str]] = field(default_factory=list)
+    files: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
 class SmbResult:
     """Parsed SMB enumeration result."""
     target: str = ""
-    shares: List[SmbShare] = field(default_factory=list)
+    shares: list[SmbShare] = field(default_factory=list)
     null_session: bool = False
     server_name: str = ""
     domain: str = ""
     os_version: str = ""
     raw_output: str = ""
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class SmbParser:
@@ -133,7 +132,7 @@ class SmbParser:
 
         return share
 
-    def get_interesting_shares(self, result: SmbResult) -> List[SmbShare]:
+    def get_interesting_shares(self, result: SmbResult) -> list[SmbShare]:
         """Get non-default shares that may contain useful data.
 
         Args:

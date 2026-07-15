@@ -7,12 +7,12 @@ discovered open ports. Uses nmap version detection and httpx probing.
 """
 
 import json
-from typing import Any, Dict, List
+from typing import Any
 
 from modules.surface.base import SurfacePhaseBase
+from modules.surface.parsers.surface_parser import SurfaceParser
 from modules.surface.tools.nmap_stealth import NmapStealthTool
 from modules.surface.tools.service_detector import ServiceDetectorTool
-from modules.surface.parsers.surface_parser import SurfaceParser
 
 
 class ServiceFingerprintPhase(SurfacePhaseBase):
@@ -34,7 +34,7 @@ class ServiceFingerprintPhase(SurfacePhaseBase):
         self.detector = detector
         self.parser = parser
 
-    def run(self, target: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target: str, **kwargs) -> dict[str, Any]:
         """Execute service fingerprinting phase.
 
         Args:
@@ -45,7 +45,7 @@ class ServiceFingerprintPhase(SurfacePhaseBase):
             Dict with fingerprinted services, finding count, and success flag.
         """
         ports = kwargs.get("ports", [])
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "services": [],
             "http_services": [],
@@ -73,8 +73,8 @@ class ServiceFingerprintPhase(SurfacePhaseBase):
 
         return results
 
-    def _run_version_scan(self, target: str, ports: List[Dict],
-                          results: Dict) -> int:
+    def _run_version_scan(self, target: str, ports: list[dict],
+                          results: dict) -> int:
         """Run nmap service version detection on discovered ports."""
         count = 0
 
@@ -145,8 +145,8 @@ class ServiceFingerprintPhase(SurfacePhaseBase):
         )
         return count
 
-    def _run_http_probe(self, target: str, ports: List[Dict],
-                        results: Dict) -> int:
+    def _run_http_probe(self, target: str, ports: list[dict],
+                        results: dict) -> int:
         """Probe for HTTP services on discovered ports."""
         count = 0
 

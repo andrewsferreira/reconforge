@@ -6,8 +6,9 @@ Analyzes domain/forest trust relationships for risk and
 lateral movement opportunities.
 """
 
-from typing import Any, Dict, List
-from modules.ad.analyzers.base import AnalyzerBase, AnalysisResult
+from typing import Any
+
+from modules.ad.analyzers.base import AnalysisResult, AnalyzerBase
 
 
 class TrustAnalyzer(AnalyzerBase):
@@ -15,7 +16,7 @@ class TrustAnalyzer(AnalyzerBase):
 
     ANALYZER_NAME = "trusts"
 
-    def analyze(self, collected_data: Dict[str, Any], **kwargs) -> AnalysisResult:
+    def analyze(self, collected_data: dict[str, Any], **kwargs) -> AnalysisResult:
         """Analyze trust relationships.
 
         Expected keys:

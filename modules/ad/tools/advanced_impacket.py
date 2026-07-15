@@ -16,9 +16,9 @@ Author: Andrews Ferreira
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from core.runner import Runner, RunResult, RC_TOOL_NOT_FOUND
+from core.runner import RC_TOOL_NOT_FOUND, Runner, RunResult
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -48,15 +48,15 @@ class AdvancedImpacketTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
         self.opsec_mode = opsec_mode
         self._config = config
-        self._resolved: Dict[str, str] = {}
+        self._resolved: dict[str, str] = {}
 
-    def _resolve_binary(self, key: str) -> Optional[str]:
+    def _resolve_binary(self, key: str) -> str | None:
         """Resolve the actual binary name for a tool."""
         if key in self._resolved:
             return self._resolved[key]
@@ -96,7 +96,7 @@ class AdvancedImpacketTool:
         out = self.output_dir / "impacket_finddelegation.txt"
 
         cred = self._build_identity(domain, username, password)
-        cmd: List[str] = [binary]
+        cmd: list[str] = [binary]
         if dc_ip:
             cmd += ["-dc-ip", dc_ip]
         cmd.append(cred)
@@ -120,7 +120,7 @@ class AdvancedImpacketTool:
         out = self.output_dir / "impacket_getuserspns.txt"
 
         cred = self._build_identity(domain, username, password)
-        cmd: List[str] = [binary]
+        cmd: list[str] = [binary]
         if dc_ip:
             cmd += ["-dc-ip", dc_ip]
         if request:
@@ -145,7 +145,7 @@ class AdvancedImpacketTool:
         base_dn = ",".join(f"DC={part}" for part in domain.split("."))
         dc = dc_ip or target
 
-        cmd: List[str] = ["ldapsearch", "-H", f"ldap://{dc}"]
+        cmd: list[str] = ["ldapsearch", "-H", f"ldap://{dc}"]
         if username and password:
             cmd += ["-D", f"{domain}\\{username}", "-w", password]
         else:

@@ -10,8 +10,6 @@ Author: Andrews Ferreira
 
 import re
 from dataclasses import dataclass
-from typing import Dict, List
-
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -63,7 +61,7 @@ class NetexecParser:
     # SMB output
     # ------------------------------------------------------------------
 
-    def parse_smb_output(self, text: str) -> Dict[str, object]:
+    def parse_smb_output(self, text: str) -> dict[str, object]:
         """Parse netexec SMB enumeration output.
 
         Extracts hosts, shares, and user information from the
@@ -75,9 +73,9 @@ class NetexecParser:
         Returns:
             Dict with 'hosts', 'shares', and 'users' keys.
         """
-        hosts: List[NetexecHost] = []
-        shares: List[NetexecShare] = []
-        users: List[NetexecUser] = []
+        hosts: list[NetexecHost] = []
+        shares: list[NetexecShare] = []
+        users: list[NetexecUser] = []
 
         for line in text.splitlines():
             line = line.strip()
@@ -159,7 +157,7 @@ class NetexecParser:
     # LDAP output
     # ------------------------------------------------------------------
 
-    def parse_ldap_output(self, text: str) -> List[NetexecUser]:
+    def parse_ldap_output(self, text: str) -> list[NetexecUser]:
         """Parse netexec LDAP enumeration output.
 
         Args:
@@ -168,7 +166,7 @@ class NetexecParser:
         Returns:
             List of NetexecUser objects.
         """
-        users: List[NetexecUser] = []
+        users: list[NetexecUser] = []
 
         for line in text.splitlines():
             line = line.strip()
@@ -200,7 +198,7 @@ class NetexecParser:
     # Signing status
     # ------------------------------------------------------------------
 
-    def parse_signing_status(self, text: str) -> Dict[str, bool]:
+    def parse_signing_status(self, text: str) -> dict[str, bool]:
         """Parse SMB signing status from netexec output.
 
         Args:
@@ -209,7 +207,7 @@ class NetexecParser:
         Returns:
             Dict mapping IP → signing_required (True/False).
         """
-        signing: Dict[str, bool] = {}
+        signing: dict[str, bool] = {}
 
         for line in text.splitlines():
             line = line.strip()

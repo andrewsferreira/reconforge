@@ -32,14 +32,16 @@ def test_surface_main_passes_encrypt_loot_to_module():
     fake_module = MagicMock()
     fake_module.run.return_value = {"phases": {"port_discovery": {}}}
 
-    with patch("modules.surface.surface_module.SurfaceModule", return_value=fake_module) as mock_surface:
-        with patch.object(
+    with (
+        patch("modules.surface.surface_module.SurfaceModule", return_value=fake_module) as mock_surface,
+        patch.object(
             sys,
             "argv",
             ["reconforge", "surface", "--target", "10.10.10.1", "--encrypt-loot", "--dry-run"],
-        ):
-            with pytest.raises(SystemExit) as exc:
-                cli.main()
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        cli.main()
 
     assert exc.value.code == 0
     assert mock_surface.call_args.kwargs["encrypt_loot"] is True

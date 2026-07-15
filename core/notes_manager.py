@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 from core.logger import sanitize_log
 
@@ -12,7 +11,7 @@ class NotesManager:
 
     def __init__(self, target: str = ""):
         self.target = target
-        self._entries: List[dict] = []
+        self._entries: list[dict] = []
         self._start_time = datetime.now()
 
     def add(self, note: str, category: str = "general"):

@@ -1,6 +1,5 @@
 """Tests for core.profile_loader – ProfileLoader."""
 
-import pytest
 
 from core.config_loader import ConfigLoader
 from core.profile_loader import ProfileLoader

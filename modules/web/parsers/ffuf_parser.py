@@ -11,7 +11,6 @@ Extracts:
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
@@ -28,13 +27,13 @@ class FfufEntry:
 @dataclass
 class FfufResult:
     """Complete ffuf scan result."""
-    entries: List[FfufEntry] = field(default_factory=list)
+    entries: list[FfufEntry] = field(default_factory=list)
     command_line: str = ""
     raw_output: str = ""
 
     @property
-    def by_status(self) -> Dict[int, List[FfufEntry]]:
-        groups: Dict[int, List[FfufEntry]] = {}
+    def by_status(self) -> dict[int, list[FfufEntry]]:
+        groups: dict[int, list[FfufEntry]] = {}
         for e in self.entries:
             groups.setdefault(e.status, []).append(e)
         return groups

@@ -15,7 +15,7 @@ Author: Andrews Ferreira
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -31,7 +31,7 @@ class ADLdapsearchTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -51,7 +51,7 @@ class ADLdapsearchTool:
         """Test for anonymous LDAP bind and retrieve RootDSE."""
         self.logger.info(f"Testing anonymous LDAP bind on {target}:{port}")
         out = self.output_dir / "ldap_rootdse.txt"
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ldapsearch", "-x", "-H", f"ldap://{target}:{port}",
             "-s", "base", "-b", "", "(objectClass=*)", "*", "+",
         ]
@@ -63,7 +63,7 @@ class ADLdapsearchTool:
         """Retrieve naming contexts (base DN, configuration, schema)."""
         self.logger.info(f"Querying naming contexts on {target}")
         out = self.output_dir / "ldap_naming_contexts.txt"
-        cmd: List[str] = [
+        cmd: list[str] = [
             "ldapsearch", "-x", "-H", f"ldap://{target}:{port}",
             "-s", "base", "-b", "", "namingContexts",
         ]
@@ -225,9 +225,9 @@ class ADLdapsearchTool:
 
     @staticmethod
     def _bind_args(target: str, port: int = 389,
-                   username: str = "", password: str = "") -> List[str]:
+                   username: str = "", password: str = "") -> list[str]:
         """Build ldapsearch bind arguments as a list."""
-        cmd: List[str] = ["ldapsearch"]
+        cmd: list[str] = ["ldapsearch"]
         if username and password:
             cmd += ["-H", f"ldap://{target}:{port}",
                     "-D", username, "-w", password]

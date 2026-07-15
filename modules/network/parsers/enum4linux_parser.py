@@ -12,7 +12,6 @@ Extracts:
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Dict
 
 
 @dataclass
@@ -23,15 +22,15 @@ class Enum4linuxResult:
     domain: str = ""
     os_info: str = ""
     server_type: str = ""
-    users: List[Dict[str, str]] = field(default_factory=list)
-    groups: List[Dict[str, str]] = field(default_factory=list)
-    shares: List[Dict[str, str]] = field(default_factory=list)
-    password_policy: Dict[str, str] = field(default_factory=dict)
+    users: list[dict[str, str]] = field(default_factory=list)
+    groups: list[dict[str, str]] = field(default_factory=list)
+    shares: list[dict[str, str]] = field(default_factory=list)
+    password_policy: dict[str, str] = field(default_factory=dict)
     null_session: bool = False
-    sessions: List[str] = field(default_factory=list)
+    sessions: list[str] = field(default_factory=list)
     domain_sid: str = ""
     raw_output: str = ""
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class Enum4linuxParser:
@@ -187,11 +186,11 @@ class Enum4linuxParser:
         if match:
             result.domain_sid = match.group(1)
 
-    def get_usernames(self, result: Enum4linuxResult) -> List[str]:
+    def get_usernames(self, result: Enum4linuxResult) -> list[str]:
         """Get a clean list of usernames."""
         return [u["username"] for u in result.users]
 
-    def get_accessible_shares(self, result: Enum4linuxResult) -> List[Dict]:
+    def get_accessible_shares(self, result: Enum4linuxResult) -> list[dict]:
         """Get shares that appear accessible."""
         accessible = []
         for share in result.shares:

@@ -23,58 +23,59 @@ Usage:
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from core.authorization_gate import ScopeAuthorization
 
-from core.logger import ReconLogger
-from core.runner import Runner
-from core.config_loader import ConfigLoader
-from core.output_manager import OutputManager
 from core.attack_workflow import AttackWorkflow
-from core.loot_manager import LootManager
+from core.config_loader import ConfigLoader
+from core.data_contracts import SCHEMA_VERSION, build_contract
+from core.exceptions import ModuleError
 from core.findings_manager import FindingsManager
+from core.logger import ReconLogger
+from core.loot_manager import LootManager
 from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
-from core.target_parser import parse_target
+from core.output_manager import OutputManager
 from core.profile_loader import ProfileLoader
+from core.runner import Runner
+from core.target_parser import parse_target
 from core.telemetry import ModuleTelemetry
-from core.data_contracts import SCHEMA_VERSION, build_contract
 from core.validators import validate_domain
-from core.exceptions import ModuleError
-
-from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
-from modules.ad.tools.ldapsearch import ADLdapsearchTool
-from modules.ad.tools.smbclient import ADSmbclientTool
-from modules.ad.tools.impacket import ImpacketTool
-from modules.ad.tools.nmap import ADNmapTool
-from modules.ad.tools.bloodhound import BloodhoundTool
-from modules.ad.tools.netexec import NetexecTool
-from modules.ad.tools.advanced_impacket import AdvancedImpacketTool
-
-from modules.ad.parsers.enum4linux_ng_parser import Enum4linuxNgParser
-from modules.ad.parsers.ldap_parser import ADLdapParser
-from modules.ad.parsers.smb_parser import ADSmbParser
-from modules.ad.parsers.impacket_parser import ImpacketParser
-from modules.ad.parsers.nmap_parser import ADNmapParser
 from modules.ad.parsers.bloodhound_parser import BloodhoundParser
-from modules.ad.parsers.netexec_parser import NetexecParser
 from modules.ad.parsers.delegation_parser import DelegationParser
-
-from modules.ad.phases.passive_recon import PassiveReconPhase
-from modules.ad.phases.identity_enumeration import IdentityEnumerationPhase
+from modules.ad.parsers.enum4linux_ng_parser import Enum4linuxNgParser
+from modules.ad.parsers.impacket_parser import ImpacketParser
+from modules.ad.parsers.ldap_parser import ADLdapParser
+from modules.ad.parsers.netexec_parser import NetexecParser
+from modules.ad.parsers.nmap_parser import ADNmapParser
+from modules.ad.parsers.smb_parser import ADSmbParser
+from modules.ad.phases.bloodhound_collection import BloodhoundCollectionPhase
 from modules.ad.phases.configuration_enumeration import ConfigurationEnumerationPhase
 from modules.ad.phases.delegation_discovery import DelegationDiscoveryPhase
-from modules.ad.phases.bloodhound_collection import BloodhoundCollectionPhase
-
+from modules.ad.phases.identity_enumeration import IdentityEnumerationPhase
+from modules.ad.phases.passive_recon import PassiveReconPhase
 from modules.ad.reporting import (
-    AttackSurfaceReporter, HighValueTargetsReporter,
-    AttackPathReporter, RemediationReporter, ADSummaryReporter,
-    build_attack_surface_data, build_hvt_data,
-    build_path_data, build_remediation_data, build_ad_summary_data,
+    ADSummaryReporter,
+    AttackPathReporter,
+    AttackSurfaceReporter,
+    HighValueTargetsReporter,
+    RemediationReporter,
+    build_ad_summary_data,
+    build_attack_surface_data,
+    build_hvt_data,
+    build_path_data,
+    build_remediation_data,
 )
+from modules.ad.tools.advanced_impacket import AdvancedImpacketTool
+from modules.ad.tools.bloodhound import BloodhoundTool
+from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
+from modules.ad.tools.impacket import ImpacketTool
+from modules.ad.tools.ldapsearch import ADLdapsearchTool
+from modules.ad.tools.netexec import NetexecTool
+from modules.ad.tools.nmap import ADNmapTool
+from modules.ad.tools.smbclient import ADSmbclientTool
 
 
 class ADModule:
@@ -91,12 +92,12 @@ class ADModule:
                  output_base: str = "outputs",
                  opsec_mode: str = "normal", verbose: bool = False,
                  dry_run: bool = False, timeout: int = 600,
-                 config_dir: Optional[str] = None,
+                 config_dir: str | None = None,
                  username: str = "", password: str = "",
                  dc_ip: str = "",
                  encrypt_loot: bool = False,
                  scope: Optional["ScopeAuthorization"] = None,
-                 approval_id: Optional[str] = None):
+                 approval_id: str | None = None):
         self.target_str = target
         self.target = parse_target(target)
         self.domain = validate_domain(domain) if domain else domain
@@ -141,13 +142,13 @@ class ADModule:
         self._init_parsers()
 
         # Shared phase kwargs
-        self._phase_kwargs = dict(
-            logger=self.logger, runner=self.runner, config=self.config,
-            output_dir=self.parsed_dir, findings=self.findings_mgr,
-            loot=self.loot, workflow=self.workflow, notes=self.notes,
-            opsec=self.opsec, opsec_mode=opsec_mode,
-            profile=self.profile,
-        )
+        self._phase_kwargs = {
+            "logger": self.logger, "runner": self.runner, "config": self.config,
+            "output_dir": self.parsed_dir, "findings": self.findings_mgr,
+            "loot": self.loot, "workflow": self.workflow, "notes": self.notes,
+            "opsec": self.opsec, "opsec_mode": opsec_mode,
+            "profile": self.profile,
+        }
 
         # Initialize phases
         self._init_phases()
@@ -232,7 +233,7 @@ class ADModule:
     # Run
     # ------------------------------------------------------------------
 
-    def run(self, phases: Optional[List[str]] = None) -> Dict[str, Any]:
+    def run(self, phases: list[str] | None = None) -> dict[str, Any]:
         """Execute the AD reconnaissance workflow.
 
         Phase selection priority:
@@ -269,7 +270,7 @@ class ADModule:
         )
         self._check_tools()
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "target": self.target_str, "domain": self.domain,
             "dc_ip": self.dc_ip, "opsec_mode": self.opsec_mode,
             "authenticated": has_creds,
@@ -302,7 +303,7 @@ class ADModule:
         self._print_summary(results)
         return results
 
-    def _run_phases(self, phases_to_run: List[str], results: Dict) -> None:
+    def _run_phases(self, phases_to_run: list[str], results: dict) -> None:
         """Execute requested phases sequentially."""
         if "passive" in phases_to_run:
             self.logger.info(f"\n{'─'*60}\nPhase 1: Passive Reconnaissance\n{'─'*60}")
@@ -408,7 +409,7 @@ class ADModule:
     # Report generation (delegates to reporting package)
     # ------------------------------------------------------------------
 
-    def _generate_reports(self, results: Dict) -> None:
+    def _generate_reports(self, results: dict) -> None:
         """Generate all output reports via the reporting package."""
         self.logger.info("Generating reports...")
         try:
@@ -508,7 +509,7 @@ class ADModule:
     # Console summary
     # ------------------------------------------------------------------
 
-    def _print_summary(self, results: Dict) -> None:
+    def _print_summary(self, results: dict) -> None:
         """Print a summary to console."""
         self.logger.info(f"\n{'='*60}")
         self.logger.info("AD SCAN COMPLETE - Summary")

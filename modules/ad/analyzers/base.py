@@ -5,7 +5,7 @@ Author: Andrews Ferreira
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -19,9 +19,9 @@ class AnalysisResult:
         data: Additional structured data.
     """
     analyzer: str = ""
-    findings: List[Dict[str, Any]] = field(default_factory=list)
-    insights: List[str] = field(default_factory=list)
-    data: Dict[str, Any] = field(default_factory=dict)
+    findings: list[dict[str, Any]] = field(default_factory=list)
+    insights: list[str] = field(default_factory=list)
+    data: dict[str, Any] = field(default_factory=dict)
 
 
 class AnalyzerBase(ABC):
@@ -30,7 +30,7 @@ class AnalyzerBase(ABC):
     ANALYZER_NAME: str = "base"
 
     @abstractmethod
-    def analyze(self, collected_data: Dict[str, Any], **kwargs) -> AnalysisResult:
+    def analyze(self, collected_data: dict[str, Any], **kwargs) -> AnalysisResult:
         """Analyze collected data and return structured results."""
         ...
 
@@ -43,9 +43,9 @@ class AnalyzerBase(ABC):
         description: str,
         evidence: str = "",
         recommendation: str = "",
-        references: List[str] = None,
+        references: list[str] | None = None,
         phase: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Helper to build a finding dict."""
         return {
             "finding_type": finding_type,

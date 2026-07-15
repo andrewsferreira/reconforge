@@ -5,7 +5,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core.adapters.burp.models import BurpCapability, BurpProviderState, BurpSessionState, NormalizedBurpHttpRecord
+from core.adapters.burp.models import (
+    BurpCapability,
+    BurpProviderState,
+    BurpSessionState,
+    NormalizedBurpHttpRecord,
+)
 
 ENTRYPOINT_PATH = Path(__file__).resolve().parents[2] / "reconforge" / "entrypoints" / "burp_validation.py"
 SPEC = spec_from_file_location("_burp_validation_entrypoint", ENTRYPOINT_PATH)

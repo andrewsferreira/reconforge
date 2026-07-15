@@ -37,9 +37,11 @@ def test_main_dispatches_mcp_serve_without_any_authorization_flag():
     cli = _load_cli_module()
     fake_run_stdio_server = MagicMock()
 
-    with patch("reconforge.mcp.server.run_stdio_server", fake_run_stdio_server):
-        with patch.object(sys, "argv", ["reconforge", "mcp", "serve"]):
-            cli.main()
+    with (
+        patch("reconforge.mcp.server.run_stdio_server", fake_run_stdio_server),
+        patch.object(sys, "argv", ["reconforge", "mcp", "serve"]),
+    ):
+        cli.main()
 
     fake_run_stdio_server.assert_called_once_with()
 

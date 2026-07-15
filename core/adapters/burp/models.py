@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -17,7 +17,7 @@ class BurpSseEvent:
 class BurpCapability:
     name: str
     description: str = ""
-    input_schema: Dict[str, Any] = field(default_factory=dict)
+    input_schema: dict[str, Any] = field(default_factory=dict)
     enabled: bool = False
     reason: str = ""
 
@@ -36,8 +36,8 @@ class BurpSessionState:
 class BurpRpcResult:
     request_id: int
     ok: bool
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[Dict[str, Any]] = None
+    result: dict[str, Any] | None = None
+    error: dict[str, Any] | None = None
 
 
 @dataclass
@@ -47,8 +47,8 @@ class NormalizedBurpHttpRecord:
     method: str = ""
     status_code: int = 0
     response_body_length: int = 0
-    request_headers: Dict[str, str] = field(default_factory=dict)
-    response_headers: Dict[str, str] = field(default_factory=dict)
+    request_headers: dict[str, str] = field(default_factory=dict)
+    response_headers: dict[str, str] = field(default_factory=dict)
     provider: str = "burp_mcp"
     tool_name: str = ""
     evidence_source: str = ""
@@ -57,6 +57,6 @@ class NormalizedBurpHttpRecord:
 @dataclass
 class BurpProviderState:
     session: BurpSessionState
-    discovered_tools: List[BurpCapability] = field(default_factory=list)
-    enabled_tools: List[str] = field(default_factory=list)
-    disabled_tools: List[str] = field(default_factory=list)
+    discovered_tools: list[BurpCapability] = field(default_factory=list)
+    enabled_tools: list[str] = field(default_factory=list)
+    disabled_tools: list[str] = field(default_factory=list)

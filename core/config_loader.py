@@ -1,9 +1,10 @@
 """ReconForge Config Loader - YAML configuration management."""
 
 import os
-import yaml
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any
+
+import yaml
 
 from core.secrets_manager import SecretManager
 
@@ -14,10 +15,10 @@ if TYPE_CHECKING:
 class ConfigLoader:
     """Load and manage YAML configuration files."""
 
-    def __init__(self, config_dir: Optional[Path] = None, environment: Optional[str] = None):
+    def __init__(self, config_dir: str | Path | None = None, environment: str | None = None):
         self.config_dir = Path(config_dir) if config_dir else Path(__file__).parent.parent / "config"
-        self._cache: Dict[str, dict] = {}
-        self.environment = (environment or os.getenv("RECONFORGE_ENV", "dev")).strip().lower()
+        self._cache: dict[str, dict] = {}
+        self.environment = (environment or os.getenv("RECONFORGE_ENV") or "dev").strip().lower()
         self._env_dir = self.config_dir / "environments"
         self._secrets = self._build_secret_manager()
 
@@ -27,7 +28,7 @@ class ConfigLoader:
         return SecretManager(provider=provider, file_path=file_path)
 
     @staticmethod
-    def _merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
         merged = dict(base)
         for k, v in override.items():
             if isinstance(v, dict) and isinstance(merged.get(k), dict):

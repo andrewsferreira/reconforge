@@ -6,9 +6,13 @@ Builds comprehensive privilege escalation paths combining
 multiple techniques: password spray, trust exploitation, etc.
 """
 
-from typing import Any, Dict
+from typing import Any
+
 from modules.ad.attack_paths.base import (
-    AttackPathBuilderBase, AttackPathResult, AttackChain, NextStepSuggestion,
+    AttackChain,
+    AttackPathBuilderBase,
+    AttackPathResult,
+    NextStepSuggestion,
 )
 
 
@@ -18,7 +22,7 @@ class PrivilegeEscalationPathBuilder(AttackPathBuilderBase):
     BUILDER_NAME = "privesc"
 
     def build(
-        self, analysis_data: Dict[str, Any],
+        self, analysis_data: dict[str, Any],
         target: str = "", domain: str = "", **kwargs,
     ) -> AttackPathResult:
         result = AttackPathResult(builder=self.BUILDER_NAME)
@@ -38,7 +42,7 @@ class PrivilegeEscalationPathBuilder(AttackPathBuilderBase):
         return result
 
     def _build_password_spray(
-        self, data: Dict, target: str, domain: str, result: AttackPathResult,
+        self, data: dict, target: str, domain: str, result: AttackPathResult,
     ) -> None:
         policy = data.get("password_policy", {})
         if not policy:
@@ -78,7 +82,7 @@ class PrivilegeEscalationPathBuilder(AttackPathBuilderBase):
             ))
 
     def _build_trust_exploitation(
-        self, data: Dict, target: str, domain: str, result: AttackPathResult,
+        self, data: dict, target: str, domain: str, result: AttackPathResult,
     ) -> None:
         trusts = data.get("trusts", [])
         for trust in trusts:
@@ -100,7 +104,7 @@ class PrivilegeEscalationPathBuilder(AttackPathBuilderBase):
             ))
 
     def _build_privileged_targeting(
-        self, data: Dict, target: str, domain: str, result: AttackPathResult,
+        self, data: dict, target: str, domain: str, result: AttackPathResult,
     ) -> None:
         privileged = data.get("privileged_users", [])
         if privileged:

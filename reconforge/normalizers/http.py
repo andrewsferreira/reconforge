@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 import base64
 import uuid
-from typing import Any, Mapping
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from typing import Any
 from urllib.parse import urlparse
 
 

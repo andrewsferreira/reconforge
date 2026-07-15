@@ -19,21 +19,21 @@ from reconforge.mcp import approvals, approvals_cli
 
 
 def _create(**overrides) -> approvals.ApprovalRequest:
-    defaults = dict(
-        engagement_id="engagement_active",
-        target="10.10.10.1",
-        normalized_target="10.10.10.1",
-        module="surface",
-        phase="vector_correlation",
-        opsec_profile="normal",
-        tier="safe_read_only",
-        scope_reference="scope.yaml",
-        output_base="outputs",
-        domain="",
-        scope_file=None,
-        approval_id=None,
-        timeout=600,
-    )
+    defaults = {
+        "engagement_id": "engagement_active",
+        "target": "10.10.10.1",
+        "normalized_target": "10.10.10.1",
+        "module": "surface",
+        "phase": "vector_correlation",
+        "opsec_profile": "normal",
+        "tier": "safe_read_only",
+        "scope_reference": "scope.yaml",
+        "output_base": "outputs",
+        "domain": "",
+        "scope_file": None,
+        "approval_id": None,
+        "timeout": 600,
+    }
     defaults.update(overrides)
     return approvals.create_request(**defaults)
 

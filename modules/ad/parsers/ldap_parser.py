@@ -15,10 +15,8 @@ Author: Andrews Ferreira
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 from modules.ad.parsers.ldif_utils import split_ldif_entries
-
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -30,11 +28,11 @@ class LdapUser:
     sam_account_name: str = ""
     cn: str = ""
     description: str = ""
-    member_of: List[str] = field(default_factory=list)
+    member_of: list[str] = field(default_factory=list)
     user_account_control: int = 0
     pwd_last_set: str = ""
     last_logon: str = ""
-    spn: List[str] = field(default_factory=list)
+    spn: list[str] = field(default_factory=list)
     admin_count: int = 0
     dn: str = ""
 
@@ -60,7 +58,7 @@ class LdapGroup:
     """An AD group extracted from LDAP."""
     cn: str = ""
     description: str = ""
-    members: List[str] = field(default_factory=list)
+    members: list[str] = field(default_factory=list)
     group_type: str = ""
     dn: str = ""
     admin_count: int = 0
@@ -75,7 +73,7 @@ class LdapComputer:
     os_version: str = ""
     os_sp: str = ""
     user_account_control: int = 0
-    spn: List[str] = field(default_factory=list)
+    spn: list[str] = field(default_factory=list)
     last_logon: str = ""
     dn: str = ""
 
@@ -154,7 +152,7 @@ class ADLdapParser:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _split_entries(text: str) -> List[Dict[str, List[str]]]:
+    def _split_entries(text: str) -> list[dict[str, list[str]]]:
         """Split ldapsearch text output into a list of attribute dicts.
 
         Each entry is separated by a blank line.  Attributes that appear
@@ -163,16 +161,16 @@ class ADLdapParser:
         return split_ldif_entries(text)
 
     @staticmethod
-    def _first(d: Dict[str, List[str]], key: str, default: str = "") -> str:
+    def _first(d: dict[str, list[str]], key: str, default: str = "") -> str:
         vals = d.get(key, [])
         return vals[0] if vals else default
 
     @staticmethod
-    def _all(d: Dict[str, List[str]], key: str) -> List[str]:
+    def _all(d: dict[str, list[str]], key: str) -> list[str]:
         return d.get(key, [])
 
     @staticmethod
-    def _int(d: Dict[str, List[str]], key: str, default: int = 0) -> int:
+    def _int(d: dict[str, list[str]], key: str, default: int = 0) -> int:
         val = d.get(key, [""])[0] if d.get(key) else ""
         try:
             return int(val)
@@ -198,9 +196,12 @@ class ADLdapParser:
                 info.config_dn = ctx
             elif ctx_lower.startswith("cn=schema"):
                 info.schema_dn = ctx
-            elif "domaindnszones" not in ctx_lower and "forestdnszones" not in ctx_lower:
-                if not info.base_dn:
-                    info.base_dn = ctx
+            elif (
+                "domaindnszones" not in ctx_lower
+                and "forestdnszones" not in ctx_lower
+                and not info.base_dn
+            ):
+                info.base_dn = ctx
 
         info.default_naming_context = self._first(entry, "defaultnamingcontext", info.base_dn)
         info.server_name = self._first(entry, "servername")
@@ -223,9 +224,9 @@ class ADLdapParser:
     # Users
     # ------------------------------------------------------------------
 
-    def parse_users(self, text: str) -> List[LdapUser]:
+    def parse_users(self, text: str) -> list[LdapUser]:
         """Parse LDAP user query output."""
-        users: List[LdapUser] = []
+        users: list[LdapUser] = []
         for entry in self._split_entries(text):
             sam = self._first(entry, "samaccountname")
             if not sam:
@@ -249,9 +250,9 @@ class ADLdapParser:
     # Groups
     # ------------------------------------------------------------------
 
-    def parse_groups(self, text: str) -> List[LdapGroup]:
+    def parse_groups(self, text: str) -> list[LdapGroup]:
         """Parse LDAP group query output."""
-        groups: List[LdapGroup] = []
+        groups: list[LdapGroup] = []
         for entry in self._split_entries(text):
             cn = self._first(entry, "cn")
             if not cn:
@@ -271,9 +272,9 @@ class ADLdapParser:
     # Computers
     # ------------------------------------------------------------------
 
-    def parse_computers(self, text: str) -> List[LdapComputer]:
+    def parse_computers(self, text: str) -> list[LdapComputer]:
         """Parse LDAP computer query output."""
-        computers: List[LdapComputer] = []
+        computers: list[LdapComputer] = []
         for entry in self._split_entries(text):
             cn = self._first(entry, "cn")
             if not cn:
@@ -296,9 +297,9 @@ class ADLdapParser:
     # Trusts
     # ------------------------------------------------------------------
 
-    def parse_trusts(self, text: str) -> List[LdapTrust]:
+    def parse_trusts(self, text: str) -> list[LdapTrust]:
         """Parse LDAP trust query output."""
-        trusts: List[LdapTrust] = []
+        trusts: list[LdapTrust] = []
         for entry in self._split_entries(text):
             cn = self._first(entry, "cn")
             if not cn:
@@ -318,9 +319,9 @@ class ADLdapParser:
     # GPOs
     # ------------------------------------------------------------------
 
-    def parse_gpos(self, text: str) -> List[LdapGPO]:
+    def parse_gpos(self, text: str) -> list[LdapGPO]:
         """Parse LDAP GPO query output."""
-        gpos: List[LdapGPO] = []
+        gpos: list[LdapGPO] = []
         for entry in self._split_entries(text):
             dn_val = self._first(entry, "dn")
             display = self._first(entry, "displayname")
@@ -363,11 +364,11 @@ class ADLdapParser:
     # SPN / AS-REP
     # ------------------------------------------------------------------
 
-    def parse_spn_accounts(self, text: str) -> List[LdapUser]:
+    def parse_spn_accounts(self, text: str) -> list[LdapUser]:
         """Parse SPN-filtered user query (Kerberoasting targets)."""
         return self.parse_users(text)
 
-    def parse_asrep_users(self, text: str) -> List[LdapUser]:
+    def parse_asrep_users(self, text: str) -> list[LdapUser]:
         """Parse AS-REP roastable user query."""
         return self.parse_users(text)
 

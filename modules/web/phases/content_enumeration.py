@@ -8,14 +8,13 @@ interesting content on the target web application.
 """
 
 import json
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from modules.web.base import WebPhaseBase
-from modules.web.tools.ffuf import FfufTool
-from modules.web.tools.gobuster import GobusterTool
 from modules.web.parsers.ffuf_parser import FfufParser
 from modules.web.parsers.gobuster_parser import GobusterParser
+from modules.web.tools.ffuf import FfufTool
+from modules.web.tools.gobuster import GobusterTool
 
 
 class ContentEnumerationPhase(WebPhaseBase):
@@ -42,7 +41,7 @@ class ContentEnumerationPhase(WebPhaseBase):
         self.ffuf_parser = ffuf_parser
         self.gobuster_parser = gobuster_parser
 
-    def run(self, target_url: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target_url: str, **kwargs) -> dict[str, Any]:
         """Execute content enumeration phase.
 
         Args:
@@ -54,7 +53,7 @@ class ContentEnumerationPhase(WebPhaseBase):
         """
         waf_detected = kwargs.get("waf_detected", False)
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "paths": [],
             "finding_count": 0,
@@ -104,7 +103,7 @@ class ContentEnumerationPhase(WebPhaseBase):
 
     # ── ffuf ───────────────────────────────────────────────────────
 
-    def _run_ffuf(self, target_url: str, results: Dict,
+    def _run_ffuf(self, target_url: str, results: dict,
                   waf_detected: bool) -> int:
         """Run ffuf directory discovery.
 
@@ -128,7 +127,7 @@ class ContentEnumerationPhase(WebPhaseBase):
 
         self.workflow.add_step(
             phase=self.PHASE_NAME,
-            hypothesis=f"Target has hidden directories and files",
+            hypothesis="Target has hidden directories and files",
             command=f"ffuf -u {target_url}/FUZZ -w <wordlist>",
             justification="Directory brute-forcing to discover hidden content",
             alternatives=["gobuster dir", "dirsearch", "feroxbuster"],
@@ -200,7 +199,7 @@ class ContentEnumerationPhase(WebPhaseBase):
 
     # ── gobuster ───────────────────────────────────────────────────
 
-    def _run_gobuster(self, target_url: str, results: Dict) -> int:
+    def _run_gobuster(self, target_url: str, results: dict) -> int:
         """Run gobuster directory discovery.
 
         Returns:
@@ -230,7 +229,7 @@ class ContentEnumerationPhase(WebPhaseBase):
 
         self.workflow.add_step(
             phase=self.PHASE_NAME,
-            hypothesis=f"gobuster may discover paths missed by ffuf",
+            hypothesis="gobuster may discover paths missed by ffuf",
             command=f"gobuster dir -u {target_url} -w <wordlist>",
             justification="Secondary content discovery tool for coverage",
         )

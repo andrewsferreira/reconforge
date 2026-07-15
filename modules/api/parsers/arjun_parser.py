@@ -11,7 +11,6 @@ Extracts:
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
@@ -26,24 +25,24 @@ class ArjunParam:
 @dataclass
 class ArjunResult:
     """Complete Arjun scan result."""
-    params: List[ArjunParam] = field(default_factory=list)
+    params: list[ArjunParam] = field(default_factory=list)
     raw_output: str = ""
-    urls_scanned: List[str] = field(default_factory=list)
+    urls_scanned: list[str] = field(default_factory=list)
 
     @property
-    def by_url(self) -> Dict[str, List[ArjunParam]]:
-        groups: Dict[str, List[ArjunParam]] = {}
+    def by_url(self) -> dict[str, list[ArjunParam]]:
+        groups: dict[str, list[ArjunParam]] = {}
         for p in self.params:
             groups.setdefault(p.url, []).append(p)
         return groups
 
     @property
-    def param_names(self) -> List[str]:
+    def param_names(self) -> list[str]:
         """Return unique parameter names."""
-        return list(set(p.name for p in self.params))
+        return list({p.name for p in self.params})
 
     @property
-    def sensitive_params(self) -> List[ArjunParam]:
+    def sensitive_params(self) -> list[ArjunParam]:
         """Return parameters that look security-sensitive."""
         sensitive_keywords = (
             "token", "key", "secret", "password", "passwd", "auth",

@@ -7,7 +7,6 @@ and scan phases. Ensures the attack surface map has unique, enriched
 entries without redundant findings.
 """
 
-from typing import Dict, List, Optional, Set, Tuple
 
 
 class ServiceDeduplicator:
@@ -21,8 +20,8 @@ class ServiceDeduplicator:
     """
 
     def deduplicate_ports(
-        self, ports: List[Dict], services: List[Dict]
-    ) -> List[Dict]:
+        self, ports: list[dict], services: list[dict]
+    ) -> list[dict]:
         """Merge port and service lists, deduplicating by port number.
 
         Keeps the entry with the most information. If version scan
@@ -35,7 +34,7 @@ class ServiceDeduplicator:
         Returns:
             Deduplicated list of service entries.
         """
-        by_port: Dict[int, Dict] = {}
+        by_port: dict[int, dict] = {}
 
         # Ingest port scan results first (baseline)
         for entry in ports:
@@ -68,8 +67,8 @@ class ServiceDeduplicator:
         return list(by_port.values())
 
     def deduplicate_http(
-        self, http_services: List[Dict]
-    ) -> List[Dict]:
+        self, http_services: list[dict]
+    ) -> list[dict]:
         """Deduplicate HTTP service entries by URL.
 
         Args:
@@ -78,7 +77,7 @@ class ServiceDeduplicator:
         Returns:
             Deduplicated HTTP services.
         """
-        by_url: Dict[str, Dict] = {}
+        by_url: dict[str, dict] = {}
 
         for entry in http_services:
             url = entry.get("url", "")
@@ -92,13 +91,13 @@ class ServiceDeduplicator:
 
         return list(by_url.values())
 
-    def count_detection_methods(self, entry: Dict) -> int:
+    def count_detection_methods(self, entry: dict) -> int:
         """Count how many detection methods found this service."""
         methods = entry.get("_detection_methods", set())
         return len(methods) if isinstance(methods, set) else 1
 
     @staticmethod
-    def _merge_entries(existing: Dict, new: Dict) -> Dict:
+    def _merge_entries(existing: dict, new: dict) -> dict:
         """Merge two entries for the same service, keeping best data.
 
         Strategy:

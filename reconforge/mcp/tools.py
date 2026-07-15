@@ -16,7 +16,8 @@ outside what dry-run module execution already writes (see
 
 from __future__ import annotations
 
-from typing import Any, Callable, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 from mcp import types
 from mcp.server.lowlevel import Server

@@ -10,7 +10,7 @@ read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult, validate_arg
 from core.tool_config import ToolConfig
@@ -25,7 +25,7 @@ class SmbclientTool:
     TOOL_NAME = "smbclient"
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -42,7 +42,7 @@ class SmbclientTool:
         output_file = self.output_dir / "smbclient_shares.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
 
-        cmd: List[str] = ["smbclient", "-L", f"//{target}"]
+        cmd: list[str] = ["smbclient", "-L", f"//{target}"]
         if username:
             cmd += ["-U", f"{username}%{password}"]
         else:
@@ -57,7 +57,7 @@ class SmbclientTool:
         self.logger.info(f"Testing access to //{target}/{share}")
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "smbclient", f"//{target}/{share}",
         ]
         if username:
@@ -79,7 +79,7 @@ class SmbclientTool:
         if path:
             validate_arg(path, label="path")
         ls_cmd = f"ls {path}/*" if path else "ls"
-        cmd: List[str] = [
+        cmd: list[str] = [
             "smbclient", f"//{target}/{share}",
         ]
         if username:

@@ -60,9 +60,8 @@ def test_main_exits_with_error_when_no_authorization_signal(capsys):
         sys,
         "argv",
         ["reconforge", "surface", "--target", "10.10.10.1"],
-    ):
-        with pytest.raises(SystemExit) as exc:
-            cli.main()
+    ), pytest.raises(SystemExit) as exc:
+        cli.main()
 
     assert exc.value.code == 2
     captured = capsys.readouterr()
@@ -75,13 +74,15 @@ def test_main_dispatches_with_lab_mode_flag():
     fake_module = MagicMock()
     fake_module.run.return_value = {"phases": {"port_discovery": {}}}
 
-    with patch("modules.surface.surface_module.SurfaceModule", return_value=fake_module):
-        with patch.object(
+    with (
+        patch("modules.surface.surface_module.SurfaceModule", return_value=fake_module),
+        patch.object(
             sys,
             "argv",
             ["reconforge", "surface", "--target", "10.10.10.1", "--lab-mode"],
-        ):
-            with pytest.raises(SystemExit) as exc:
-                cli.main()
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
+        cli.main()
 
     assert exc.value.code == 0

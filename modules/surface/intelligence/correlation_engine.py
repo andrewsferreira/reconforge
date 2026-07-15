@@ -8,12 +8,11 @@ to share enumeration, LDAP to AD enumeration, etc.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 from urllib.parse import urlparse
 
 from modules.surface.intelligence.service_intelligence import (
     ServiceIntelligenceDB,
-    ServiceProfile,
 )
 from modules.surface.intelligence.service_normalizer import ServiceNormalizer
 
@@ -23,22 +22,22 @@ class CorrelatedService:
     """A fully correlated service entry in the attack surface map."""
     canonical_name: str
     display_name: str = ""
-    ports: List[int] = field(default_factory=list)
-    protocols: List[str] = field(default_factory=list)
-    versions: List[str] = field(default_factory=list)
-    products: List[str] = field(default_factory=list)
-    urls: List[str] = field(default_factory=list)
-    technologies: List[str] = field(default_factory=list)
-    detection_methods: Set[str] = field(default_factory=set)
+    ports: list[int] = field(default_factory=list)
+    protocols: list[str] = field(default_factory=list)
+    versions: list[str] = field(default_factory=list)
+    products: list[str] = field(default_factory=list)
+    urls: list[str] = field(default_factory=list)
+    technologies: list[str] = field(default_factory=list)
+    detection_methods: set[str] = field(default_factory=set)
     category: str = ""
     attack_context: str = ""
-    next_steps: List[str] = field(default_factory=list)
-    common_tools: List[str] = field(default_factory=list)
+    next_steps: list[str] = field(default_factory=list)
+    common_tools: list[str] = field(default_factory=list)
     high_value: bool = False
     cleartext: bool = False
     default_creds: bool = False
     confidence: float = 0.0
-    raw_entries: List[Dict] = field(default_factory=list)  # original data
+    raw_entries: list[dict] = field(default_factory=list)  # original data
 
     @property
     def best_version(self) -> str:
@@ -53,7 +52,7 @@ class CorrelatedService:
         """Comma-separated port list."""
         return ", ".join(str(p) for p in sorted(set(self.ports)))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize for JSON output."""
         return {
             "canonical_name": self.canonical_name,
@@ -61,8 +60,8 @@ class CorrelatedService:
             "ports": sorted(set(self.ports)),
             "protocols": list(set(self.protocols)),
             "best_version": self.best_version,
-            "all_versions": list(set(v for v in self.versions if v)),
-            "products": list(set(p for p in self.products if p)),
+            "all_versions": list({v for v in self.versions if v}),
+            "products": list({p for p in self.products if p}),
             "urls": self.urls,
             "technologies": list(set(self.technologies)),
             "detection_methods": sorted(self.detection_methods),
@@ -81,21 +80,21 @@ class CorrelatedService:
 class AttackSurfaceMap:
     """Unified attack surface representation."""
     target: str = ""
-    services: Dict[str, CorrelatedService] = field(default_factory=dict)
+    services: dict[str, CorrelatedService] = field(default_factory=dict)
     # Category groupings for quick access
-    by_category: Dict[str, List[str]] = field(default_factory=dict)
+    by_category: dict[str, list[str]] = field(default_factory=dict)
     total_ports: int = 0
     total_services: int = 0
     high_value_count: int = 0
 
-    def get_services_by_category(self, category: str) -> List[CorrelatedService]:
+    def get_services_by_category(self, category: str) -> list[CorrelatedService]:
         names = self.by_category.get(category, [])
         return [self.services[n] for n in names if n in self.services]
 
-    def get_high_value(self) -> List[CorrelatedService]:
+    def get_high_value(self) -> list[CorrelatedService]:
         return [s for s in self.services.values() if s.high_value]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "target": self.target,
             "total_ports": self.total_ports,
@@ -119,8 +118,8 @@ class CorrelationEngine:
 
     def __init__(
         self,
-        intel_db: Optional[ServiceIntelligenceDB] = None,
-        normalizer: Optional[ServiceNormalizer] = None,
+        intel_db: ServiceIntelligenceDB | None = None,
+        normalizer: ServiceNormalizer | None = None,
     ) -> None:
         self._db = intel_db or ServiceIntelligenceDB()
         self._normalizer = normalizer or ServiceNormalizer(self._db)
@@ -128,9 +127,9 @@ class CorrelationEngine:
     def correlate(
         self,
         target: str,
-        ports: List[Dict],
-        services: List[Dict],
-        http_services: List[Dict],
+        ports: list[dict],
+        services: list[dict],
+        http_services: list[dict],
     ) -> AttackSurfaceMap:
         """Build a unified attack surface map from all scan data.
 
@@ -144,7 +143,7 @@ class CorrelationEngine:
             AttackSurfaceMap with correlated services.
         """
         surface = AttackSurfaceMap(target=target)
-        correlated: Dict[str, CorrelatedService] = {}
+        correlated: dict[str, CorrelatedService] = {}
 
         # Process port discovery data
         for entry in ports:
@@ -159,11 +158,11 @@ class CorrelationEngine:
             self._ingest_http(correlated, http_svc)
 
         # Enrich all correlated services with intelligence
-        for name, svc in correlated.items():
+        for svc in correlated.values():
             self._enrich_service(svc)
 
         # Build category index
-        by_category: Dict[str, List[str]] = {}
+        by_category: dict[str, list[str]] = {}
         for name, svc in correlated.items():
             cat = svc.category or "misc"
             by_category.setdefault(cat, []).append(name)
@@ -181,8 +180,8 @@ class CorrelationEngine:
 
         return surface
 
-    def _ingest_entry(self, correlated: Dict[str, CorrelatedService],
-                      entry: Dict, detection_method: str) -> None:
+    def _ingest_entry(self, correlated: dict[str, CorrelatedService],
+                      entry: dict, detection_method: str) -> None:
         """Ingest a port/service entry into the correlation map."""
         port = entry.get("port", 0)
         service_name = entry.get("service", "")
@@ -228,8 +227,8 @@ class CorrelationEngine:
             svc.detection_methods.add(detection_method)
         svc.raw_entries.append(entry)
 
-    def _ingest_http(self, correlated: Dict[str, CorrelatedService],
-                     http_entry: Dict) -> None:
+    def _ingest_http(self, correlated: dict[str, CorrelatedService],
+                     http_entry: dict) -> None:
         """Ingest an HTTP service entry and link it to the right service."""
         url = http_entry.get("url", "")
         if not url:

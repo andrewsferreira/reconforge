@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reconforge"
-version = "2.15.0"
+version = "2.15.1"
 description = "An evidence-driven reconnaissance and attack-path analysis framework for authorized penetration testing and Red Team laboratories."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -73,7 +73,18 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E9", "F63", "F7", "F82"]
+# E9 (syntax errors) is kept explicit rather than folded into a broader "E"
+# selection: E501 (line-too-long) alone is ~500 hits across this 32k-line
+# codebase, pure reformatting with no correctness value — deliberately
+# deferred rather than accepted as unavoidable scope creep on this pass.
+# F/B/UP/I/SIM/C4 (pyflakes, bugbear, pyupgrade, isort, flake8-simplify,
+# flake8-comprehensions) were widened from the prior syntax-error-only
+# scope (2026-07-15) after auditing and fixing every real violation they
+# surfaced — see CHANGELOG.md for the fix list, including two genuine bugs
+# (network/phases/port_scanning.py's dead has_kerberos read, and
+# network/phases/service_enumeration.py's cruder-than-necessary share
+# severity heuristic) found via F841 unused-variable, not by inspection.
+select = ["E9", "F", "B", "UP", "I", "SIM", "C4"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -110,11 +121,28 @@ omit = ["*/tests/*", "outputs/*"]
 
 [tool.coverage.report]
 # Honest floor, not an aspiration: actual measured coverage as of
-# 2026-07-14 is ~69% (core/modules/reconforge combined — reconforge
-# added to `source` above alongside CI's --cov=reconforge, v2.11.1).
-# The CI workflow previously asserted --cov-fail-under=85 without this
-# ever having been true (nothing in pyproject.toml codified it either,
-# so a local `pytest --cov` run enforced nothing at all). Raising real
-# coverage back toward 85% is tracked as a P1 follow-up in
-# docs/ARCHITECTURE_REVIEW.md rather than silently claimed here.
-fail_under = 50
+# 2026-07-15 is ~70.5% (core/modules/reconforge combined). Raised from
+# the previous fail_under=50 — which was never close to the real number
+# and enforced nothing meaningful — to a value the suite genuinely clears
+# today, so a real regression below current levels now fails CI instead
+# of silently passing under a 20-point-stale gate.
+#
+# The Priority-1 spec target (≥78% globally, 85-90% for security-critical
+# modules) is NOT met by this floor and is not claimed here. Reaching it
+# needs real new tests across dozens of currently-low-coverage files —
+# a separate, larger effort, not a config-file change. Lowest-coverage
+# files as of 2026-07-15 (>=20 statements, most-to-least urgent):
+#   core/adapters/burp/burp_mcp_sse_client.py   0%  (198 stmts)
+#   core/utils.py                                0%  ( 37 stmts)
+#   modules/ad/analyzers/privilege_analyzer.py   9%  ( 65 stmts)
+#   modules/ad/reporting/high_value_targets_reporter.py 11% ( 57 stmts)
+#   modules/ad/reporting/attack_surface_reporter.py     14% ( 51 stmts)
+#   modules/ad/analyzers/misconfiguration_analyzer.py   15% ( 60 stmts)
+#   modules/ad/reporting/remediation_reporter.py        15% ( 41 stmts)
+#   modules/ad/analyzers/relationship_analyzer.py       17% ( 60 stmts)
+#   modules/surface/phases/prioritization.py            17% (132 stmts)
+#   modules/ad/reporting/attack_path_reporter.py        18% ( 40 stmts)
+# (reconforge/burp/* and reconforge/entrypoints/{attack_paths,burp_intelligence}.py
+# also show 0%, but are thin CLI-entrypoint wrappers around already-tested
+# core logic, not independently test-worthy in the same way.)
+fail_under = 70

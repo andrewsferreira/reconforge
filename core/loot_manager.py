@@ -12,14 +12,13 @@ exposure, not against compromise of the operator's own account. Set
 ``RECONFORGE_LOOT_KEY`` to supply the key out-of-band instead.
 """
 
-import base64
 import json
 import os
 import warnings
-from dataclasses import dataclass, field, asdict
-from typing import List, Optional, Dict
-from pathlib import Path
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from pathlib import Path
+
 from core.data_contracts import build_contract
 
 try:
@@ -87,7 +86,7 @@ class LootItem:
     source: str
     module: str
     confidence: str = "medium"
-    metadata: Dict = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -100,17 +99,18 @@ class LootManager:
     """
 
     def __init__(self, encrypt: bool = False):
-        self._loot: List[LootItem] = []
+        self._loot: list[LootItem] = []
         self.encrypt = encrypt and _HAS_CRYPTO
         if encrypt and not _HAS_CRYPTO:
             import warnings
             warnings.warn(
                 "cryptography package not installed — loot will be stored in plaintext. "
-                "Install with: pip install cryptography"
+                "Install with: pip install cryptography",
+                stacklevel=2,
             )
 
     def add(self, loot_type: str, value: str, source: str, module: str,
-            confidence: str = "medium", metadata: Optional[Dict] = None) -> LootItem:
+            confidence: str = "medium", metadata: dict | None = None) -> LootItem:
         """Add a loot item.
 
         A rediscovery of the same (loot_type, value) is deduplicated
@@ -173,19 +173,19 @@ class LootManager:
         return self.add("service", f"{service}/{version}", source, module, "confirmed",
                         {"service": service, "version": version, "port": port})
 
-    def get_by_type(self, loot_type: str) -> List[LootItem]:
+    def get_by_type(self, loot_type: str) -> list[LootItem]:
         """Get all loot of a specific type."""
         return [item for item in self._loot if item.loot_type == loot_type]
 
-    def get_all(self) -> List[LootItem]:
+    def get_all(self) -> list[LootItem]:
         """Get all loot items."""
         return list(self._loot)
 
-    def get_users(self) -> List[str]:
+    def get_users(self) -> list[str]:
         """Get all enumerated usernames."""
         return [item.value for item in self._loot if item.loot_type == "user"]
 
-    def get_credentials(self) -> List[Dict]:
+    def get_credentials(self) -> list[dict]:
         """Get all credentials."""
         return [item.metadata for item in self._loot if item.loot_type == "credential"]
 
@@ -257,9 +257,9 @@ class LootManager:
         encrypted = Path(path).read_bytes()
         return fernet.decrypt(encrypted).decode("utf-8")
 
-    def summary(self) -> Dict[str, int]:
+    def summary(self) -> dict[str, int]:
         """Get loot summary counts."""
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for item in self._loot:
             counts[item.loot_type] = counts.get(item.loot_type, 0) + 1
         return counts

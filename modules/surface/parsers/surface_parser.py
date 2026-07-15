@@ -8,11 +8,11 @@ mapping. Extracts open ports, services, versions, and HTTP metadata.
 
 import json
 import xml.etree.ElementTree as ET  # nosec B405 - only used for type hints (Element, ParseError); parsing itself goes through defusedxml below
-import defusedxml.ElementTree as DefusedET
-from defusedxml.common import DefusedXmlException
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 
 
 @dataclass
@@ -34,7 +34,7 @@ class ServiceInfo:
     url: str = ""
     status_code: int = 0
     title: str = ""
-    technologies: List[str] = field(default_factory=list)
+    technologies: list[str] = field(default_factory=list)
     content_length: int = 0
     web_server: str = ""
 
@@ -42,8 +42,8 @@ class ServiceInfo:
 @dataclass
 class SurfaceParseResult:
     """Combined parsing results for attack-surface data."""
-    ports: List[PortInfo] = field(default_factory=list)
-    services: List[ServiceInfo] = field(default_factory=list)
+    ports: list[PortInfo] = field(default_factory=list)
+    services: list[ServiceInfo] = field(default_factory=list)
     raw_output: str = ""
 
 

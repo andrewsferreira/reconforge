@@ -13,7 +13,6 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
 
 
 @dataclass
@@ -30,7 +29,7 @@ class NiktoFinding:
 @dataclass
 class NiktoResult:
     """Complete Nikto scan result."""
-    findings: List[NiktoFinding] = field(default_factory=list)
+    findings: list[NiktoFinding] = field(default_factory=list)
     target_ip: str = ""
     target_port: str = ""
     target_hostname: str = ""

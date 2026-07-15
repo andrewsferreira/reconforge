@@ -5,9 +5,9 @@ sentinels instead of magic literals that collide with unrelated meanings
 
 from unittest.mock import MagicMock
 
-from core.runner import RC_TOOL_NOT_FOUND, RC_POLICY_BLOCKED, RC_PRECONDITION_FAILED
-from modules.network.tools.hydra import HydraTool
+from core.runner import RC_POLICY_BLOCKED, RC_PRECONDITION_FAILED, RC_TOOL_NOT_FOUND
 from modules.ad.tools.netexec import NetexecTool
+from modules.network.tools.hydra import HydraTool
 from modules.web.tools.ffuf import FfufTool
 
 

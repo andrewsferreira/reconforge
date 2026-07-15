@@ -13,7 +13,6 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
@@ -28,7 +27,7 @@ class WpscanVuln:
     # _classify_severity()'s own fallback rather than implying "high" is
     # a safe/neutral default for an uncategorized vulnerability.
     severity: str = "low"
-    references: List[str] = field(default_factory=list)
+    references: list[str] = field(default_factory=list)
     fixed_in: str = ""
 
 
@@ -37,10 +36,10 @@ class WpscanResult:
     """Complete WPScan result."""
     wp_version: str = ""
     wp_status: str = ""  # latest, outdated, insecure
-    plugins: Dict[str, str] = field(default_factory=dict)  # name -> version
-    themes: Dict[str, str] = field(default_factory=dict)
-    users: List[str] = field(default_factory=list)
-    vulnerabilities: List[WpscanVuln] = field(default_factory=list)
+    plugins: dict[str, str] = field(default_factory=dict)  # name -> version
+    themes: dict[str, str] = field(default_factory=dict)
+    users: list[str] = field(default_factory=list)
+    vulnerabilities: list[WpscanVuln] = field(default_factory=list)
     raw_output: str = ""
 
     @property
@@ -172,8 +171,8 @@ class WpscanParser:
         return "low"
 
     @staticmethod
-    def _extract_references(refs_data) -> List[str]:
-        refs: List[str] = []
+    def _extract_references(refs_data) -> list[str]:
+        refs: list[str] = []
         if isinstance(refs_data, dict):
             for key, value in refs_data.items():
                 if isinstance(value, str):

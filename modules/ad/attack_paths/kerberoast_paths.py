@@ -3,9 +3,13 @@
 Author: Andrews Ferreira
 """
 
-from typing import Any, Dict
+from typing import Any
+
 from modules.ad.attack_paths.base import (
-    AttackPathBuilderBase, AttackPathResult, AttackChain, NextStepSuggestion,
+    AttackChain,
+    AttackPathBuilderBase,
+    AttackPathResult,
+    NextStepSuggestion,
 )
 
 
@@ -15,7 +19,7 @@ class KerberoastPathBuilder(AttackPathBuilderBase):
     BUILDER_NAME = "kerberoast"
 
     def build(
-        self, analysis_data: Dict[str, Any],
+        self, analysis_data: dict[str, Any],
         target: str = "", domain: str = "", **kwargs,
     ) -> AttackPathResult:
         result = AttackPathResult(builder=self.BUILDER_NAME)

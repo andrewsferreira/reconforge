@@ -1,14 +1,12 @@
 """ReconForge Logger - Structured logging with color-coded output."""
 
-import logging
 import json
+import logging
 import re
 import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-
 
 # ── Credential sanitization patterns ────────────────────────────────
 # Order matters throughout this list: specific patterns for a value that
@@ -134,12 +132,12 @@ class ReconLogger:
         "CRITICAL": "[X]",
     }
 
-    def __init__(self, name: str = "reconforge", log_dir: Optional[Path] = None, verbose: bool = False,
-                 execution_id: Optional[str] = None):
+    def __init__(self, name: str = "reconforge", log_dir: Path | None = None, verbose: bool = False,
+                 execution_id: str | None = None):
         self.name = name
         self.verbose = verbose
         self.execution_id = execution_id or f"run_{uuid.uuid4().hex[:12]}"
-        self._json_log_path: Optional[Path] = None
+        self._json_log_path: Path | None = None
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG if verbose else logging.INFO)
         self.logger.handlers.clear()

@@ -1,8 +1,7 @@
 """ReconForge Utilities - Common helper functions."""
 
-import re
 import hashlib
-from typing import Optional, List
+import re
 from pathlib import Path
 
 
@@ -42,9 +41,9 @@ def md5sum(text: str) -> str:
     return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
 
-def parse_port_range(port_spec: str) -> List[int]:
+def parse_port_range(port_spec: str) -> list[int]:
     """Parse a port specification like '22,80,443' or '1-1024'."""
-    ports = []
+    ports: list[int] = []
     for part in port_spec.split(","):
         part = part.strip()
         if "-" in part:

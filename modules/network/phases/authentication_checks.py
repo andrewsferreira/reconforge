@@ -7,8 +7,7 @@ Active brute-force requires explicit --brute-force flag.
 """
 
 import json
-from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 from modules.network.base import NetworkPhaseBase
 from modules.network.tools.hydra import HydraTool
@@ -40,8 +39,12 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
         self.hydra = hydra
         self.smbclient = smbclient
 
-    def run(self, target: str, scan_results: Dict[str, Any],
-            brute_force: bool = False, opsec_mode: str = "normal") -> Dict[str, Any]:
+    # NetworkPhaseBase.run() declares **kwargs: Any deliberately loosely;
+    # every real call site invokes this phase through its concrete type
+    # (network_module.py), never through the base type, so this narrower,
+    # self-documenting signature carries no real substitutability risk.
+    def run(self, target: str, scan_results: dict[str, Any],  # type: ignore[override]
+            brute_force: bool = False, opsec_mode: str = "normal") -> dict[str, Any]:
         """Execute authentication checks phase.
 
         Args:
@@ -56,7 +59,7 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
         self.logger.info(f"=== Phase 4: Authentication Checks on {target} ===")
         self.notes.add_phase_start(self.PHASE_NAME)
 
-        results = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "target": target,
             "anonymous_access": [],
@@ -107,8 +110,8 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
 
         return results
 
-    def _check_anonymous_access(self, target: str, port_numbers: List[int],
-                                 open_ports: List[Dict], results: Dict):
+    def _check_anonymous_access(self, target: str, port_numbers: list[int],
+                                 open_ports: list[dict], results: dict):
         """Check for anonymous/unauthenticated access on services."""
         self.logger.info("Checking for anonymous/unauthenticated access...")
 
@@ -188,8 +191,8 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
                         )
                         break
 
-    def _run_brute_force(self, target: str, port_numbers: List[int],
-                          open_ports: List[Dict], results: Dict,
+    def _run_brute_force(self, target: str, port_numbers: list[int],
+                          open_ports: list[dict], results: dict,
                           opsec_mode: str):
         """Run brute-force testing with hydra (opt-in only)."""
         self.logger.warning("⚠️  Brute-force testing enabled - proceeding with caution")
@@ -203,7 +206,7 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
             return
 
         # Determine which services to test
-        brute_services = []
+        brute_services: list[dict[str, Any]] = []
         service_map = {
             22: "ssh",
             21: "ftp",
@@ -288,7 +291,7 @@ class AuthenticationChecksPhase(NetworkPhaseBase):
                     self.workflow.record_result("No default credentials found")
 
     @staticmethod
-    def _parse_hydra_output(output: str) -> List[Dict[str, str]]:
+    def _parse_hydra_output(output: str) -> list[dict[str, str]]:
         """Parse hydra output for discovered credentials."""
         import re
         creds = []

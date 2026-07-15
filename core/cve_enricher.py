@@ -9,8 +9,6 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import List
-
 
 _CVE_RE = re.compile(r"\bCVE-\d{4}-\d{4,7}\b", re.IGNORECASE)
 _CPE_RE = re.compile(r"\bcpe:2\.3:[aho]:[^\s]+", re.IGNORECASE)
@@ -36,7 +34,7 @@ _MIN_REQUEST_INTERVAL_SECONDS = 6.0
 _last_request_at: float = 0.0
 
 
-def enrich_references(description: str, evidence: str, references: List[str]) -> List[str]:
+def enrich_references(description: str, evidence: str, references: list[str]) -> list[str]:
     """Append CVE/NVD links extracted from finding text.
 
     - Always links explicit CVE IDs found in description/evidence.
@@ -57,7 +55,7 @@ def enrich_references(description: str, evidence: str, references: List[str]) ->
     return refs
 
 
-def lookup_cves_for_cpe(cpe: str, limit: int = 3) -> List[str]:
+def lookup_cves_for_cpe(cpe: str, limit: int = 3) -> list[str]:
     """Lookup CVEs for a given CPE via NVD API with local caching.
 
     Cache reads/writes hit the in-memory `_MEMORY_CACHE` after the first
@@ -87,7 +85,7 @@ def lookup_cves_for_cpe(cpe: str, limit: int = 3) -> List[str]:
         f"?cpeName={encoded}&resultsPerPage=5"
     )
     req = urllib.request.Request(url, headers={"User-Agent": "ReconForge/1.1.0"})
-    cves: List[str] = []
+    cves: list[str] = []
     try:
         _last_request_at = time.monotonic()
         # url's scheme+host is the fixed literal above; only the
@@ -117,6 +115,6 @@ def _load_cache(path: Path) -> dict:
         return {}
 
 
-def _add_unique(refs: List[str], value: str) -> None:
+def _add_unique(refs: list[str], value: str) -> None:
     if value not in refs:
         refs.append(value)

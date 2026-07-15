@@ -6,12 +6,11 @@ interesting services for further enumeration.
 """
 
 import json
-from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 from modules.network.base import NetworkPhaseBase
+from modules.network.parsers.nmap_parser import NmapHost, NmapParser
 from modules.network.tools.nmap import NmapTool
-from modules.network.parsers.nmap_parser import NmapParser, NmapHost
 
 
 class PortScanningPhase(NetworkPhaseBase):
@@ -65,7 +64,11 @@ class PortScanningPhase(NetworkPhaseBase):
         self.nmap = nmap
         self.parser = parser
 
-    def run(self, targets: List[str], opsec_mode: str = "normal") -> Dict[str, Any]:
+    # NetworkPhaseBase.run() declares a single target: str; this phase
+    # deliberately scans every host host_discovery found in one call
+    # (targets: list[str]), and is only ever invoked through its concrete
+    # type (network_module.py), never through the base type.
+    def run(self, targets: list[str], opsec_mode: str = "normal") -> dict[str, Any]:  # type: ignore[override]
         """Execute port scanning phase.
 
         Args:
@@ -78,7 +81,7 @@ class PortScanningPhase(NetworkPhaseBase):
         self.logger.info(f"=== Phase 2: Port Scanning ({len(targets)} targets) ===")
         self.notes.add_phase_start(self.PHASE_NAME)
 
-        results = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "hosts": {},
             "total_open_ports": 0,
@@ -112,7 +115,7 @@ class PortScanningPhase(NetworkPhaseBase):
 
         return results
 
-    def _scan_host(self, target: str, opsec_mode: str) -> Dict[str, Any]:
+    def _scan_host(self, target: str, opsec_mode: str) -> dict[str, Any]:
         """Scan a single host."""
         host_result = {
             "target": target,
@@ -203,7 +206,7 @@ class PortScanningPhase(NetworkPhaseBase):
 
         return host_result
 
-    def _process_host(self, host: NmapHost, host_result: Dict, target: str):
+    def _process_host(self, host: NmapHost, host_result: dict, target: str):
         """Process a scanned host and extract findings."""
         for port in host.open_ports:
             port_info = {
@@ -296,7 +299,7 @@ class PortScanningPhase(NetworkPhaseBase):
                 recommendation=config.get("recommendation", ""),
             )
 
-    def _version_scan(self, target: str, host_result: Dict):
+    def _version_scan(self, target: str, host_result: dict):
         """Run version detection on discovered open ports."""
         open_port_str = ",".join(str(p["port"]) for p in host_result["open_ports"])
         if not open_port_str:
@@ -353,7 +356,7 @@ class PortScanningPhase(NetworkPhaseBase):
 
             self.workflow.record_result("Version detection complete")
 
-    def _suggest_next_steps(self, target: str, host_result: Dict):
+    def _suggest_next_steps(self, target: str, host_result: dict):
         """Suggest next steps based on scan results."""
         for port_info in host_result.get("interesting_services", []):
             port = port_info["port"]
@@ -367,7 +370,7 @@ class PortScanningPhase(NetworkPhaseBase):
                 )
                 self.workflow.suggest_next(
                     command=f"smbclient -L //{target} -N",
-                    justification=f"Test null session SMB share listing",
+                    justification="Test null session SMB share listing",
                     priority="high"
                 )
 
@@ -381,7 +384,7 @@ class PortScanningPhase(NetworkPhaseBase):
             if service == "ftp" or port == 21:
                 self.workflow.suggest_next(
                     command=f"ftp {target} (test anonymous)",
-                    justification=f"FTP detected - test anonymous access",
+                    justification="FTP detected - test anonymous access",
                     priority="medium"
                 )
 
@@ -407,18 +410,22 @@ class PortScanningPhase(NetworkPhaseBase):
         has_kerberos = any(p["port"] == 88 for p in host_result.get("open_ports", []))
 
         if has_smb and has_ldap:
+            ad_steps = [
+                "Enumerate LDAP for base DN and users",
+                "Test SMB null session for share enumeration",
+                "Enumerate users via RID cycling",
+            ]
+            ad_prerequisites = ["SMB port 445 open", "LDAP port 389 open"]
+            if has_kerberos:
+                ad_steps.append("Check for ASREPRoasting (Kerberos port 88 open)")
+                ad_prerequisites.append("Kerberos port 88 open")
+            ad_steps.append("Attempt password spray with discovered users")
             self.workflow.add_attack_path(
                 name="Active Directory Enumeration",
                 description="SMB and LDAP detected - likely a Domain Controller",
-                steps=[
-                    "Enumerate LDAP for base DN and users",
-                    "Test SMB null session for share enumeration",
-                    "Enumerate users via RID cycling",
-                    "Check for ASREPRoasting if Kerberos available",
-                    "Attempt password spray with discovered users",
-                ],
+                steps=ad_steps,
                 risk="high",
-                prerequisites=["SMB port 445 open", "LDAP port 389 open"],
+                prerequisites=ad_prerequisites,
             )
 
         if has_smb:

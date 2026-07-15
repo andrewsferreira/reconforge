@@ -6,11 +6,11 @@ Analyzes group memberships, nesting, privileged groups, and
 identifies high-value identity relationships.
 """
 
-from typing import Any, Dict, List, Set
-from modules.ad.analyzers.base import AnalyzerBase, AnalysisResult
+from typing import Any
 
+from modules.ad.analyzers.base import AnalysisResult, AnalyzerBase
 
-PRIVILEGED_GROUPS: Set[str] = {
+PRIVILEGED_GROUPS: set[str] = {
     "Domain Admins",
     "Enterprise Admins",
     "Schema Admins",
@@ -28,7 +28,7 @@ class RelationshipAnalyzer(AnalyzerBase):
 
     ANALYZER_NAME = "relationships"
 
-    def analyze(self, collected_data: Dict[str, Any], **kwargs) -> AnalysisResult:
+    def analyze(self, collected_data: dict[str, Any], **kwargs) -> AnalysisResult:
         """Analyze identity relationships.
 
         Expected keys:
@@ -93,9 +93,9 @@ class RelationshipAnalyzer(AnalyzerBase):
 
         return result
 
-    def _find_privileged_users(self, users: List[Dict]) -> List[str]:
+    def _find_privileged_users(self, users: list[dict]) -> list[str]:
         """Return list of privileged usernames."""
-        privileged: List[str] = []
+        privileged: list[str] = []
         for u in users:
             if u.get("is_admin"):
                 privileged.append(u["username"])
@@ -108,11 +108,11 @@ class RelationshipAnalyzer(AnalyzerBase):
         return list(set(privileged))
 
     def _analyze_privileged_groups(
-        self, groups: List[Dict], target: str,
-    ) -> Dict[str, Any]:
+        self, groups: list[dict], target: str,
+    ) -> dict[str, Any]:
         """Analyze privileged groups and generate findings."""
-        findings: List[Dict] = []
-        priv_group_info: List[Dict] = []
+        findings: list[dict] = []
+        priv_group_info: list[dict] = []
 
         for g in groups:
             cn = g.get("cn", "")

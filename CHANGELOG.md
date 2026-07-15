@@ -6,6 +6,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.15.1] — 2026-07-15
+
+Quality-gate hardening: widened Ruff and MyPy scope from a narrow syntax-error/4-file subset to real repo-wide checks, fixed every real issue they surfaced, and raised the coverage gate from an unenforced 50% to an honest, currently-true 70%. PATCH per `docs/VERSIONING.md` — bug fixes and CI/tooling hardening, no new capabilities.
+
+### Changed (tooling)
+
+- **Ruff** (`pyproject.toml`'s `[tool.ruff.lint]`): `select` widened from `["E9", "F63", "F7", "F82"]` (syntax errors only) to `["E9", "F", "B", "UP", "I", "SIM", "C4"]` (pyflakes, bugbear, pyupgrade, isort, flake8-simplify, flake8-comprehensions). 2537 raw violations audited; ~2018 auto-fixed (typing modernization, import sorting) with the full test suite re-run after each stage; the remaining ~60 fixed by hand. `E501` (line-too-long, ~500 hits) deliberately deferred as pure reformatting with no correctness value.
+- **MyPy**: CI's invocation widened from 4 hand-picked files (`reconforge/cli.py core/runner.py core/workflow_orchestrator.py reconforge/mcp/*.py`) to `core modules reconforge mcp_validation scripts` — 232 source files, all clean. 115 real errors fixed for real; only ~5 use a narrowly-justified, comment-explained `# type: ignore` (e.g. a collector class shared across phases that only ever need a subset of its constructor's dependencies in a given phase).
+- **Coverage**: `[tool.coverage.report]`'s `fail_under` raised from 50 (never true, never enforced anything meaningful) to 70 (real, currently-measured combined coverage is ~70.5%). The Priority-1 spec target of ≥78% globally / 85-90% for security-critical modules is explicitly *not* claimed — reaching it needs real new tests across dozens of low-coverage files, tracked as a separate future effort in `docs/ARCHITECTURE_REVIEW.md` with the lowest-coverage files listed by name.
+
+### Fixed (real bugs found via the widened checks, not by inspection)
+
+- **`modules/ad/phases/passive_recon.py`**: both `self.logger.finding(description)` call sites (SMB null session, anonymous LDAP bind) passed only one argument against `ReconLogger.finding(severity, description)`'s real two-argument signature. Any run that actually found an anonymous LDAP bind or an SMB null session would have crashed with `TypeError` before ever recording the finding — these were silent, high-value crash bugs on exactly the code paths that matter most. Regression tests added (`tests/modules/ad/test_passive_recon_finding_calls.py`).
+- **`modules/network/phases/port_scanning.py`**: `has_kerberos` (port-88 detection) was computed and then never used — the "Check for ASREPRoasting if Kerberos available" attack-path step ran unconditionally regardless of whether Kerberos was actually observed open. Now gated correctly, with a `"Kerberos port 88 open"` prerequisite added when true.
+- **`modules/network/phases/service_enumeration.py`**: anonymous-share-access severity was derived from a cruder inline `share.name not in ("IPC$",)` check instead of the already-computed, more precise `SmbParser.get_interesting_shares()` filter (which correctly excludes `ADMIN$`/`C$`/`print$` and non-`Disk` share types) — the discarded, more accurate value was silently computed and thrown away. Anonymous access to `ADMIN$`/`C$`/`print$` was incorrectly rated `"high"` alongside genuinely sensitive data shares; now uses the precise filter.
+- **`modules/ad/parsers/bloodhound_parser.py`**: `entry.get("Properties", entry.get("properties", {}))`-style fallback chains don't fall through when the key is present but explicitly `null` in the source JSON (only when the key is *missing* does the default apply) — the same crash class already fixed for `api/nuclei_parser.py`'s `"info": null` case in an earlier phase, previously missed here across users/groups/computers/domains/sessions parsing. Fixed with new `_dict_field()`/`_str_field()` helpers that treat an explicit `null` the same as a missing key.
+- **`modules/web/parsers/nuclei_parser.py`**, **`modules/api/parsers/nuclei_parser.py`**: the identical `entry.get(A, entry.get(B, default))` null-fallback gap for `template-id`/`name`/`matched-at` fields.
+- **`modules/api/phases/discovery.py`**: `_enrich_from_spec()` re-fetched `results.get("spec_data")` a second time via a redundant, unguarded call instead of reusing the already null-checked `spec` local variable a few lines above — harmless today only because the two calls happened to agree, but a real crash risk if that ever changed.
+- **`core/detection_map.py::is_allowed()`**: rewritten from an `if`/`elif` chain to a dict lookup (`_ALLOWED_NOISE_LEVELS_BY_MODE`), preserving the exact fail-closed semantics an existing regression test already pins down (unrecognized `opsec_mode` → denied).
+- **`core/config_loader.py`**: `ConfigLoader.__init__`'s `config_dir` type widened from `Path | None` to `str | Path | None`, matching what its body already did at runtime (`Path(config_dir) if config_dir else ...`) — all 5 module constructors pass a `str | None` here, which mypy had never actually checked before this pass.
+
+### Testing
+
+- 1167/1167 tests passing (1165 + 2 new regression tests for the `ReconLogger.finding()` arity bug).
+- Ruff, MyPy (widened scope), Bandit, pip-audit, and the doc-link checker all pass together.
+- Coverage: 70.56% combined (core/modules/reconforge), against the new 70% floor.
+
 ## [2.15.0] — 2026-07-15
 
 Out-of-band human approval architecture for MCP execution — closes the trust-boundary gap flagged as "next" in 2.14.4's release note. MINOR per `docs/VERSIONING.md`: two new tools, and a breaking change to the execution-tool request schema (broader than 2.14.4's single-field break) is scoped to the optional MCP interface, not the core CLI/config surface `VERSIONING.md`'s MAJOR criteria target.

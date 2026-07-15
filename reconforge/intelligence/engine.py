@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from dataclasses import asdict, dataclass, field
 import json
 import logging
+from collections import defaultdict
+from dataclasses import asdict, dataclass
 from typing import Any
 from urllib.parse import parse_qsl, urlparse
 

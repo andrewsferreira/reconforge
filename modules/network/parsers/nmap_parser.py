@@ -9,13 +9,13 @@ Extracts:
 - Service banners
 """
 
+import re
 import xml.etree.ElementTree as ET  # nosec B405 - only used for type hints (Element, ParseError); parsing itself goes through defusedxml below
+from dataclasses import dataclass, field
+from pathlib import Path
+
 import defusedxml.ElementTree as DefusedET
 from defusedxml.common import DefusedXmlException
-import re
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional
-from pathlib import Path
 
 
 @dataclass
@@ -28,7 +28,7 @@ class NmapPort:
     version: str = ""
     product: str = ""
     extra_info: str = ""
-    scripts: Dict[str, str] = field(default_factory=dict)
+    scripts: dict[str, str] = field(default_factory=dict)
     cpe: str = ""
 
     @property
@@ -49,13 +49,13 @@ class NmapHost:
     ip: str
     hostname: str = ""
     state: str = "up"
-    os_matches: List[str] = field(default_factory=list)
-    ports: List[NmapPort] = field(default_factory=list)
+    os_matches: list[str] = field(default_factory=list)
+    ports: list[NmapPort] = field(default_factory=list)
     mac: str = ""
     vendor: str = ""
 
     @property
-    def open_ports(self) -> List[NmapPort]:
+    def open_ports(self) -> list[NmapPort]:
         return [p for p in self.ports if p.state == "open"]
 
     @property
@@ -67,16 +67,16 @@ class NmapHost:
 @dataclass
 class NmapResult:
     """Complete nmap scan result."""
-    hosts: List[NmapHost] = field(default_factory=list)
-    scan_info: Dict[str, str] = field(default_factory=dict)
+    hosts: list[NmapHost] = field(default_factory=list)
+    scan_info: dict[str, str] = field(default_factory=dict)
     raw_output: str = ""
 
     @property
-    def live_hosts(self) -> List[NmapHost]:
+    def live_hosts(self) -> list[NmapHost]:
         return [h for h in self.hosts if h.state == "up"]
 
     @property
-    def all_open_ports(self) -> List[int]:
+    def all_open_ports(self) -> list[int]:
         """All unique open port numbers across all hosts."""
         ports = set()
         for h in self.live_hosts:
@@ -222,7 +222,7 @@ class NmapParser:
 
         return result
 
-    def _parse_host(self, host_elem: ET.Element) -> Optional[NmapHost]:
+    def _parse_host(self, host_elem: ET.Element) -> NmapHost | None:
         """Parse a single host element from XML."""
         # Get host status
         status = host_elem.find("status")
@@ -275,7 +275,7 @@ class NmapParser:
 
         return host
 
-    def _parse_port(self, port_elem: ET.Element) -> Optional[NmapPort]:
+    def _parse_port(self, port_elem: ET.Element) -> NmapPort | None:
         """Parse a single port element from XML."""
         state_elem = port_elem.find("state")
         if state_elem is None:
@@ -307,7 +307,7 @@ class NmapParser:
 
         return port
 
-    def check_known_vulns(self, host: NmapHost) -> List[Dict]:
+    def check_known_vulns(self, host: NmapHost) -> list[dict]:
         """Check host services against known vulnerable versions.
 
         Args:
@@ -330,7 +330,7 @@ class NmapParser:
                     })
         return vulns
 
-    def check_anonymous_access(self, host: NmapHost) -> List[Dict]:
+    def check_anonymous_access(self, host: NmapHost) -> list[dict]:
         """Check for services that may allow anonymous access.
 
         A port is reported at most once, even when both the service-name
@@ -377,7 +377,7 @@ class NmapParser:
                 })
         return findings
 
-    def check_weak_configs(self, host: NmapHost) -> List[Dict]:
+    def check_weak_configs(self, host: NmapHost) -> list[dict]:
         """Check for weak service configurations.
 
         Args:
@@ -390,15 +390,14 @@ class NmapParser:
         for port in host.open_ports:
             # Check for SMB signing disabled
             for script_id, output in port.scripts.items():
-                if "smb-security-mode" in script_id:
-                    if "message_signing: disabled" in output.lower():
-                        findings.append({
-                            "port": port.port,
-                            "severity": "medium",
-                            "description": "SMB message signing is disabled",
-                            "evidence": output[:300],
-                            "recommendation": "Enable SMB signing to prevent relay attacks",
-                        })
+                if "smb-security-mode" in script_id and "message_signing: disabled" in output.lower():
+                    findings.append({
+                        "port": port.port,
+                        "severity": "medium",
+                        "description": "SMB message signing is disabled",
+                        "evidence": output[:300],
+                        "recommendation": "Enable SMB signing to prevent relay attacks",
+                    })
 
                 # Check for outdated SSL/TLS
                 if "ssl" in script_id.lower():
@@ -423,7 +422,7 @@ class NmapParser:
 
         return findings
 
-    def extract_script_vulns(self, host: NmapHost) -> List[Dict]:
+    def extract_script_vulns(self, host: NmapHost) -> list[dict]:
         """Extract vulnerability findings from NSE script output.
 
         Args:
@@ -435,17 +434,16 @@ class NmapParser:
         vulns = []
         for port in host.open_ports:
             for script_id, output in port.scripts.items():
-                if "vuln" in script_id.lower():
-                    # Parse NSE vuln script output
-                    if "VULNERABLE" in output:
-                        # Extract CVE if present
-                        cves = re.findall(r"CVE-\d{4}-\d+", output)
-                        vulns.append({
-                            "port": port.port,
-                            "script": script_id,
-                            "severity": "high",
-                            "description": f"Vulnerability detected by {script_id}",
-                            "evidence": output[:500],
-                            "cves": cves,
-                        })
+                # Parse NSE vuln script output
+                if "vuln" in script_id.lower() and "VULNERABLE" in output:
+                    # Extract CVE if present
+                    cves = re.findall(r"CVE-\d{4}-\d+", output)
+                    vulns.append({
+                        "port": port.port,
+                        "script": script_id,
+                        "severity": "high",
+                        "description": f"Vulnerability detected by {script_id}",
+                        "evidence": output[:500],
+                        "cves": cves,
+                    })
         return vulns

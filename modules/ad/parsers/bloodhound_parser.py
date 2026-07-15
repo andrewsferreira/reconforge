@@ -13,8 +13,6 @@ Author: Andrews Ferreira
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
-
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -34,13 +32,13 @@ class BloodhoundUser:
     password_not_reqd: bool = False
     pwd_last_set: int = 0
     last_logon: int = 0
-    spn_targets: List[str] = field(default_factory=list)
-    member_of: List[str] = field(default_factory=list)
+    spn_targets: list[str] = field(default_factory=list)
+    member_of: list[str] = field(default_factory=list)
     is_da: bool = False
     is_high_value: bool = False
     sensitive: bool = False
     unconstraineddelegation: bool = False
-    allowedtodelegate: List[str] = field(default_factory=list)
+    allowedtodelegate: list[str] = field(default_factory=list)
 
     @property
     def sam_account_name(self) -> str:
@@ -57,7 +55,7 @@ class BloodhoundGroup:
     principal_name: str = ""
     description: str = ""
     admin_count: bool = False
-    members: List[Dict[str, str]] = field(default_factory=list)
+    members: list[dict[str, str]] = field(default_factory=list)
     member_count: int = 0
     is_high_value: bool = False
 
@@ -76,11 +74,11 @@ class BloodhoundComputer:
     os: str = ""
     enabled: bool = True
     unconstraineddelegation: bool = False
-    allowedtodelegate: List[str] = field(default_factory=list)
-    allowedtoact: List[Dict[str, str]] = field(default_factory=list)
+    allowedtodelegate: list[str] = field(default_factory=list)
+    allowedtoact: list[dict[str, str]] = field(default_factory=list)
     has_laps: bool = False
-    local_admins: List[Dict[str, str]] = field(default_factory=list)
-    sessions: List[Dict[str, str]] = field(default_factory=list)
+    local_admins: list[dict[str, str]] = field(default_factory=list)
+    sessions: list[dict[str, str]] = field(default_factory=list)
     is_dc: bool = False
 
     @property
@@ -96,8 +94,8 @@ class BloodhoundDomain:
     object_id: str = ""
     name: str = ""
     functional_level: str = ""
-    trusts: List[Dict[str, str]] = field(default_factory=list)
-    child_domains: List[str] = field(default_factory=list)
+    trusts: list[dict[str, str]] = field(default_factory=list)
+    child_domains: list[str] = field(default_factory=list)
     user_count: int = 0
     group_count: int = 0
     computer_count: int = 0
@@ -119,7 +117,7 @@ class BloodhoundParser:
     # Users
     # ------------------------------------------------------------------
 
-    def parse_users_json(self, data: str) -> List[BloodhoundUser]:
+    def parse_users_json(self, data: str) -> list[BloodhoundUser]:
         """Parse bloodhound users JSON output.
 
         Args:
@@ -132,7 +130,7 @@ class BloodhoundParser:
         if not raw:
             return []
 
-        users: List[BloodhoundUser] = []
+        users: list[BloodhoundUser] = []
         entries = raw.get("data", raw) if isinstance(raw, dict) else raw
 
         if isinstance(entries, dict):
@@ -141,12 +139,10 @@ class BloodhoundParser:
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
-            props = entry.get("Properties", entry.get("properties", {}))
-            aces = entry.get("Aces", [])
+            props = self._dict_field(entry, "Properties", "properties")
 
             user = BloodhoundUser(
-                object_id=entry.get("ObjectIdentifier",
-                                    entry.get("objectid", "")),
+                object_id=self._str_field(entry, "ObjectIdentifier", "objectid"),
                 principal_name=props.get("name", ""),
                 display_name=props.get("displayname", ""),
                 description=props.get("description", ""),
@@ -183,7 +179,7 @@ class BloodhoundParser:
     # Groups
     # ------------------------------------------------------------------
 
-    def parse_groups_json(self, data: str) -> List[BloodhoundGroup]:
+    def parse_groups_json(self, data: str) -> list[BloodhoundGroup]:
         """Parse bloodhound groups JSON output.
 
         Args:
@@ -196,7 +192,7 @@ class BloodhoundParser:
         if not raw:
             return []
 
-        groups: List[BloodhoundGroup] = []
+        groups: list[BloodhoundGroup] = []
         entries = raw.get("data", raw) if isinstance(raw, dict) else raw
 
         if isinstance(entries, dict):
@@ -205,13 +201,12 @@ class BloodhoundParser:
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
-            props = entry.get("Properties", entry.get("properties", {}))
+            props = self._dict_field(entry, "Properties", "properties")
             members_raw = entry.get("Members",
                                     entry.get("members", []))
 
             group = BloodhoundGroup(
-                object_id=entry.get("ObjectIdentifier",
-                                    entry.get("objectid", "")),
+                object_id=self._str_field(entry, "ObjectIdentifier", "objectid"),
                 principal_name=props.get("name", ""),
                 description=props.get("description", ""),
                 admin_count=props.get("admincount", False),
@@ -227,7 +222,7 @@ class BloodhoundParser:
     # Computers
     # ------------------------------------------------------------------
 
-    def parse_computers_json(self, data: str) -> List[BloodhoundComputer]:
+    def parse_computers_json(self, data: str) -> list[BloodhoundComputer]:
         """Parse bloodhound computers JSON output.
 
         Args:
@@ -240,7 +235,7 @@ class BloodhoundParser:
         if not raw:
             return []
 
-        computers: List[BloodhoundComputer] = []
+        computers: list[BloodhoundComputer] = []
         entries = raw.get("data", raw) if isinstance(raw, dict) else raw
 
         if isinstance(entries, dict):
@@ -249,11 +244,10 @@ class BloodhoundParser:
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
-            props = entry.get("Properties", entry.get("properties", {}))
+            props = self._dict_field(entry, "Properties", "properties")
 
             comp = BloodhoundComputer(
-                object_id=entry.get("ObjectIdentifier",
-                                    entry.get("objectid", "")),
+                object_id=self._str_field(entry, "ObjectIdentifier", "objectid"),
                 principal_name=props.get("name", ""),
                 os=props.get("operatingsystem", ""),
                 enabled=props.get("enabled", True),
@@ -290,7 +284,7 @@ class BloodhoundParser:
     # Domains
     # ------------------------------------------------------------------
 
-    def parse_domains_json(self, data: str) -> List[BloodhoundDomain]:
+    def parse_domains_json(self, data: str) -> list[BloodhoundDomain]:
         """Parse bloodhound domains JSON output.
 
         Args:
@@ -303,7 +297,7 @@ class BloodhoundParser:
         if not raw:
             return []
 
-        domains: List[BloodhoundDomain] = []
+        domains: list[BloodhoundDomain] = []
         entries = raw.get("data", raw) if isinstance(raw, dict) else raw
 
         if isinstance(entries, dict):
@@ -312,11 +306,10 @@ class BloodhoundParser:
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
-            props = entry.get("Properties", entry.get("properties", {}))
+            props = self._dict_field(entry, "Properties", "properties")
 
             domain = BloodhoundDomain(
-                object_id=entry.get("ObjectIdentifier",
-                                    entry.get("objectid", "")),
+                object_id=self._str_field(entry, "ObjectIdentifier", "objectid"),
                 name=props.get("name", ""),
                 functional_level=props.get("functionallevel", ""),
             )
@@ -344,7 +337,7 @@ class BloodhoundParser:
     # Sessions
     # ------------------------------------------------------------------
 
-    def parse_sessions_json(self, data: str) -> List[BloodhoundSession]:
+    def parse_sessions_json(self, data: str) -> list[BloodhoundSession]:
         """Parse bloodhound sessions JSON output.
 
         Args:
@@ -357,7 +350,7 @@ class BloodhoundParser:
         if not raw:
             return []
 
-        sessions: List[BloodhoundSession] = []
+        sessions: list[BloodhoundSession] = []
         entries = raw.get("data", raw) if isinstance(raw, dict) else raw
 
         if isinstance(entries, dict):
@@ -367,14 +360,10 @@ class BloodhoundParser:
             if not isinstance(entry, dict):
                 continue
             session = BloodhoundSession(
-                user_sid=entry.get("UserSID",
-                                   entry.get("usersid", "")),
-                computer_sid=entry.get("ComputerSID",
-                                       entry.get("computersid", "")),
-                user_name=entry.get("UserName",
-                                    entry.get("username", "")),
-                computer_name=entry.get("ComputerName",
-                                        entry.get("computername", "")),
+                user_sid=self._str_field(entry, "UserSID", "usersid"),
+                computer_sid=self._str_field(entry, "ComputerSID", "computersid"),
+                user_name=self._str_field(entry, "UserName", "username"),
+                computer_name=self._str_field(entry, "ComputerName", "computername"),
             )
             sessions.append(session)
 
@@ -385,7 +374,32 @@ class BloodhoundParser:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _load_json(data: str) -> Optional[dict | list]:
+    def _dict_field(entry: dict, *keys: str) -> dict:
+        """Return the first key's value that is itself a dict.
+
+        Unlike ``dict.get(key, fallback)``, this also falls through past a
+        key that is present but explicitly ``null`` in the source JSON —
+        bloodhound-python has been observed to emit exactly that for
+        malformed/incomplete collector output, the same crash class fixed
+        for ``api/nuclei_parser.py``'s ``"info": null`` case.
+        """
+        for key in keys:
+            value = entry.get(key)
+            if isinstance(value, dict):
+                return value
+        return {}
+
+    @staticmethod
+    def _str_field(entry: dict, *keys: str, default: str = "") -> str:
+        """Return the first key's value that is a string, else *default*."""
+        for key in keys:
+            value = entry.get(key)
+            if isinstance(value, str):
+                return value
+        return default
+
+    @staticmethod
+    def _load_json(data: str) -> dict | list | None:
         """Load JSON from a string or file path.
 
         Args:
@@ -401,7 +415,7 @@ class BloodhoundParser:
         path = Path(data)
         if path.exists() and path.is_file():
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     return json.load(f)
             except (json.JSONDecodeError, OSError):
                 pass

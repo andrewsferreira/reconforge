@@ -20,7 +20,7 @@ class DomainScopePolicy:
     allow_subdomains: bool = False
 
     @classmethod
-    def from_mapping(cls, data: dict[str, Any]) -> "DomainScopePolicy":
+    def from_mapping(cls, data: dict[str, Any]) -> DomainScopePolicy:
         return cls(
             allowed_domains=_normalize_domains(data.get("allowed_domains", [])),
             denied_domains=_normalize_domains(data.get("denied_domains", [])),

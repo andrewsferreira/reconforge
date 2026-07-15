@@ -6,15 +6,13 @@ Provides a structured exception hierarchy for the framework so that
 callers can handle errors at the appropriate granularity.
 """
 
-from typing import Optional
-
 
 # ── Base ────────────────────────────────────────────────────────────
 
 class ReconForgeError(Exception):
     """Root exception for all ReconForge errors."""
 
-    def __init__(self, message: str = "", detail: Optional[str] = None):
+    def __init__(self, message: str = "", detail: str | None = None):
         self.detail = detail
         full = f"{message} — {detail}" if detail else message
         super().__init__(full)
@@ -79,7 +77,7 @@ class ExecutionError(ReconForgeError):
     """Raised when a subprocess / tool execution fails."""
 
     def __init__(self, command: str, returncode: int = -1,
-                 stderr: str = "", detail: Optional[str] = None):
+                 stderr: str = "", detail: str | None = None):
         self.command = command
         self.returncode = returncode
         self.stderr = stderr
@@ -140,7 +138,7 @@ class ModuleError(ReconForgeError):
     """Raised when a module encounters an unrecoverable error."""
 
     def __init__(self, module: str, message: str = "",
-                 detail: Optional[str] = None):
+                 detail: str | None = None):
         self.module = module
         super().__init__(f"[{module}] {message}", detail=detail)
 
@@ -149,7 +147,7 @@ class PhaseError(ModuleError):
     """Raised when a specific phase inside a module fails."""
 
     def __init__(self, module: str, phase: str, message: str = "",
-                 detail: Optional[str] = None):
+                 detail: str | None = None):
         self.phase = phase
         super().__init__(module=module, message=f"Phase '{phase}': {message}",
                          detail=detail)

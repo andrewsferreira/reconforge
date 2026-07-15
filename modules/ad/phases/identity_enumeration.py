@@ -13,26 +13,23 @@ Refactored to delegate to collectors → analyzers → attack_paths pipeline.
 Author: Andrews Ferreira
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
-from modules.ad.tools.ldapsearch import ADLdapsearchTool
-from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
-from modules.ad.tools.impacket import ImpacketTool
-from modules.ad.tools.smbclient import ADSmbclientTool
-
-from modules.ad.parsers.ldap_parser import ADLdapParser
+from modules.ad.analyzers.misconfiguration_analyzer import MisconfigurationAnalyzer
+from modules.ad.analyzers.relationship_analyzer import RelationshipAnalyzer
+from modules.ad.attack_paths.asrep_paths import AsrepPathBuilder
+from modules.ad.attack_paths.kerberoast_paths import KerberoastPathBuilder
+from modules.ad.base import ADPhaseBase
+from modules.ad.collectors.kerberos_collector import KerberosCollector
+from modules.ad.collectors.ldap_collector import LdapCollector
+from modules.ad.collectors.smb_collector import SmbCollector
 from modules.ad.parsers.enum4linux_ng_parser import Enum4linuxNgParser
 from modules.ad.parsers.impacket_parser import ImpacketParser
-
-from modules.ad.collectors.ldap_collector import LdapCollector
-from modules.ad.collectors.kerberos_collector import KerberosCollector
-from modules.ad.collectors.smb_collector import SmbCollector
-from modules.ad.analyzers.relationship_analyzer import RelationshipAnalyzer
-from modules.ad.analyzers.misconfiguration_analyzer import MisconfigurationAnalyzer
-from modules.ad.attack_paths.kerberoast_paths import KerberoastPathBuilder
-from modules.ad.attack_paths.asrep_paths import AsrepPathBuilder
-
-from modules.ad.base import ADPhaseBase
+from modules.ad.parsers.ldap_parser import ADLdapParser
+from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
+from modules.ad.tools.impacket import ImpacketTool
+from modules.ad.tools.ldapsearch import ADLdapsearchTool
+from modules.ad.tools.smbclient import ADSmbclientTool
 
 
 class IdentityEnumerationPhase(ADPhaseBase):
@@ -68,21 +65,26 @@ class IdentityEnumerationPhase(ADPhaseBase):
         self.impacket_parser = impacket_parser
 
         # Collectors
-        collector_kwargs = dict(
-            logger=self.logger, runner=self.runner,
-            opsec=self.opsec, output_dir=self.output_dir,
-            opsec_mode=self.opsec_mode,
-        )
+        collector_kwargs = {
+            "logger": self.logger, "runner": self.runner,
+            "opsec": self.opsec, "output_dir": self.output_dir,
+            "opsec_mode": self.opsec_mode,
+        }
         self.ldap_collector = LdapCollector(
             ldapsearch=ldapsearch, ldap_parser=ldap_parser, **collector_kwargs,
         )
+        # This phase only calls collect_asrep_hashes()/collect_rid_cycling(),
+        # which use self.impacket/self.impacket_parser alone -- self.nmap is
+        # never touched (unlike detect_kerberos(), used by passive_recon.py).
         self.kerberos_collector = KerberosCollector(
-            nmap=None, impacket=impacket,
+            nmap=None, impacket=impacket,  # type: ignore[arg-type]
             impacket_parser=impacket_parser, **collector_kwargs,
         )
+        # Likewise, collect_enum4linux() uses self.enum4linux_ng/self.opsec
+        # alone -- self.smb_parser is never touched here.
         self.smb_collector = SmbCollector(
             smbclient=smbclient, enum4linux_ng=enum4linux_ng,
-            smb_parser=None, enum4linux_ng_parser=enum4linux_ng_parser,
+            smb_parser=None, enum4linux_ng_parser=enum4linux_ng_parser,  # type: ignore[arg-type]
             **collector_kwargs,
         )
 
@@ -98,7 +100,11 @@ class IdentityEnumerationPhase(ADPhaseBase):
     # Main entry point
     # ------------------------------------------------------------------
 
-    def run(
+    # ADPhaseBase.run() declares **kwargs: Any deliberately loosely; every
+    # real call site invokes this phase through its concrete type
+    # (ad_module.py), never through the base type, so this narrower,
+    # self-documenting signature carries no real substitutability risk.
+    def run(  # type: ignore[override]
         self,
         target: str,
         domain: str = "",
@@ -108,14 +114,14 @@ class IdentityEnumerationPhase(ADPhaseBase):
         username: str = "",
         password: str = "",
         opsec_mode: str = "normal",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute identity enumeration phase."""
         self.logger.info(f"{'='*60}")
         self.logger.info(f"=== AD Phase 2: Identity Enumeration on {target} ===")
         self.logger.info(f"{'='*60}")
         self.notes.add_phase_start(self.PHASE_NAME)
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "target": target,
             "domain": domain,

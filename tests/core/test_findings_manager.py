@@ -6,13 +6,12 @@ Phase 8-I: core/findings_manager.py had zero test coverage prior to this.
 import pytest
 
 from core.findings_manager import (
+    _CONFIDENCE_SEVERITY_CAP,
+    _SEVERITY_RANK,
     Finding,
     FindingsManager,
     _clamp_severity,
-    _CONFIDENCE_SEVERITY_CAP,
-    _SEVERITY_RANK,
 )
-
 
 # ── _clamp_severity: full confidence x severity matrix ──────────────
 

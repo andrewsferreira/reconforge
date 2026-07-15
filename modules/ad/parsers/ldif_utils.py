@@ -21,10 +21,9 @@ deliberately left as-is.
 Author: Andrews Ferreira
 """
 
-from typing import Dict, List
 
 
-def split_ldif_entries(text: str) -> List[Dict[str, List[str]]]:
+def split_ldif_entries(text: str) -> list[dict[str, list[str]]]:
     """Split ldapsearch text output into a list of attribute dicts.
 
     Each entry is separated by a blank line. Attributes that appear
@@ -32,8 +31,8 @@ def split_ldif_entries(text: str) -> List[Dict[str, List[str]]]:
     lowercased; ``# comment``, ``search:``, and ``result:`` metadata
     lines are skipped.
     """
-    entries: List[Dict[str, List[str]]] = []
-    current: Dict[str, List[str]] = {}
+    entries: list[dict[str, list[str]]] = []
+    current: dict[str, list[str]] = {}
     prev_key = ""
 
     for raw_line in text.splitlines():

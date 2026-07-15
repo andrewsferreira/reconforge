@@ -23,14 +23,13 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 
 async def main() -> None:
     params = StdioServerParameters(command="reconforge", args=["mcp", "serve"])
-    async with stdio_client(params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(
-                "reconforge_plan_workflow",
-                {"target": "10.10.10.5", "modules": ["web"]},
-            )
-            print(json.dumps(result.structuredContent, indent=2))
+    async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+        await session.initialize()
+        result = await session.call_tool(
+            "reconforge_plan_workflow",
+            {"target": "10.10.10.5", "modules": ["web"]},
+        )
+        print(json.dumps(result.structuredContent, indent=2))
 
 
 if __name__ == "__main__":

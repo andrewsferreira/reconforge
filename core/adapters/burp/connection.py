@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import queue
@@ -11,10 +12,13 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Dict, Optional
 
 from core.adapters.burp.config import BurpMcpConfig
-from core.adapters.burp.exceptions import BurpMalformedEventError, BurpNotReachableError, BurpResponseTimeoutError
+from core.adapters.burp.exceptions import (
+    BurpMalformedEventError,
+    BurpNotReachableError,
+    BurpResponseTimeoutError,
+)
 from core.adapters.burp.models import BurpSessionState, BurpSseEvent
 
 LOGGER = logging.getLogger(__name__)
@@ -44,11 +48,11 @@ class BurpSseConnection:
         self.state = BurpSessionState(base_url=config.base_url)
         self._sse_response = None
         self._stop = threading.Event()
-        self._events: "queue.Queue[BurpSseEvent]" = queue.Queue()
-        self._reader_thread: Optional[threading.Thread] = None
+        self._events: queue.Queue[BurpSseEvent] = queue.Queue()
+        self._reader_thread: threading.Thread | None = None
 
     def connect(self) -> BurpSessionState:
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
         for attempt in range(self.config.max_retries + 1):
             try:
                 self.state.retries_used = attempt
@@ -172,7 +176,7 @@ class BurpSseConnection:
         if match:
             self.state.session_id = match.group(1)
 
-    def post_json(self, payload: Dict) -> Dict:
+    def post_json(self, payload: dict) -> dict:
         endpoint = self.state.message_endpoint
         if not endpoint:
             raise BurpNotReachableError("No message endpoint available for JSON-RPC")
@@ -201,7 +205,7 @@ class BurpSseConnection:
             # deliver JSON-RPC result asynchronously over SSE.
             return {"_non_json_body": text.strip()}
 
-    def wait_for_response(self, request_id: int, timeout: float) -> Dict:
+    def wait_for_response(self, request_id: int, timeout: float) -> dict:
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
@@ -222,10 +226,9 @@ class BurpSseConnection:
     def close(self) -> None:
         self._stop.set()
         if self._sse_response is not None:
-            try:
+            # Best-effort teardown of a possibly already-closed/broken socket; must never block shutdown.
+            with contextlib.suppress(Exception):
                 self._sse_response.close()
-            except Exception:  # noqa: BLE001  # nosec B110 - best-effort teardown of a possibly already-closed/broken socket; must never block shutdown
-                pass
             self._sse_response = None
         if self._reader_thread and self._reader_thread.is_alive():
             self._reader_thread.join(timeout=0.3)

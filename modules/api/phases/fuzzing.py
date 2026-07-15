@@ -11,18 +11,14 @@ PRIORITY 5 hardened fuzzing phase:
 - Reduced false positives via evidence-based scoring
 """
 
-import json
 import re
-import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from modules.api.base import APIPhaseBase
-from modules.api.tools.ffuf_api import FfufApiTool
-from modules.api.tools.arjun_tool import ArjunTool
-from modules.api.parsers.ffuf_parser import FfufApiParser
 from modules.api.parsers.arjun_parser import ArjunParser
-
+from modules.api.parsers.ffuf_parser import FfufApiParser
+from modules.api.tools.arjun_tool import ArjunTool
+from modules.api.tools.ffuf_api import FfufApiTool
 
 # ── Error Fingerprints ──────────────────────────────────────────────
 # These patterns in response bodies are concrete evidence of injection
@@ -120,7 +116,7 @@ class FuzzingPhase(APIPhaseBase):
         self.ffuf_parser = ffuf_parser
         self.arjun_parser = arjun_parser
 
-    def run(self, target_url: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target_url: str, **kwargs) -> dict[str, Any]:
         """Execute fuzzing phase.
 
         Args:
@@ -136,7 +132,7 @@ class FuzzingPhase(APIPhaseBase):
         headers = kwargs.get("headers", [])
         wordlist = kwargs.get("wordlist", "")
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "discovered_params": [],
             "sensitive_params": [],
@@ -173,8 +169,8 @@ class FuzzingPhase(APIPhaseBase):
             )
         return results
 
-    def _run_arjun(self, target_url: str, endpoints: List[Dict],
-                    headers: List[str], results: Dict) -> int:
+    def _run_arjun(self, target_url: str, endpoints: list[dict],
+                    headers: list[str], results: dict) -> int:
         """Run Arjun for hidden parameter discovery."""
         if not self.arjun.is_available():
             self.logger.warning("Arjun not available, skipping parameter discovery")
@@ -249,9 +245,9 @@ class FuzzingPhase(APIPhaseBase):
         )
         return finding_count
 
-    def _run_ffuf_param_fuzz(self, target_url: str, endpoints: List[Dict],
-                              wordlist: str, headers: List[str],
-                              results: Dict) -> int:
+    def _run_ffuf_param_fuzz(self, target_url: str, endpoints: list[dict],
+                              wordlist: str, headers: list[str],
+                              results: dict) -> int:
         """Run ffuf for parameter value fuzzing with response content analysis.
 
         PRIORITY 5 enhancement: Analyse response bodies, not just status codes.
@@ -349,7 +345,7 @@ class FuzzingPhase(APIPhaseBase):
         self.logger.info(f"ffuf parameter fuzzing: {finding_count} findings")
         return finding_count
 
-    def _classify_error_response(self, full_output: str) -> Dict[str, Any]:
+    def _classify_error_response(self, full_output: str) -> dict[str, Any]:
         """Classify a batch of 500 responses by analyzing available evidence.
 
         ffuf's JSON output format captures no per-result response body, so
@@ -423,8 +419,8 @@ class FuzzingPhase(APIPhaseBase):
         }
 
     def _report_classified_error(
-        self, fuzz_url: str, error_entries: List[Any],
-        classification: Dict[str, Any], results: Dict,
+        self, fuzz_url: str, error_entries: list[Any],
+        classification: dict[str, Any], results: dict,
     ) -> int:
         """Report a batch-level classification covering every 500 response
         from this fuzz run. error_entries is the full set of entries that
@@ -520,7 +516,4 @@ class FuzzingPhase(APIPhaseBase):
         """Check if this run's combined output contains information
         disclosure patterns (debug flags, connection strings, etc.)."""
         search_text = full_output or ""
-        for pattern in _INFO_DISCLOSURE_PATTERNS:
-            if pattern.search(search_text):
-                return True
-        return False
+        return any(pattern.search(search_text) for pattern in _INFO_DISCLOSURE_PATTERNS)

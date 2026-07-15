@@ -42,13 +42,12 @@ Usage::
 
 import json
 import os
-import re
 import uuid
 import warnings
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from core.exceptions import CredentialVaultError
 
@@ -91,7 +90,7 @@ class Credential:
     module: str = ""   # module that discovered it
     confidence: str = "medium"  # confirmed, high, medium, low
     validated: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -106,9 +105,9 @@ class CredentialVault:
     """
 
     def __init__(self, encrypt: bool = False,
-                 key_path: Optional[Path] = None):
-        self._credentials: List[Credential] = []
-        self._seen: Set[str] = set()  # dedup fingerprints
+                 key_path: Path | None = None):
+        self._credentials: list[Credential] = []
+        self._seen: set[str] = set()  # dedup fingerprints
         self.encrypt = encrypt and _HAS_CRYPTO
         self._key_path = key_path or Path.home() / ".reconforge" / "vault.key"
 
@@ -116,7 +115,8 @@ class CredentialVault:
             import warnings
             warnings.warn(
                 "cryptography package not installed — vault will be stored "
-                "in plaintext. Install with: pip install cryptography"
+                "in plaintext. Install with: pip install cryptography",
+                stacklevel=2,
             )
 
     # ── Fingerprinting (dedup) ───────────────────────────────────────
@@ -140,7 +140,7 @@ class CredentialVault:
 
     # ── Add methods ──────────────────────────────────────────────────
 
-    def _add(self, cred: Credential) -> Optional[Credential]:
+    def _add(self, cred: Credential) -> Credential | None:
         """Internal add with dedup check."""
         fp = self._fingerprint(
             cred.cred_type, cred.username, cred.secret,
@@ -156,7 +156,7 @@ class CredentialVault:
                      source: str = "", module: str = "",
                      domain: str = "", service: str = "",
                      confidence: str = "confirmed",
-                     metadata: Optional[Dict] = None) -> Optional[Credential]:
+                     metadata: dict | None = None) -> Credential | None:
         """Add a username/password credential."""
         return self._add(Credential(
             cred_type="password", username=username, secret=password,
@@ -168,7 +168,7 @@ class CredentialVault:
                  username: str = "", source: str = "", module: str = "",
                  domain: str = "", service: str = "",
                  confidence: str = "confirmed",
-                 metadata: Optional[Dict] = None) -> Optional[Credential]:
+                 metadata: dict | None = None) -> Credential | None:
         """Add a hash credential (NTLM, NTLMv2, other)."""
         type_map = {
             "ntlm": "hash_ntlm",
@@ -185,7 +185,7 @@ class CredentialVault:
     def add_token(self, token: str, token_type: str = "bearer", *,
                   username: str = "", source: str = "", module: str = "",
                   service: str = "", confidence: str = "confirmed",
-                  metadata: Optional[Dict] = None) -> Optional[Credential]:
+                  metadata: dict | None = None) -> Credential | None:
         """Add a token (JWT, Bearer, etc.)."""
         type_map = {"jwt": "token_jwt", "bearer": "token_bearer"}
         cred_type = type_map.get(token_type.lower(), "token_bearer")
@@ -198,7 +198,7 @@ class CredentialVault:
     def add_api_key(self, key: str, *, username: str = "",
                     source: str = "", module: str = "",
                     service: str = "", confidence: str = "confirmed",
-                    metadata: Optional[Dict] = None) -> Optional[Credential]:
+                    metadata: dict | None = None) -> Credential | None:
         """Add an API key."""
         return self._add(Credential(
             cred_type="api_key", username=username, secret=key,
@@ -209,7 +209,7 @@ class CredentialVault:
     def add_ssh_key(self, key_material: str, *, username: str = "",
                     source: str = "", module: str = "",
                     service: str = "ssh", confidence: str = "confirmed",
-                    metadata: Optional[Dict] = None) -> Optional[Credential]:
+                    metadata: dict | None = None) -> Credential | None:
         """Add an SSH private key."""
         return self._add(Credential(
             cred_type="ssh_key", username=username, secret=key_material,
@@ -220,7 +220,7 @@ class CredentialVault:
     def add_username(self, username: str, *, source: str = "",
                      module: str = "", domain: str = "",
                      confidence: str = "high",
-                     metadata: Optional[Dict] = None) -> Optional[Credential]:
+                     metadata: dict | None = None) -> Credential | None:
         """Add a bare username (no password yet)."""
         return self._add(Credential(
             cred_type="username", username=username, secret="",
@@ -230,27 +230,27 @@ class CredentialVault:
 
     # ── Query methods ────────────────────────────────────────────────
 
-    def get_all(self) -> List[Credential]:
+    def get_all(self) -> list[Credential]:
         """Return all stored credentials."""
         return list(self._credentials)
 
-    def get_by_type(self, cred_type: str) -> List[Credential]:
+    def get_by_type(self, cred_type: str) -> list[Credential]:
         """Filter credentials by type."""
         return [c for c in self._credentials if c.cred_type == cred_type]
 
-    def get_passwords(self) -> List[Credential]:
+    def get_passwords(self) -> list[Credential]:
         """Return all password credentials."""
         return self.get_by_type("password")
 
-    def get_hashes(self) -> List[Credential]:
+    def get_hashes(self) -> list[Credential]:
         """Return all hash credentials."""
         return [c for c in self._credentials if c.cred_type.startswith("hash_")]
 
-    def get_tokens(self) -> List[Credential]:
+    def get_tokens(self) -> list[Credential]:
         """Return all token credentials."""
         return [c for c in self._credentials if c.cred_type.startswith("token_")]
 
-    def get_usernames(self) -> List[str]:
+    def get_usernames(self) -> list[str]:
         """Return a deduplicated list of all known usernames."""
         names: set = set()
         for c in self._credentials:
@@ -258,13 +258,13 @@ class CredentialVault:
                 names.add(c.username)
         return sorted(names)
 
-    def get_for_service(self, service: str) -> List[Credential]:
+    def get_for_service(self, service: str) -> list[Credential]:
         """Return credentials applicable to a given service."""
         service = service.lower()
         return [c for c in self._credentials
                 if c.service.lower() == service or not c.service]
 
-    def get_for_module(self, module: str) -> List[Credential]:
+    def get_for_module(self, module: str) -> list[Credential]:
         """Return credentials discovered by a specific module."""
         return [c for c in self._credentials if c.module == module]
 
@@ -272,9 +272,9 @@ class CredentialVault:
         """Total credential count."""
         return len(self._credentials)
 
-    def summary(self) -> Dict[str, int]:
+    def summary(self) -> dict[str, int]:
         """Count credentials by type."""
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for c in self._credentials:
             counts[c.cred_type] = counts.get(c.cred_type, 0) + 1
         return counts
@@ -370,7 +370,7 @@ class CredentialVault:
                 return
         raise CredentialVaultError(f"Credential {cred_id} not found")
 
-    def get_validated(self) -> List[Credential]:
+    def get_validated(self) -> list[Credential]:
         """Return only validated credentials."""
         return [c for c in self._credentials if c.validated]
 
@@ -484,7 +484,7 @@ class CredentialVault:
 
     # ── Export helpers ────────────────────────────────────────────────
 
-    def export_usernames(self, path: Optional[Path] = None) -> List[str]:
+    def export_usernames(self, path: Path | None = None) -> list[str]:
         """Export unique usernames (optionally to a file)."""
         names = self.get_usernames()
         if path:
@@ -493,7 +493,7 @@ class CredentialVault:
             path.write_text("\n".join(names) + "\n")
         return names
 
-    def export_passwords(self, path: Optional[Path] = None) -> List[str]:
+    def export_passwords(self, path: Path | None = None) -> list[str]:
         """Export unique passwords (optionally to a file)."""
         passwords = sorted({c.secret for c in self.get_passwords() if c.secret})
         if path:
@@ -502,7 +502,7 @@ class CredentialVault:
             path.write_text("\n".join(passwords) + "\n")
         return passwords
 
-    def export_hashes(self, path: Optional[Path] = None) -> List[str]:
+    def export_hashes(self, path: Path | None = None) -> list[str]:
         """Export hashes in ``username:hash`` format."""
         lines = [f"{c.username}:{c.secret}" for c in self.get_hashes()]
         if path:

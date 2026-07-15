@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable, Set
 
 from core.adapters.burp.capabilities import SAFE_EXPOSED_TOOLS
-
 
 _DEFAULT_BLOCKED_KEYWORDS = (
     "config",
@@ -22,7 +20,7 @@ _DEFAULT_BLOCKED_KEYWORDS = (
 
 @dataclass(frozen=True)
 class BurpCapabilityPolicy:
-    enabled_tools: Set[str] = field(default_factory=lambda: set(SAFE_EXPOSED_TOOLS))
+    enabled_tools: set[str] = field(default_factory=lambda: set(SAFE_EXPOSED_TOOLS))
     blocked_keywords: tuple[str, ...] = _DEFAULT_BLOCKED_KEYWORDS
 
     def is_allowed(self, tool_name: str) -> bool:

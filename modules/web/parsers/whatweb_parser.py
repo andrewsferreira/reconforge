@@ -13,7 +13,6 @@ Extracts:
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
@@ -30,12 +29,12 @@ class DetectedTechnology:
 class WhatwebResult:
     """Complete WhatWeb scan result."""
     target_url: str = ""
-    technologies: List[DetectedTechnology] = field(default_factory=list)
-    headers: Dict[str, str] = field(default_factory=dict)
+    technologies: list[DetectedTechnology] = field(default_factory=list)
+    headers: dict[str, str] = field(default_factory=dict)
     raw_output: str = ""
 
     @property
-    def tech_names(self) -> List[str]:
+    def tech_names(self) -> list[str]:
         return [t.name for t in self.technologies]
 
 

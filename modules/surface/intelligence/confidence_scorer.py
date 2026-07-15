@@ -9,7 +9,6 @@ score and label.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Optional, Set
 
 from modules.surface.intelligence.correlation_engine import CorrelatedService
 
@@ -19,7 +18,7 @@ class ConfidenceResult:
     """Result of confidence scoring."""
     score: float  # 0.0 - 1.0
     label: str  # "confirmed", "high", "medium", "low", "heuristic"
-    signals: Dict[str, bool]  # Which signals contributed
+    signals: dict[str, bool]  # Which signals contributed
     explanation: str  # Human-readable explanation
 
 
@@ -62,7 +61,7 @@ class ConfidenceScorer:
         (0.0, "heuristic"),
     ]
 
-    def __init__(self, port_map: Optional[Dict[int, str]] = None) -> None:
+    def __init__(self, port_map: dict[int, str] | None = None) -> None:
         """Initialize with optional port-to-service mapping."""
         self._port_map = port_map or {}
 
@@ -102,7 +101,7 @@ class ConfidenceScorer:
             explanation=explanation,
         )
 
-    def score_batch(self, services: Dict[str, CorrelatedService]) -> Dict[str, ConfidenceResult]:
+    def score_batch(self, services: dict[str, CorrelatedService]) -> dict[str, ConfidenceResult]:
         """Score all services in a map."""
         return {name: self.score_service(svc) for name, svc in services.items()}
 
@@ -123,7 +122,7 @@ class ConfidenceScorer:
         return any(p.strip() for p in svc.products)
 
     @staticmethod
-    def _build_explanation(svc: CorrelatedService, signals: Dict[str, bool],
+    def _build_explanation(svc: CorrelatedService, signals: dict[str, bool],
                            score: float, label: str) -> str:
         """Build human-readable confidence explanation."""
         parts = [f"{svc.display_name or svc.canonical_name}: {label} confidence ({score:.0%})"]

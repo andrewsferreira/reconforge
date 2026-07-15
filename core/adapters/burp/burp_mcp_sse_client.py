@@ -32,12 +32,10 @@ import os
 import queue
 import re
 import threading
-import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import requests
-
 
 DEFAULT_BASE_URL = os.getenv("BURP_MCP_BASE_URL", "http://127.0.0.1:9876")
 DEFAULT_CONNECT_TIMEOUT = 10
@@ -85,9 +83,9 @@ class BurpMCPClient:
 
         self._session = requests.Session()
         self._stop_event = threading.Event()
-        self._sse_thread: Optional[threading.Thread] = None
+        self._sse_thread: threading.Thread | None = None
 
-        self.session_id: Optional[str] = None
+        self.session_id: str | None = None
         self._sse_ready = threading.Event()
 
         # JSON-RPC responses correlated by id
@@ -254,7 +252,7 @@ class BurpMCPClient:
         self.log(f"POST response status={response.status_code} body={body!r}")
         return body
 
-    def request(self, method: str, params: Optional[dict[str, Any]] = None, rpc_id: int = 1) -> dict[str, Any]:
+    def request(self, method: str, params: dict[str, Any] | None = None, rpc_id: int = 1) -> dict[str, Any]:
         """
         Send a JSON-RPC request and wait for the asynchronous SSE response.
 
@@ -301,7 +299,7 @@ class BurpMCPClient:
     def tools_list(self) -> dict[str, Any]:
         return self.request("tools/list", params={}, rpc_id=1)
 
-    def tools_call(self, name: str, arguments: Optional[dict[str, Any]] = None, rpc_id: int = 2) -> dict[str, Any]:
+    def tools_call(self, name: str, arguments: dict[str, Any] | None = None, rpc_id: int = 2) -> dict[str, Any]:
         if arguments is None:
             arguments = {}
 
@@ -352,7 +350,7 @@ def main() -> int:
         return 0
 
     except Exception as exc:
-        print(f"\nStatus: FAILED")
+        print("\nStatus: FAILED")
         print(f"Error: {exc!r}")
         return 1
 

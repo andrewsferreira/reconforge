@@ -9,16 +9,16 @@ tools, parsers, and core services (findings, loot, workflow, notes, opsec).
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
-from core.logger import ReconLogger
-from core.runner import Runner
+from core.attack_workflow import AttackWorkflow
 from core.config_loader import ConfigLoader
 from core.findings_manager import FindingsManager
+from core.logger import ReconLogger
 from core.loot_manager import LootManager
-from core.attack_workflow import AttackWorkflow
 from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
+from core.runner import Runner
 
 if TYPE_CHECKING:
     from core.profile_loader import ProfileLoader
@@ -81,11 +81,11 @@ class ADPhaseBase(ABC):
         self.opsec = opsec
         self.opsec_mode = opsec_mode
         self.profile = profile
-        self.tools_used: List[str] = []
+        self.tools_used: list[str] = []
 
     # ── Template method ────────────────────────────────────────────
 
-    def execute(self, target: str, **kwargs) -> Dict[str, Any]:
+    def execute(self, target: str, **kwargs) -> dict[str, Any]:
         """Execute the full phase lifecycle.
 
         1. Log phase start
@@ -138,7 +138,7 @@ class ADPhaseBase(ABC):
         return results
 
     @abstractmethod
-    def run(self, target: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target: str, **kwargs) -> dict[str, Any]:
         """Run the phase tools and return results.
 
         Must be implemented by subclasses.
@@ -169,7 +169,7 @@ class ADPhaseBase(ABC):
         description: str,
         evidence: str = "",
         recommendation: str = "",
-        references: Optional[List[str]] = None,
+        references: list[str] | None = None,
         confidence_reason: str = "",
     ) -> None:
         """Convenience wrapper to add a finding with module/phase pre-filled."""

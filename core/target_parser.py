@@ -1,7 +1,6 @@
 """ReconForge Target Parser - Parse and validate target specifications."""
 
 import ipaddress
-from typing import List, Optional
 from dataclasses import dataclass
 
 from core.exceptions import TargetValidationError
@@ -12,9 +11,9 @@ from core.validators import validate_hostname, validate_ip
 class Target:
     """Parsed target specification."""
     raw: str
-    ip: Optional[str] = None
-    hostname: Optional[str] = None
-    network: Optional[str] = None
+    ip: str | None = None
+    hostname: str | None = None
+    network: str | None = None
     is_network: bool = False
 
     @property
@@ -71,7 +70,7 @@ def parse_target(target_str: str) -> Target:
     return target
 
 
-def parse_targets(target_list: List[str]) -> List[Target]:
+def parse_targets(target_list: list[str]) -> list[Target]:
     """Parse a list of target strings.
 
     Raises:

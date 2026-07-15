@@ -6,11 +6,11 @@ Collects users, groups, computers, OUs, GPOs, password policy,
 SPN accounts, AS-REP roastable accounts, and trusts via LDAP.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from modules.ad.collectors.base import CollectorBase, CollectorResult
-from modules.ad.tools.ldapsearch import ADLdapsearchTool
 from modules.ad.parsers.ldap_parser import ADLdapParser
+from modules.ad.tools.ldapsearch import ADLdapsearchTool
 
 
 class LdapCollector(CollectorBase):
@@ -61,7 +61,7 @@ class LdapCollector(CollectorBase):
 
     # ── Individual collectors ──────────────────────────────────────
 
-    def collect_rootdse(self, target: str) -> Dict[str, Any]:
+    def collect_rootdse(self, target: str) -> dict[str, Any]:
         """Test anonymous bind and extract RootDSE."""
         if not self.opsec.check("ldap_anonymous_bind"):
             return {"anonymous": False}
@@ -83,7 +83,7 @@ class LdapCollector(CollectorBase):
         }
 
     def collect_users(self, target: str, base_dn: str,
-                      username: str = "", password: str = "") -> List[Dict]:
+                      username: str = "", password: str = "") -> list[dict]:
         """Return list of user dicts."""
         if not self.opsec.check("ldap_user_enum"):
             return []
@@ -109,7 +109,7 @@ class LdapCollector(CollectorBase):
         ]
 
     def collect_groups(self, target: str, base_dn: str,
-                       username: str = "", password: str = "") -> List[Dict]:
+                       username: str = "", password: str = "") -> list[dict]:
         """Return list of group dicts."""
         if not self.opsec.check("ldap_group_enum"):
             return []
@@ -129,7 +129,7 @@ class LdapCollector(CollectorBase):
         ]
 
     def collect_computers(self, target: str, base_dn: str,
-                          username: str = "", password: str = "") -> List[Dict]:
+                          username: str = "", password: str = "") -> list[dict]:
         """Return list of computer dicts."""
         if not self.opsec.check("ldap_computer_enum"):
             return []
@@ -149,7 +149,7 @@ class LdapCollector(CollectorBase):
         ]
 
     def collect_spn_accounts(self, target: str, base_dn: str,
-                             username: str = "", password: str = "") -> List[Dict]:
+                             username: str = "", password: str = "") -> list[dict]:
         """Return list of SPN account dicts (Kerberoasting targets)."""
         if not self.opsec.check("ldap_spn_query"):
             return []
@@ -169,7 +169,7 @@ class LdapCollector(CollectorBase):
         ]
 
     def collect_asrep_users(self, target: str, base_dn: str,
-                            username: str = "", password: str = "") -> List[Dict]:
+                            username: str = "", password: str = "") -> list[dict]:
         """Return list of users with pre-auth disabled."""
         if not self.opsec.check("ldap_asrep_query"):
             return []
@@ -183,7 +183,7 @@ class LdapCollector(CollectorBase):
         ]
 
     def collect_trusts(self, target: str, base_dn: str,
-                       username: str = "", password: str = "") -> List[Dict]:
+                       username: str = "", password: str = "") -> list[dict]:
         """Return list of trust relationship dicts."""
         if not self.opsec.check("ldap_trust_enum"):
             return []
@@ -202,7 +202,7 @@ class LdapCollector(CollectorBase):
         ]
 
     def collect_gpos(self, target: str, base_dn: str,
-                     username: str = "", password: str = "") -> List[Dict]:
+                     username: str = "", password: str = "") -> list[dict]:
         """Return list of GPO dicts."""
         if not self.opsec.check("ldap_gpo_enum"):
             return []
@@ -221,7 +221,7 @@ class LdapCollector(CollectorBase):
         ]
 
     def collect_password_policy(self, target: str, base_dn: str,
-                                username: str = "", password: str = "") -> Dict:
+                                username: str = "", password: str = "") -> dict:
         """Return password policy dict."""
         if not self.opsec.check("ldap_password_policy"):
             return {}

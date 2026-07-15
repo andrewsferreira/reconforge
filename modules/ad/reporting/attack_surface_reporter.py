@@ -4,7 +4,8 @@ Author: Andrews Ferreira
 """
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
+
 from core.version import __version__
 from modules.ad.reporting.base import ReporterBase
 
@@ -14,7 +15,7 @@ class AttackSurfaceReporter(ReporterBase):
 
     REPORTER_NAME = "attack_surface"
 
-    def generate(self, data: Dict[str, Any], **kwargs) -> str:
+    def generate(self, data: dict[str, Any], **kwargs) -> str:
         """Generate attack surface summary markdown."""
         target = data.get("target", "")
         domain = data.get("domain", "Not discovered")
@@ -33,7 +34,7 @@ class AttackSurfaceReporter(ReporterBase):
             f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**OPSEC Mode:** {opsec_mode}",
             f"**Authenticated:** {'Yes' if authenticated else 'No'}",
-            f"**Author:** Andrews Ferreira",
+            "**Author:** Andrews Ferreira",
             "",
             "## Executive Summary\n",
             f"Active Directory reconnaissance of **{domain or target}** "

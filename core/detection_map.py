@@ -1,7 +1,5 @@
 """ReconForge Detection Map - OPSEC risk assessment for tools and techniques."""
 
-from typing import Dict, Optional
-
 
 DETECTION_LEVELS = {
     "nmap_ping_sweep": {"noise": "low", "description": "ICMP/ARP ping sweep"},
@@ -104,9 +102,16 @@ DETECTION_LEVELS = {
 }
 
 
-def get_detection_level(technique: str) -> Optional[Dict]:
+def get_detection_level(technique: str) -> dict | None:
     """Get detection level for a technique."""
     return DETECTION_LEVELS.get(technique)
+
+
+_ALLOWED_NOISE_LEVELS_BY_MODE: dict[str, tuple[str, ...]] = {
+    "stealth": ("low",),
+    "normal": ("low", "medium"),
+    "aggressive": ("low", "medium", "high", "very_high"),
+}
 
 
 def is_allowed(technique: str, opsec_mode: str) -> bool:
@@ -120,10 +125,4 @@ def is_allowed(technique: str, opsec_mode: str) -> bool:
     disabled all noise gating, including very_high-noise techniques.
     """
     level = DETECTION_LEVELS.get(technique, {}).get("noise", "unknown")
-    if opsec_mode == "stealth":
-        return level in ("low",)
-    elif opsec_mode == "normal":
-        return level in ("low", "medium")
-    elif opsec_mode == "aggressive":
-        return level in ("low", "medium", "high", "very_high")
-    return False
+    return level in _ALLOWED_NOISE_LEVELS_BY_MODE.get(opsec_mode, ())

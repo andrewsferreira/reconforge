@@ -7,8 +7,7 @@ aliases, descriptions, and version-specific intelligence.
 Transforms raw port/service data into actionable pentesting intelligence.
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -40,9 +39,9 @@ class ServiceIntelligenceDB:
     """
 
     def __init__(self) -> None:
-        self._profiles: Dict[str, ServiceProfile] = {}
-        self._port_map: Dict[int, str] = {}  # port → canonical_name
-        self._alias_map: Dict[str, str] = {}  # alias → canonical_name
+        self._profiles: dict[str, ServiceProfile] = {}
+        self._port_map: dict[int, str] = {}  # port → canonical_name
+        self._alias_map: dict[str, str] = {}  # alias → canonical_name
         self._build_database()
 
     def _build_database(self) -> None:
@@ -576,51 +575,51 @@ class ServiceIntelligenceDB:
 
     # ── Lookups ────────────────────────────────────────────────────
 
-    def get_profile(self, service_name: str) -> Optional[ServiceProfile]:
+    def get_profile(self, service_name: str) -> ServiceProfile | None:
         """Get intelligence profile for a service by name or alias."""
         canonical = self.resolve_canonical(service_name)
         if canonical:
             return self._profiles.get(canonical)
         return None
 
-    def get_profile_by_port(self, port: int) -> Optional[ServiceProfile]:
+    def get_profile_by_port(self, port: int) -> ServiceProfile | None:
         """Get intelligence profile by port number."""
         canonical = self._port_map.get(port)
         if canonical:
             return self._profiles.get(canonical)
         return None
 
-    def resolve_canonical(self, name: str) -> Optional[str]:
+    def resolve_canonical(self, name: str) -> str | None:
         """Resolve any service name/alias to its canonical name."""
         if not name:
             return None
         lower = name.lower().strip()
         return self._alias_map.get(lower)
 
-    def resolve_by_port(self, port: int) -> Optional[str]:
+    def resolve_by_port(self, port: int) -> str | None:
         """Resolve a port number to its canonical service name."""
         return self._port_map.get(port)
 
-    def get_category_services(self, category: str) -> List[ServiceProfile]:
+    def get_category_services(self, category: str) -> list[ServiceProfile]:
         """Get all services in a category."""
         return [p for p in self._profiles.values() if p.category == category]
 
-    def get_high_value_services(self) -> List[ServiceProfile]:
+    def get_high_value_services(self) -> list[ServiceProfile]:
         """Get all high-value target services."""
         return [p for p in self._profiles.values() if p.high_value]
 
-    def get_all_profiles(self) -> Dict[str, ServiceProfile]:
+    def get_all_profiles(self) -> dict[str, ServiceProfile]:
         """Return all service profiles."""
         return dict(self._profiles)
 
-    def get_categories(self) -> Set[str]:
+    def get_categories(self) -> set[str]:
         """Return all known categories."""
         return {p.category for p in self._profiles.values()}
 
     @property
-    def port_map(self) -> Dict[int, str]:
+    def port_map(self) -> dict[int, str]:
         return dict(self._port_map)
 
     @property
-    def alias_map(self) -> Dict[str, str]:
+    def alias_map(self) -> dict[str, str]:
         return dict(self._alias_map)

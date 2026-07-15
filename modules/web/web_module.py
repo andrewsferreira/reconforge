@@ -19,53 +19,52 @@ Usage:
 import json
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from core.authorization_gate import ScopeAuthorization
 
-from core.logger import ReconLogger
-from core.runner import Runner
-from core.config_loader import ConfigLoader
-from core.output_manager import OutputManager
 from core.attack_workflow import AttackWorkflow
-from core.loot_manager import LootManager
+from core.config_loader import ConfigLoader
+from core.data_contracts import SCHEMA_VERSION, build_contract
+from core.exceptions import ModuleError
 from core.findings_manager import FindingsManager
+from core.logger import ReconLogger
+from core.loot_manager import LootManager
 from core.notes_manager import NotesManager
 from core.opsec_checks import OpsecChecker
+from core.output_manager import OutputManager
 from core.profile_loader import ProfileLoader
+from core.runner import Runner
 from core.telemetry import ModuleTelemetry
-from core.data_contracts import SCHEMA_VERSION, build_contract
 from core.validators import validate_url
 from core.version import __version__
-from core.exceptions import ModuleError
-
-# Tool imports
-from modules.web.tools.whatweb import WhatwebTool
-from modules.web.tools.wafw00f import Wafw00fTool
-from modules.web.tools.curl_tool import CurlTool
-from modules.web.tools.nikto import NiktoTool
-from modules.web.tools.gobuster import GobusterTool
-from modules.web.tools.ffuf import FfufTool
-from modules.web.tools.wpscan import WpscanTool
-from modules.web.tools.sqlmap import SqlmapTool
-from modules.web.tools.nuclei import NucleiTool
+from modules.web.parsers.ffuf_parser import FfufParser
+from modules.web.parsers.gobuster_parser import GobusterParser
+from modules.web.parsers.nikto_parser import NiktoParser
+from modules.web.parsers.nuclei_parser import NucleiParser
+from modules.web.parsers.wafw00f_parser import Wafw00fParser
 
 # Parser imports
 from modules.web.parsers.whatweb_parser import WhatwebParser
-from modules.web.parsers.wafw00f_parser import Wafw00fParser
-from modules.web.parsers.nikto_parser import NiktoParser
-from modules.web.parsers.gobuster_parser import GobusterParser
-from modules.web.parsers.ffuf_parser import FfufParser
 from modules.web.parsers.wpscan_parser import WpscanParser
-from modules.web.parsers.nuclei_parser import NucleiParser
+from modules.web.phases.content_enumeration import ContentEnumerationPhase
+from modules.web.phases.exploit_candidates import ExploitCandidatesPhase
 
 # Phase imports
 from modules.web.phases.surface_discovery import SurfaceDiscoveryPhase
-from modules.web.phases.content_enumeration import ContentEnumerationPhase
 from modules.web.phases.vulnerability_scanning import VulnerabilityScanningPhase
-from modules.web.phases.exploit_candidates import ExploitCandidatesPhase
+from modules.web.tools.curl_tool import CurlTool
+from modules.web.tools.ffuf import FfufTool
+from modules.web.tools.gobuster import GobusterTool
+from modules.web.tools.nikto import NiktoTool
+from modules.web.tools.nuclei import NucleiTool
+from modules.web.tools.sqlmap import SqlmapTool
+from modules.web.tools.wafw00f import Wafw00fTool
+
+# Tool imports
+from modules.web.tools.whatweb import WhatwebTool
+from modules.web.tools.wpscan import WpscanTool
 
 
 class WebModule:
@@ -90,10 +89,10 @@ class WebModule:
         verbose: bool = False,
         dry_run: bool = False,
         timeout: int = 900,
-        config_dir: Optional[str] = None,
+        config_dir: str | None = None,
         encrypt_loot: bool = False,
         scope: Optional["ScopeAuthorization"] = None,
-        approval_id: Optional[str] = None,
+        approval_id: str | None = None,
     ) -> None:
         """Initialise the Web module.
 
@@ -172,19 +171,19 @@ class WebModule:
         self.nuclei_parser = NucleiParser()
 
         # Shared keyword args for all phases
-        self._phase_kwargs = dict(
-            logger=self.logger,
-            runner=self.runner,
-            config=self.config,
-            output_dir=self.parsed_dir,
-            findings=self.findings_mgr,
-            loot=self.loot,
-            workflow=self.workflow,
-            notes=self.notes,
-            opsec=self.opsec,
-            opsec_mode=opsec_mode,
-            profile=self.profile,
-        )
+        self._phase_kwargs = {
+            "logger": self.logger,
+            "runner": self.runner,
+            "config": self.config,
+            "output_dir": self.parsed_dir,
+            "findings": self.findings_mgr,
+            "loot": self.loot,
+            "workflow": self.workflow,
+            "notes": self.notes,
+            "opsec": self.opsec,
+            "opsec_mode": opsec_mode,
+            "profile": self.profile,
+        }
 
         # Initialise phases
         self.phase_surface = SurfaceDiscoveryPhase(
@@ -218,9 +217,9 @@ class WebModule:
 
     def run(
         self,
-        phases: Optional[List[str]] = None,
+        phases: list[str] | None = None,
         opt_in: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute the web reconnaissance workflow.
 
         Args:
@@ -267,7 +266,7 @@ class WebModule:
         # Check tool availability
         self._check_tools()
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "target": self.target_url,
             "opsec_mode": self.opsec_mode,
             "schema_version": SCHEMA_VERSION,
@@ -359,7 +358,7 @@ class WebModule:
         target = target.rstrip("/")
         return validate_url(target)
 
-    def _check_tools(self) -> Dict[str, bool]:
+    def _check_tools(self) -> dict[str, bool]:
         """Check availability of web reconnaissance tools."""
         tools = {
             "whatweb": self.whatweb.is_available(),
@@ -389,7 +388,7 @@ class WebModule:
 
         return tools
 
-    def _generate_reports(self, results: Dict) -> None:
+    def _generate_reports(self, results: dict) -> None:
         """Generate all output reports."""
         self.logger.info("Generating reports...")
 
@@ -468,7 +467,7 @@ class WebModule:
                 message=f"Report generation failed partway through — some artifacts may be missing: {e}",
             ) from e
 
-    def _generate_quick_report(self, results: Dict) -> None:
+    def _generate_quick_report(self, results: dict) -> None:
         """Generate executive summary report."""
         report_path = self.output.report_file(self.MODULE_NAME)
 
@@ -481,7 +480,7 @@ class WebModule:
             f"**Target:** {self.target_url}",
             f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"**OPSEC Mode:** {self.opsec_mode}",
-            f"**Author:** Andrews Ferreira",
+            "**Author:** Andrews Ferreira",
             "",
             "## Executive Summary\n",
             f"Web reconnaissance of **{self.target_url}** identified "
@@ -563,7 +562,7 @@ class WebModule:
 
         report_path.write_text("\n".join(lines))
 
-    def _print_summary(self, results: Dict) -> None:
+    def _print_summary(self, results: dict) -> None:
         """Print a summary to console."""
         self.logger.info(f"\n{'='*60}")
         self.logger.info("WEB SCAN COMPLETE - Summary")

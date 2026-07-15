@@ -78,8 +78,8 @@ def test_run_module_aggregates_findings_into_provided_manager():
     spawned module's findings into the caller-provided FindingsManager —
     previously WorkflowOrchestrator.findings existed but nothing ever
     wrote to it, so no cross-module aggregation happened at all."""
-    from core.workflow_orchestrator import _run_module
     from core.findings_manager import FindingsManager
+    from core.workflow_orchestrator import _run_module
 
     fake_module = MagicMock()
     fake_module.run.return_value = {"phases": {}}

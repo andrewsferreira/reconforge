@@ -12,7 +12,7 @@ mode arguments are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -28,7 +28,7 @@ class WpscanTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -68,7 +68,7 @@ class WpscanTool:
             timeout,
         )
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "wpscan", "--url", target_url, "--format", "json",
             "-o", str(json_path), "--enumerate", enum_flags, "--no-banner",
         ]

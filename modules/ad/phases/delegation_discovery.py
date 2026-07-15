@@ -12,20 +12,17 @@ Refactored to delegate to collectors → analyzers → attack_paths pipeline.
 Author: Andrews Ferreira
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
-from modules.ad.tools.ldapsearch import ADLdapsearchTool
-from modules.ad.tools.advanced_impacket import AdvancedImpacketTool
-from modules.ad.tools.netexec import NetexecTool
-
-from modules.ad.parsers.ldap_parser import ADLdapParser
-from modules.ad.parsers.delegation_parser import DelegationParser
-
-from modules.ad.collectors.delegation_collector import DelegationCollector
 from modules.ad.analyzers.misconfiguration_analyzer import MisconfigurationAnalyzer
 from modules.ad.attack_paths.delegation_paths import DelegationPathBuilder
-
 from modules.ad.base import ADPhaseBase
+from modules.ad.collectors.delegation_collector import DelegationCollector
+from modules.ad.parsers.delegation_parser import DelegationParser
+from modules.ad.parsers.ldap_parser import ADLdapParser
+from modules.ad.tools.advanced_impacket import AdvancedImpacketTool
+from modules.ad.tools.ldapsearch import ADLdapsearchTool
+from modules.ad.tools.netexec import NetexecTool
 
 
 class DelegationDiscoveryPhase(ADPhaseBase):
@@ -52,11 +49,11 @@ class DelegationDiscoveryPhase(ADPhaseBase):
         self.delegation_parser = delegation_parser
 
         # Collector
-        collector_kwargs = dict(
-            logger=self.logger, runner=self.runner,
-            opsec=self.opsec, output_dir=self.output_dir,
-            opsec_mode=self.opsec_mode,
-        )
+        collector_kwargs = {
+            "logger": self.logger, "runner": self.runner,
+            "opsec": self.opsec, "output_dir": self.output_dir,
+            "opsec_mode": self.opsec_mode,
+        }
         self.delegation_collector = DelegationCollector(
             ldapsearch=ldapsearch,
             advanced_impacket=advanced_impacket,
@@ -74,7 +71,11 @@ class DelegationDiscoveryPhase(ADPhaseBase):
     # Main entry point
     # ------------------------------------------------------------------
 
-    def run(
+    # ADPhaseBase.run() declares **kwargs: Any deliberately loosely; every
+    # real call site invokes this phase through its concrete type
+    # (ad_module.py), never through the base type, so this narrower,
+    # self-documenting signature carries no real substitutability risk.
+    def run(  # type: ignore[override]
         self,
         target: str,
         domain: str = "",
@@ -82,14 +83,14 @@ class DelegationDiscoveryPhase(ADPhaseBase):
         username: str = "",
         password: str = "",
         opsec_mode: str = "normal",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute delegation discovery phase."""
         self.logger.info(f"{'='*60}")
         self.logger.info(f"=== AD Phase 4: Delegation Discovery on {target} ===")
         self.logger.info(f"{'='*60}")
         self.notes.add_phase_start(self.PHASE_NAME)
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "target": target,
             "domain": domain,
@@ -230,7 +231,7 @@ class DelegationDiscoveryPhase(ADPhaseBase):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _record_delegation_loot(self, results: Dict) -> None:
+    def _record_delegation_loot(self, results: dict) -> None:
         """Record delegation data as loot entries."""
         for entry in results["unconstrained_delegation"]:
             if not getattr(entry, "is_dc", False):

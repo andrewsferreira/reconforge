@@ -92,7 +92,7 @@ def build_burp_config(
 ) -> BurpMcpConfig:
     """Build Burp config aligned to ReconForge environment conventions."""
     return BurpMcpConfig(
-        base_url=base_url or os.getenv("BURP_MCP_URL", "http://127.0.0.1:9876"),
+        base_url=base_url or os.getenv("BURP_MCP_URL") or "http://127.0.0.1:9876",
         rpc_timeout_seconds=(
             rpc_timeout_seconds if rpc_timeout_seconds is not None else _float_env("BURP_MCP_RPC_TIMEOUT_SECONDS", 8.0)
         ),

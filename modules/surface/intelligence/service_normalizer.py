@@ -9,7 +9,6 @@ string extraction, and common variations.
 
 import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 from modules.surface.intelligence.service_intelligence import ServiceIntelligenceDB
 
@@ -48,7 +47,7 @@ class ServiceNormalizer:
     # SSL/TLS prefix patterns
     _SSL_PREFIXES = re.compile(r"^ssl[/|]|^tls[/|]", re.I)
 
-    def __init__(self, intel_db: Optional[ServiceIntelligenceDB] = None) -> None:
+    def __init__(self, intel_db: ServiceIntelligenceDB | None = None) -> None:
         self._db = intel_db or ServiceIntelligenceDB()
 
     def normalize(self, service_name: str, port: int = 0,
@@ -149,7 +148,7 @@ class ServiceNormalizer:
             confidence="low",
         )
 
-    def _extract_version(self, name: str) -> Tuple[str, str]:
+    def _extract_version(self, name: str) -> tuple[str, str]:
         """Extract product and version from a service name string."""
         for pattern in self._VERSION_PATTERNS:
             m = pattern.match(name)

@@ -25,14 +25,13 @@ Usage::
 
 import json
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.exceptions import EngagementError, EngagementNotFoundError
 from core.version import __version__
-
 
 # ── Status constants ─────────────────────────────────────────────────
 
@@ -58,12 +57,12 @@ class EngagementMeta:
     name: str = ""
     client: str = ""
     operator: str = ""
-    scope: List[str] = field(default_factory=list)
+    scope: list[str] = field(default_factory=list)
     status: str = "planning"
     start_time: str = ""
     end_time: str = ""
     pause_time: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     notes: str = ""
 
 
@@ -81,18 +80,18 @@ class EngagementManager:
         name: str = "",
         client: str = "",
         operator: str = "",
-        scope: Optional[List[str]] = None,
-        tags: Optional[List[str]] = None,
+        scope: list[str] | None = None,
+        tags: list[str] | None = None,
         notes: str = "",
     ):
         self.meta = EngagementMeta(
             name=name, client=client, operator=operator,
             scope=scope or [], tags=tags or [], notes=notes,
         )
-        self._timeline: List[TimelineEntry] = []
-        self._module_results: Dict[str, Dict[str, Any]] = {}
-        self._findings_summary: Dict[str, int] = {}
-        self._loot_summary: Dict[str, int] = {}
+        self._timeline: list[TimelineEntry] = []
+        self._module_results: dict[str, dict[str, Any]] = {}
+        self._findings_summary: dict[str, int] = {}
+        self._loot_summary: dict[str, int] = {}
 
     # ── Lifecycle ────────────────────────────────────────────────────
 
@@ -180,13 +179,13 @@ class EngagementManager:
             operator=operator or self.meta.operator,
         ))
 
-    def record_module_result(self, module: str, result: Dict[str, Any]):
+    def record_module_result(self, module: str, result: dict[str, Any]):
         """Store the result dict from a module run."""
         self._module_results[module] = result
         self.record_action(module, "module_completed",
                            detail=f"Module '{module}' completed")
 
-    def get_timeline(self) -> List[Dict[str, str]]:
+    def get_timeline(self) -> list[dict[str, str]]:
         """Return the full timeline as a list of dicts."""
         return [asdict(e) for e in self._timeline]
 
@@ -207,20 +206,20 @@ class EngagementManager:
             )
 
     @property
-    def findings_summary(self) -> Dict[str, int]:
+    def findings_summary(self) -> dict[str, int]:
         return dict(self._findings_summary)
 
     @property
-    def loot_summary(self) -> Dict[str, int]:
+    def loot_summary(self) -> dict[str, int]:
         return dict(self._loot_summary)
 
     @property
-    def modules_run(self) -> List[str]:
+    def modules_run(self) -> list[str]:
         return list(self._module_results.keys())
 
     # ── Persistence ──────────────────────────────────────────────────
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialise the engagement to a dict."""
         return {
             "meta": asdict(self.meta),
@@ -305,7 +304,7 @@ class EngagementManager:
 
     def to_markdown(self) -> str:
         """Generate a Markdown engagement summary."""
-        lines: List[str] = []
+        lines: list[str] = []
         lines.append("# Engagement Report\n")
         lines.append(f"**Engagement:** {self.meta.name}")
         lines.append(f"**Client:** {self.meta.client}")

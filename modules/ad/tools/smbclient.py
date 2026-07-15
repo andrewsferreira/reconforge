@@ -14,7 +14,7 @@ Author: Andrews Ferreira
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult
 from core.tool_config import ToolConfig
@@ -30,7 +30,7 @@ class ADSmbclientTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -50,7 +50,7 @@ class ADSmbclientTool:
         self.logger.info(f"Testing SMB null session share listing on {target}")
         out = self.output_dir / "smb_null_shares.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = ["smbclient", "-N", "-L", f"//{target}"]
+        cmd: list[str] = ["smbclient", "-N", "-L", f"//{target}"]
         return self.runner.run(cmd, timeout=effective_timeout, output_file=out)
 
     def authenticated_list(self, target: str, username: str, password: str,
@@ -59,7 +59,7 @@ class ADSmbclientTool:
         self.logger.info(f"Listing SMB shares on {target} as {username}")
         out = self.output_dir / "smb_auth_shares.txt"
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "smbclient", "-L", f"//{target}",
             "-U", f"{username}%{password}",
         ]
@@ -73,7 +73,7 @@ class ADSmbclientTool:
         """Test access to a specific share."""
         self.logger.info(f"Testing access to //{target}/{share}")
         effective_timeout = self.tool_cfg.effective_timeout(None, timeout)
-        cmd: List[str] = [
+        cmd: list[str] = [
             "smbclient", f"//{target}/{share}",
         ]
         if username:
@@ -95,9 +95,9 @@ class ADSmbclientTool:
 
     def test_admin_shares(self, target: str,
                           username: str = "", password: str = "",
-                          timeout: int = 30) -> Dict[str, bool]:
+                          timeout: int = 30) -> dict[str, bool]:
         """Test access to administrative shares (C$, ADMIN$, IPC$)."""
-        results: Dict[str, bool] = {}
+        results: dict[str, bool] = {}
         for share in ["C$", "ADMIN$", "IPC$"]:
             res = self.test_share_access(target, share, username, password, timeout)
             results[share] = res.success

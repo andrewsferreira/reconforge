@@ -25,7 +25,7 @@ Author: Andrews Ferreira
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from core.config_loader import ConfigLoader
@@ -44,10 +44,10 @@ class ToolConfig:
         The key under ``tools:`` in *tools.yaml* (e.g. ``"gobuster"``).
     """
 
-    def __init__(self, config: Optional["ConfigLoader"], tool_name: str) -> None:
+    def __init__(self, config: ConfigLoader | None, tool_name: str) -> None:
         self._tool_name = tool_name
         if config is not None:
-            self._data: Dict[str, Any] = config.get_tool_config(tool_name)
+            self._data: dict[str, Any] = config.get_tool_config(tool_name)
         else:
             self._data = {}
 
@@ -97,7 +97,7 @@ class ToolConfig:
     # Mode / scan_profile helpers
     # ------------------------------------------------------------------
 
-    def _modes(self) -> Dict[str, Any]:
+    def _modes(self) -> dict[str, Any]:
         """Return the ``modes`` or ``scan_profiles`` mapping."""
         return self._data.get("modes", self._data.get("scan_profiles", {}))
 
@@ -172,7 +172,7 @@ class ToolConfig:
     # Convenience: resolve effective timeout for a method call
     # ------------------------------------------------------------------
 
-    def effective_timeout(self, mode: Optional[str], caller_default: int) -> int:
+    def effective_timeout(self, mode: str | None, caller_default: int) -> int:
         """Resolve timeout: mode-specific → tool default → caller default."""
         if mode:
             return self.mode_timeout(mode, caller_default)

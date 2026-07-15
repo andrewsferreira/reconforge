@@ -10,21 +10,21 @@ Extracts:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from typing import Any
 
 
 @dataclass
 class LdapObject:
     """A generic LDAP object."""
     dn: str = ""
-    attributes: Dict[str, List[str]] = field(default_factory=dict)
+    attributes: dict[str, list[str]] = field(default_factory=dict)
 
     def get(self, attr: str, default: str = "") -> str:
         """Get first value of an attribute."""
         vals = self.attributes.get(attr, [])
         return vals[0] if vals else default
 
-    def get_all(self, attr: str) -> List[str]:
+    def get_all(self, attr: str) -> list[str]:
         """Get all values of an attribute."""
         return self.attributes.get(attr, [])
 
@@ -34,16 +34,16 @@ class LdapResult:
     """Parsed LDAP search result."""
     target: str = ""
     base_dn: str = ""
-    naming_contexts: List[str] = field(default_factory=list)
+    naming_contexts: list[str] = field(default_factory=list)
     default_naming_context: str = ""
     domain_name: str = ""
-    objects: List[LdapObject] = field(default_factory=list)
-    users: List[Dict[str, str]] = field(default_factory=list)
-    groups: List[Dict[str, str]] = field(default_factory=list)
-    computers: List[Dict[str, str]] = field(default_factory=list)
+    objects: list[LdapObject] = field(default_factory=list)
+    users: list[dict[str, Any]] = field(default_factory=list)
+    groups: list[dict[str, Any]] = field(default_factory=list)
+    computers: list[dict[str, str]] = field(default_factory=list)
     anonymous_bind: bool = False
     raw_output: str = ""
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class LdapParser:
@@ -131,10 +131,10 @@ class LdapParser:
 
         return result
 
-    def _parse_objects(self, text: str) -> List[LdapObject]:
+    def _parse_objects(self, text: str) -> list[LdapObject]:
         """Parse LDIF-formatted objects from ldapsearch output."""
         objects = []
-        current_obj: Optional[LdapObject] = None
+        current_obj: LdapObject | None = None
         current_attr = ""
 
         for line in text.splitlines():
@@ -190,7 +190,7 @@ class LdapParser:
 
         return objects
 
-    def _extract_naming_contexts(self, objects: List[LdapObject],
+    def _extract_naming_contexts(self, objects: list[LdapObject],
                                   result: LdapResult):
         """Extract naming contexts from parsed objects."""
         for obj in objects:
@@ -249,11 +249,11 @@ class LdapParser:
                 parts.append(component.split("=", 1)[1])
         return ".".join(parts)
 
-    def get_usernames(self, result: LdapResult) -> List[str]:
+    def get_usernames(self, result: LdapResult) -> list[str]:
         """Get clean list of usernames."""
         return [u["username"] for u in result.users if u["username"]]
 
-    def get_admin_users(self, result: LdapResult) -> List[Dict]:
+    def get_admin_users(self, result: LdapResult) -> list[dict]:
         """Get users that are members of admin groups."""
         admin_groups = {"Domain Admins", "Administrators", "Enterprise Admins"}
         admins = []

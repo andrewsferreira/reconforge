@@ -14,10 +14,8 @@ Author: Andrews Ferreira
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 from modules.ad.parsers.ldif_utils import split_ldif_entries
-
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -47,7 +45,7 @@ class ConstrainedDelegation:
     account_name: str = ""
     account_type: str = ""  # user or computer
     dn: str = ""
-    allowed_to_delegate_to: List[str] = field(default_factory=list)
+    allowed_to_delegate_to: list[str] = field(default_factory=list)
     protocol_transition: bool = False  # TrustedToAuthForDelegation
     user_account_control: int = 0
 
@@ -63,7 +61,7 @@ class RBCDelegation:
     """An account with Resource-Based Constrained Delegation."""
     target_account: str = ""  # The account that can be impersonated
     target_dn: str = ""
-    allowed_principals: List[str] = field(default_factory=list)
+    allowed_principals: list[str] = field(default_factory=list)
     raw_descriptor: str = ""
 
     @property
@@ -78,7 +76,7 @@ class DelegationParser:
     # findDelegation.py (impacket) output
     # ------------------------------------------------------------------
 
-    def parse_find_delegation(self, text: str) -> Dict[str, list]:
+    def parse_find_delegation(self, text: str) -> dict[str, list]:
         """Parse impacket findDelegation.py output.
 
         The output is typically a table with columns:
@@ -90,9 +88,9 @@ class DelegationParser:
         Returns:
             Dict with 'unconstrained', 'constrained', and 'rbcd' lists.
         """
-        unconstrained: List[UnconstrainedDelegation] = []
-        constrained: List[ConstrainedDelegation] = []
-        rbcd: List[RBCDelegation] = []
+        unconstrained: list[UnconstrainedDelegation] = []
+        constrained: list[ConstrainedDelegation] = []
+        rbcd: list[RBCDelegation] = []
 
         in_table = False
         for line in text.splitlines():
@@ -123,32 +121,29 @@ class DelegationParser:
             dtype_lower = delegation_type.lower()
 
             if "unconstrained" in dtype_lower:
-                entry = UnconstrainedDelegation(
+                unconstrained.append(UnconstrainedDelegation(
                     account_name=account_name,
                     account_type=account_type,
-                )
-                unconstrained.append(entry)
+                ))
 
             elif "constrained" in dtype_lower and "resource" not in dtype_lower:
                 targets = [t.strip() for t in delegation_target.split(",")
                            if t.strip()]
-                entry = ConstrainedDelegation(
+                constrained.append(ConstrainedDelegation(
                     account_name=account_name,
                     account_type=account_type,
                     allowed_to_delegate_to=targets,
                     protocol_transition="w/ Protocol Transition" in delegation_type
                                         or "protocol" in dtype_lower,
-                )
-                constrained.append(entry)
+                ))
 
             elif "resource" in dtype_lower or "rbcd" in dtype_lower:
                 principals = [t.strip() for t in delegation_target.split(",")
                               if t.strip()]
-                entry = RBCDelegation(
+                rbcd.append(RBCDelegation(
                     target_account=account_name,
                     allowed_principals=principals,
-                )
-                rbcd.append(entry)
+                ))
 
         return {
             "unconstrained": unconstrained,
@@ -160,7 +155,7 @@ class DelegationParser:
     # LDAP-based parsing
     # ------------------------------------------------------------------
 
-    def parse_unconstrained(self, text: str) -> List[UnconstrainedDelegation]:
+    def parse_unconstrained(self, text: str) -> list[UnconstrainedDelegation]:
         """Parse LDAP query output for unconstrained delegation.
 
         Expects ldapsearch output filtered by:
@@ -172,7 +167,7 @@ class DelegationParser:
         Returns:
             List of UnconstrainedDelegation entries.
         """
-        entries: List[UnconstrainedDelegation] = []
+        entries: list[UnconstrainedDelegation] = []
 
         for block in self._split_ldap_entries(text):
             sam = self._first(block, "samaccountname")
@@ -199,7 +194,7 @@ class DelegationParser:
 
         return entries
 
-    def parse_constrained(self, text: str) -> List[ConstrainedDelegation]:
+    def parse_constrained(self, text: str) -> list[ConstrainedDelegation]:
         """Parse LDAP query output for constrained delegation.
 
         Expects ldapsearch output containing msDS-AllowedToDelegateTo.
@@ -210,7 +205,7 @@ class DelegationParser:
         Returns:
             List of ConstrainedDelegation entries.
         """
-        entries: List[ConstrainedDelegation] = []
+        entries: list[ConstrainedDelegation] = []
 
         for block in self._split_ldap_entries(text):
             sam = self._first(block, "samaccountname")
@@ -238,7 +233,7 @@ class DelegationParser:
 
         return entries
 
-    def parse_rbcd(self, text: str) -> List[RBCDelegation]:
+    def parse_rbcd(self, text: str) -> list[RBCDelegation]:
         """Parse LDAP query output for Resource-Based Constrained Delegation.
 
         Expects ldapsearch output containing
@@ -250,7 +245,7 @@ class DelegationParser:
         Returns:
             List of RBCDelegation entries.
         """
-        entries: List[RBCDelegation] = []
+        entries: list[RBCDelegation] = []
 
         for block in self._split_ldap_entries(text):
             sam = self._first(block, "samaccountname")
@@ -275,7 +270,7 @@ class DelegationParser:
 
         return entries
 
-    def parse_ldap_delegation(self, text: str) -> Dict[str, list]:
+    def parse_ldap_delegation(self, text: str) -> dict[str, list]:
         """Parse a general LDAP delegation query that may contain
         all delegation types mixed together.
 
@@ -285,9 +280,9 @@ class DelegationParser:
         Returns:
             Dict with 'unconstrained', 'constrained', and 'rbcd' lists.
         """
-        unconstrained: List[UnconstrainedDelegation] = []
-        constrained: List[ConstrainedDelegation] = []
-        rbcd: List[RBCDelegation] = []
+        unconstrained: list[UnconstrainedDelegation] = []
+        constrained: list[ConstrainedDelegation] = []
+        rbcd: list[RBCDelegation] = []
 
         for block in self._split_ldap_entries(text):
             sam = self._first(block, "samaccountname")
@@ -347,7 +342,7 @@ class DelegationParser:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _split_ldap_entries(text: str) -> List[Dict[str, List[str]]]:
+    def _split_ldap_entries(text: str) -> list[dict[str, list[str]]]:
         """Split ldapsearch text output into attribute dicts.
 
         Shared with ADLdapParser._split_entries via ldif_utils.split_ldif_entries.
@@ -355,17 +350,17 @@ class DelegationParser:
         return split_ldif_entries(text)
 
     @staticmethod
-    def _first(d: Dict[str, List[str]], key: str,
+    def _first(d: dict[str, list[str]], key: str,
                default: str = "") -> str:
         vals = d.get(key, [])
         return vals[0] if vals else default
 
     @staticmethod
-    def _all(d: Dict[str, List[str]], key: str) -> List[str]:
+    def _all(d: dict[str, list[str]], key: str) -> list[str]:
         return d.get(key, [])
 
     @staticmethod
-    def _int_val(d: Dict[str, List[str]], key: str,
+    def _int_val(d: dict[str, list[str]], key: str,
                  default: int = 0) -> int:
         val = d.get(key, [""])[0] if d.get(key) else ""
         try:

@@ -7,10 +7,10 @@ docstring claiming timeouts are config-driven.
 
 from unittest.mock import MagicMock
 
+from modules.ad.tools.advanced_impacket import AdvancedImpacketTool
 from modules.ad.tools.bloodhound import BloodhoundTool
 from modules.ad.tools.ldapsearch import ADLdapsearchTool
 from modules.ad.tools.netexec import NetexecTool
-from modules.ad.tools.advanced_impacket import AdvancedImpacketTool
 
 
 def _config_with_timeout(value: int) -> MagicMock:

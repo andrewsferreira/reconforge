@@ -13,8 +13,8 @@ positive result.
 from types import SimpleNamespace
 
 from core.findings_manager import FindingsManager
-from modules.ad.phases.identity_enumeration import IdentityEnumerationPhase
 from modules.ad.phases.configuration_enumeration import ConfigurationEnumerationPhase
+from modules.ad.phases.identity_enumeration import IdentityEnumerationPhase
 from modules.ad.phases.passive_recon import PassiveReconPhase
 
 

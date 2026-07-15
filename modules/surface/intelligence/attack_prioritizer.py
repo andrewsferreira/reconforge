@@ -8,13 +8,13 @@ and provides actionable next steps for each service.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
+from modules.surface.intelligence.confidence_scorer import ConfidenceResult, ConfidenceScorer
 from modules.surface.intelligence.correlation_engine import (
     AttackSurfaceMap,
     CorrelatedService,
 )
-from modules.surface.intelligence.confidence_scorer import ConfidenceScorer, ConfidenceResult
 
 
 @dataclass
@@ -23,20 +23,20 @@ class PrioritizedTarget:
     rank: int
     canonical_name: str
     display_name: str
-    ports: List[int]
+    ports: list[int]
     category: str
     priority_level: str  # critical, high, medium, low
     confidence: str  # confirmed, high, medium, low
     confidence_score: float
     attack_context: str
-    next_steps: List[str]
-    tools: List[str]
+    next_steps: list[str]
+    tools: list[str]
     version: str = ""
-    urls: List[str] = field(default_factory=list)
-    flags: List[str] = field(default_factory=list)  # e.g., ["cleartext", "default_creds"]
+    urls: list[str] = field(default_factory=list)
+    flags: list[str] = field(default_factory=list)  # e.g., ["cleartext", "default_creds"]
     rationale: str = ""  # Why this priority level
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "rank": self.rank,
             "canonical_name": self.canonical_name,
@@ -61,10 +61,10 @@ class CategoryGroup:
     """Grouped services by attack category."""
     category: str
     display_name: str
-    targets: List[PrioritizedTarget] = field(default_factory=list)
+    targets: list[PrioritizedTarget] = field(default_factory=list)
     summary: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "category": self.category,
             "display_name": self.display_name,
@@ -77,13 +77,13 @@ class CategoryGroup:
 @dataclass
 class PrioritizationResult:
     """Complete prioritization output."""
-    ranked_targets: List[PrioritizedTarget] = field(default_factory=list)
-    category_groups: List[CategoryGroup] = field(default_factory=list)
+    ranked_targets: list[PrioritizedTarget] = field(default_factory=list)
+    category_groups: list[CategoryGroup] = field(default_factory=list)
     executive_summary: str = ""
-    quick_wins: List[PrioritizedTarget] = field(default_factory=list)
-    high_value_targets: List[PrioritizedTarget] = field(default_factory=list)
+    quick_wins: list[PrioritizedTarget] = field(default_factory=list)
+    high_value_targets: list[PrioritizedTarget] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "executive_summary": self.executive_summary,
             "total_targets": len(self.ranked_targets),
@@ -129,13 +129,13 @@ class AttackPrioritizer:
     - Provides next steps and tool suggestions
     """
 
-    def __init__(self, confidence_scorer: Optional[ConfidenceScorer] = None) -> None:
+    def __init__(self, confidence_scorer: ConfidenceScorer | None = None) -> None:
         self._scorer = confidence_scorer
 
     def prioritize(
         self,
         surface_map: AttackSurfaceMap,
-        confidence_results: Optional[Dict[str, ConfidenceResult]] = None,
+        confidence_results: dict[str, ConfidenceResult] | None = None,
     ) -> PrioritizationResult:
         """Generate intelligent prioritization from the attack surface map.
 
@@ -147,7 +147,7 @@ class AttackPrioritizer:
             PrioritizationResult with ranked targets and category groups.
         """
         result = PrioritizationResult()
-        all_targets: List[PrioritizedTarget] = []
+        all_targets: list[PrioritizedTarget] = []
 
         for name, svc in surface_map.services.items():
             conf = confidence_results.get(name) if confidence_results else None
@@ -185,7 +185,7 @@ class AttackPrioritizer:
         return result
 
     def _build_target(
-        self, svc: CorrelatedService, conf: Optional[ConfidenceResult]
+        self, svc: CorrelatedService, conf: ConfidenceResult | None
     ) -> PrioritizedTarget:
         """Build a PrioritizedTarget from a CorrelatedService."""
         flags = []
@@ -220,7 +220,7 @@ class AttackPrioritizer:
             rationale=rationale,
         )
 
-    def _compute_priority(self, svc: CorrelatedService, flags: List[str]) -> str:
+    def _compute_priority(self, svc: CorrelatedService, flags: list[str]) -> str:
         """Compute priority level based on service characteristics."""
         score = 0.0
 
@@ -246,7 +246,7 @@ class AttackPrioritizer:
             return "low"
 
     @staticmethod
-    def _build_rationale(svc: CorrelatedService, level: str, flags: List[str]) -> str:
+    def _build_rationale(svc: CorrelatedService, level: str, flags: list[str]) -> str:
         """Build human-readable rationale for priority assignment."""
         reasons = []
         if svc.high_value:
@@ -267,9 +267,9 @@ class AttackPrioritizer:
 
         return f"{level.upper()} priority: {'; '.join(reasons)}"
 
-    def _build_category_groups(self, targets: List[PrioritizedTarget]) -> List[CategoryGroup]:
+    def _build_category_groups(self, targets: list[PrioritizedTarget]) -> list[CategoryGroup]:
         """Group targets by attack category."""
-        groups_dict: Dict[str, List[PrioritizedTarget]] = {}
+        groups_dict: dict[str, list[PrioritizedTarget]] = {}
         for t in targets:
             groups_dict.setdefault(t.category, []).append(t)
 
@@ -296,7 +296,7 @@ class AttackPrioritizer:
         return result
 
     @staticmethod
-    def _category_summary(category: str, targets: List[PrioritizedTarget]) -> str:
+    def _category_summary(category: str, targets: list[PrioritizedTarget]) -> str:
         """Generate summary for a category group."""
         high_prio = sum(1 for t in targets if t.priority_level in ("critical", "high"))
         summaries = {
@@ -319,14 +319,14 @@ class AttackPrioritizer:
 
     @staticmethod
     def _build_executive_summary(
-        surface_map: AttackSurfaceMap, targets: List[PrioritizedTarget]
+        surface_map: AttackSurfaceMap, targets: list[PrioritizedTarget]
     ) -> str:
         """Generate executive summary text."""
         total = len(targets)
         hv = surface_map.high_value_count
         critical = sum(1 for t in targets if t.priority_level == "critical")
         high = sum(1 for t in targets if t.priority_level == "high")
-        cats = set(t.category for t in targets)
+        cats = {t.category for t in targets}
 
         lines = [
             f"Attack surface analysis identified {total} unique service(s) "

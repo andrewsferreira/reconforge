@@ -16,15 +16,13 @@ import base64
 import json
 import re
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from modules.api.base import APIPhaseBase
-from modules.api.tools.httpx_tool import HttpxTool
-from modules.api.tools.nuclei_api import NucleiApiTool
 from modules.api.parsers.nuclei_parser import NucleiApiParser
 from modules.api.parsers.openapi_parser import OpenApiParser, OpenApiSpec
-
+from modules.api.tools.httpx_tool import HttpxTool
+from modules.api.tools.nuclei_api import NucleiApiTool
 
 # JWT header pattern (three base64url segments separated by dots)
 JWT_PATTERN = re.compile(
@@ -41,7 +39,7 @@ def _b64url_decode(segment: str) -> bytes:
     return base64.b64decode(segment)
 
 
-def _safe_json_decode(segment: str) -> Optional[Dict]:
+def _safe_json_decode(segment: str) -> dict | None:
     """Decode a JWT segment to a dict, returning None on failure."""
     try:
         return json.loads(_b64url_decode(segment))
@@ -70,7 +68,7 @@ class AuthenticationPhase(APIPhaseBase):
         self.nuclei_parser = nuclei_parser
         self.openapi_parser = openapi_parser
 
-    def run(self, target_url: str, **kwargs) -> Dict[str, Any]:
+    def run(self, target_url: str, **kwargs) -> dict[str, Any]:
         """Execute authentication analysis phase.
 
         Args:
@@ -86,7 +84,7 @@ class AuthenticationPhase(APIPhaseBase):
         auth_token = kwargs.get("auth_token", "")
         headers = kwargs.get("headers", [])
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "auth_mechanisms": [],
             "jwt_findings": [],
@@ -134,7 +132,7 @@ class AuthenticationPhase(APIPhaseBase):
     # ── OpenAPI Spec Auth Analysis ──────────────────────────────────
 
     def _analyze_spec_auth(self, spec: OpenApiSpec, target_url: str,
-                            results: Dict) -> int:
+                            results: dict) -> int:
         """Analyze authentication schemes from OpenAPI spec.
 
         Now leverages enhanced OpenApiSpec with:
@@ -146,7 +144,7 @@ class AuthenticationPhase(APIPhaseBase):
         finding_count = 0
 
         for scheme in spec.auth_schemes:
-            auth_info: Dict[str, Any] = {
+            auth_info: dict[str, Any] = {
                 "name": scheme.name,
                 "type": scheme.auth_type,
                 "scheme": scheme.scheme,
@@ -245,7 +243,7 @@ class AuthenticationPhase(APIPhaseBase):
         return finding_count
 
     def _check_unauthenticated_sensitive_endpoints(
-        self, spec: OpenApiSpec, target_url: str, results: Dict,
+        self, spec: OpenApiSpec, target_url: str, results: dict,
     ) -> int:
         """Check for potentially sensitive endpoints without auth in spec.
 
@@ -298,8 +296,8 @@ class AuthenticationPhase(APIPhaseBase):
 
     # ── Auth Endpoint Testing ───────────────────────────────────────
 
-    def _test_auth_endpoints(self, target_url: str, headers: List[str],
-                              results: Dict) -> int:
+    def _test_auth_endpoints(self, target_url: str, headers: list[str],
+                              results: dict) -> int:
         """Test common authentication endpoints."""
         if not self.opsec.check("api_auth_testing"):
             return 0
@@ -353,7 +351,7 @@ class AuthenticationPhase(APIPhaseBase):
     # ── JWT Deep Analysis ───────────────────────────────────────────
 
     def _analyze_jwt(self, token: str, target_url: str,
-                      results: Dict) -> int:
+                      results: dict) -> int:
         """Deep JWT analysis with claims extraction and misconfiguration checks.
 
         Extracts:
@@ -393,14 +391,14 @@ class AuthenticationPhase(APIPhaseBase):
         alg = str(header.get("alg", ""))
         typ = str(header.get("typ", ""))
 
-        jwt_info: Dict[str, Any] = {
+        jwt_info: dict[str, Any] = {
             "algorithm": alg,
             "type": typ,
             "header_keys": list(header.keys()),
         }
 
         # ── Payload claims extraction ───────────────────────────────
-        claims: Dict[str, Any] = {}
+        claims: dict[str, Any] = {}
         if payload:
             standard_claims = ("sub", "iss", "exp", "aud", "iat", "nbf", "jti")
             for claim in standard_claims:
@@ -557,8 +555,8 @@ class AuthenticationPhase(APIPhaseBase):
 
         return finding_count
 
-    def _check_jwt_claims(self, payload: Dict, claims: Dict,
-                           target_url: str, results: Dict) -> int:
+    def _check_jwt_claims(self, payload: dict, claims: dict,
+                           target_url: str, results: dict) -> int:
         """Check JWT payload claims for misconfigurations."""
         finding_count = 0
         now_ts = int(time.time())
@@ -653,7 +651,7 @@ class AuthenticationPhase(APIPhaseBase):
 
         # ── Sensitive data in payload ───────────────────────────────
         sensitive_keys = ("password", "secret", "credit_card", "ssn", "card_number")
-        exposed = [k for k in payload.keys() if k.lower() in sensitive_keys]
+        exposed = [k for k in payload if k.lower() in sensitive_keys]
         if exposed:
             self.add_finding(
                 finding_type="exposure",
@@ -676,8 +674,8 @@ class AuthenticationPhase(APIPhaseBase):
 
     # ── Nuclei Auth Scan ────────────────────────────────────────────
 
-    def _run_nuclei_auth_scan(self, target_url: str, headers: List[str],
-                               results: Dict) -> int:
+    def _run_nuclei_auth_scan(self, target_url: str, headers: list[str],
+                               results: dict) -> int:
         """Run Nuclei with auth-related templates."""
         if not self.nuclei.is_available():
             self.logger.warning("Nuclei not available, skipping auth vuln scan")

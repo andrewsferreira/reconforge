@@ -9,13 +9,12 @@ URLs.  Each function returns the sanitised value on success or raises
 
 import ipaddress
 import re
-from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 from core.exceptions import (
-    ValidationError,
-    TargetValidationError,
     PortValidationError,
+    TargetValidationError,
+    ValidationError,
 )
 
 # ── Constants ───────────────────────────────────────────────────────
@@ -41,8 +40,8 @@ def validate_ip(value: str) -> str:
     try:
         addr = ipaddress.ip_address(value)
         return str(addr)
-    except ValueError:
-        raise TargetValidationError(value, "Not a valid IP address")
+    except ValueError as exc:
+        raise TargetValidationError(value, "Not a valid IP address") from exc
 
 
 def validate_cidr(value: str) -> str:
@@ -57,8 +56,8 @@ def validate_cidr(value: str) -> str:
     try:
         net = ipaddress.ip_network(value, strict=False)
         return str(net)
-    except ValueError:
-        raise TargetValidationError(value, "Not a valid CIDR network")
+    except ValueError as exc:
+        raise TargetValidationError(value, "Not a valid CIDR network") from exc
 
 
 def validate_ip_or_cidr(value: str) -> str:
@@ -131,8 +130,8 @@ def validate_port(value) -> int:
     """
     try:
         port = int(value)
-    except (ValueError, TypeError):
-        raise PortValidationError(str(value), "Not a valid integer")
+    except (ValueError, TypeError) as exc:
+        raise PortValidationError(str(value), "Not a valid integer") from exc
     if port < _PORT_MIN or port > _PORT_MAX:
         raise PortValidationError(str(value), f"Port must be {_PORT_MIN}-{_PORT_MAX}")
     return port
@@ -173,7 +172,7 @@ def validate_port_range(value: str) -> str:
     return value
 
 
-def parse_port_list(value: str) -> List[int]:
+def parse_port_list(value: str) -> list[int]:
     """Parse an nmap-style port spec into a sorted list of integers."""
     validated = validate_port_range(value)
     if validated == "-":

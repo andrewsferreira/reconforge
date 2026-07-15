@@ -70,15 +70,15 @@ def _full_request(tmp_path: Path, **overrides) -> schemas.RequestExecutionReques
     if not (tmp_path / "workflow" / "engagement_active.json").exists():
         _save_active_engagement(tmp_path)
 
-    defaults = dict(
-        engagement_id="engagement_active",
-        target="10.10.10.1",
-        module="surface",
-        phase="vector_correlation",
-        output_base=str(tmp_path),
-        scope_file=str(scope_file),
-        approval_id="APPROVAL-1",
-    )
+    defaults = {
+        "engagement_id": "engagement_active",
+        "target": "10.10.10.1",
+        "module": "surface",
+        "phase": "vector_correlation",
+        "output_base": str(tmp_path),
+        "scope_file": str(scope_file),
+        "approval_id": "APPROVAL-1",
+    }
     defaults.update(overrides)
     return schemas.RequestExecutionRequest(**defaults)
 

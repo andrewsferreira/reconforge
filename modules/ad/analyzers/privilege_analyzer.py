@@ -6,11 +6,11 @@ Analyzes delegation abuse potential, admin rights distribution,
 and high-value target identification from Bloodhound data.
 """
 
-from typing import Any, Dict, List, Set
-from modules.ad.analyzers.base import AnalyzerBase, AnalysisResult
+from typing import Any
 
+from modules.ad.analyzers.base import AnalysisResult, AnalyzerBase
 
-HIGH_VALUE_GROUPS: Set[str] = {
+HIGH_VALUE_GROUPS: set[str] = {
     "domain admins",
     "enterprise admins",
     "schema admins",
@@ -30,7 +30,7 @@ class PrivilegeAnalyzer(AnalyzerBase):
 
     ANALYZER_NAME = "privileges"
 
-    def analyze(self, collected_data: Dict[str, Any], **kwargs) -> AnalysisResult:
+    def analyze(self, collected_data: dict[str, Any], **kwargs) -> AnalysisResult:
         """Analyze privilege structure from Bloodhound or LDAP data.
 
         Expected keys (Bloodhound):
@@ -45,15 +45,15 @@ class PrivilegeAnalyzer(AnalyzerBase):
         bh_groups = collected_data.get("bh_groups", [])
         bh_computers = collected_data.get("bh_computers", [])
 
-        hvts: List[Dict] = []
-        da_users: List[str] = []
-        kerberoastable: List[str] = []
-        asreproastable: List[str] = []
-        unconstrained_computers: List[str] = []
+        hvts: list[dict] = []
+        da_users: list[str] = []
+        kerberoastable: list[str] = []
+        asreproastable: list[str] = []
+        unconstrained_computers: list[str] = []
 
         # Analyze users
         for user in bh_users:
-            reasons: List[str] = []
+            reasons: list[str] = []
             is_hvt = False
 
             if getattr(user, "is_high_value", False):

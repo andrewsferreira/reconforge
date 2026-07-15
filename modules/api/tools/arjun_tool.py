@@ -12,7 +12,7 @@ mode arguments are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from core.runner import Runner, RunResult, validate_arg
 from core.tool_config import ToolConfig
@@ -28,7 +28,7 @@ class ArjunTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -44,7 +44,7 @@ class ArjunTool:
         )
 
     def discover_params(self, target_url: str, method: str = "GET",
-                        headers: Optional[List[str]] = None,
+                        headers: list[str] | None = None,
                         timeout: int = 300) -> RunResult:
         """Discover hidden HTTP parameters."""
         validate_arg(target_url, "target_url")
@@ -54,7 +54,7 @@ class ArjunTool:
         threads = self._threads()
         effective_timeout = self.tool_cfg.mode_timeout("normal", timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "arjun", "-u", target_url, "-m", method,
             "-t", str(threads), "-oJ", str(json_path),
         ]
@@ -74,7 +74,7 @@ class ArjunTool:
         return self.runner.run(cmd, timeout=effective_timeout)
 
     def discover_params_json_body(self, target_url: str,
-                                   headers: Optional[List[str]] = None,
+                                   headers: list[str] | None = None,
                                    timeout: int = 300) -> RunResult:
         """Discover hidden parameters via JSON body."""
         validate_arg(target_url, "target_url")
@@ -83,7 +83,7 @@ class ArjunTool:
         threads = self._threads()
         effective_timeout = self.tool_cfg.mode_timeout("aggressive", timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "arjun", "-u", target_url, "-m", "JSON",
             "-t", str(threads), "-oJ", str(json_path),
         ]

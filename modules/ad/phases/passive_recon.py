@@ -13,26 +13,23 @@ Refactored to delegate to collectors → analyzers → attack_paths pipeline.
 Author: Andrews Ferreira
 """
 
-from typing import Any, Dict
+from typing import Any
 
-from modules.ad.tools.nmap import ADNmapTool
-from modules.ad.tools.ldapsearch import ADLdapsearchTool
-from modules.ad.tools.smbclient import ADSmbclientTool
-from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
-
-from modules.ad.parsers.nmap_parser import ADNmapParser
-from modules.ad.parsers.ldap_parser import ADLdapParser
-from modules.ad.parsers.smb_parser import ADSmbParser
-from modules.ad.parsers.enum4linux_ng_parser import Enum4linuxNgParser
-
-from modules.ad.collectors.dns_collector import DnsCollector
-from modules.ad.collectors.ldap_collector import LdapCollector
-from modules.ad.collectors.smb_collector import SmbCollector
-from modules.ad.collectors.kerberos_collector import KerberosCollector
 from modules.ad.analyzers.permission_analyzer import PermissionAnalyzer
 from modules.ad.attack_paths.acl_paths import AclPathBuilder
-
 from modules.ad.base import ADPhaseBase
+from modules.ad.collectors.dns_collector import DnsCollector
+from modules.ad.collectors.kerberos_collector import KerberosCollector
+from modules.ad.collectors.ldap_collector import LdapCollector
+from modules.ad.collectors.smb_collector import SmbCollector
+from modules.ad.parsers.enum4linux_ng_parser import Enum4linuxNgParser
+from modules.ad.parsers.ldap_parser import ADLdapParser
+from modules.ad.parsers.nmap_parser import ADNmapParser
+from modules.ad.parsers.smb_parser import ADSmbParser
+from modules.ad.tools.enum4linux_ng import Enum4linuxNgTool
+from modules.ad.tools.ldapsearch import ADLdapsearchTool
+from modules.ad.tools.nmap import ADNmapTool
+from modules.ad.tools.smbclient import ADSmbclientTool
 
 
 class PassiveReconPhase(ADPhaseBase):
@@ -68,11 +65,11 @@ class PassiveReconPhase(ADPhaseBase):
         self.enum_parser = enum4linux_ng_parser
 
         # Collector instances
-        collector_kwargs = dict(
-            logger=self.logger, runner=self.runner,
-            opsec=self.opsec, output_dir=self.output_dir,
-            opsec_mode=self.opsec_mode,
-        )
+        collector_kwargs = {
+            "logger": self.logger, "runner": self.runner,
+            "opsec": self.opsec, "output_dir": self.output_dir,
+            "opsec_mode": self.opsec_mode,
+        }
         self.dns_collector = DnsCollector(
             nmap=nmap, nmap_parser=nmap_parser, **collector_kwargs,
         )
@@ -84,8 +81,13 @@ class PassiveReconPhase(ADPhaseBase):
             smb_parser=smb_parser, enum4linux_ng_parser=enum4linux_ng_parser,
             **collector_kwargs,
         )
+        # Passive recon only ever calls detect_kerberos(), which uses
+        # self.nmap alone -- impacket/impacket_parser are never touched
+        # here (they back collect_asrep_hashes(), used by later,
+        # credentialed phases that construct their own real instances).
         self.kerberos_collector = KerberosCollector(
-            nmap=nmap, impacket=None, impacket_parser=None, **collector_kwargs,
+            nmap=nmap, impacket=None, impacket_parser=None,  # type: ignore[arg-type]
+            **collector_kwargs,
         )
 
         # Analyzer / path builder
@@ -96,15 +98,19 @@ class PassiveReconPhase(ADPhaseBase):
     # Main entry point
     # ------------------------------------------------------------------
 
-    def run(self, target: str, domain: str = "",
-            opsec_mode: str = "normal") -> Dict[str, Any]:
+    # ADPhaseBase.run() declares **kwargs: Any deliberately loosely; every
+    # real call site invokes this phase through its concrete type
+    # (ad_module.py), never through the base type, so this narrower,
+    # self-documenting signature carries no real substitutability risk.
+    def run(self, target: str, domain: str = "",  # type: ignore[override]
+            opsec_mode: str = "normal") -> dict[str, Any]:
         """Execute passive reconnaissance phase."""
         self.logger.info(f"{'='*60}")
         self.logger.info(f"=== AD Phase 1: Passive Reconnaissance on {target} ===")
         self.logger.info(f"{'='*60}")
         self.notes.add_phase_start(self.PHASE_NAME)
 
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "phase": self.PHASE_NAME,
             "target": target,
             "domain": domain,
@@ -145,7 +151,7 @@ class PassiveReconPhase(ADPhaseBase):
         null_data = self.smb_collector.collect_null_session(target)
         results["null_session"] = null_data.get("allowed", False)
         if results["null_session"]:
-            self.logger.finding("SMB null session ALLOWED — shares accessible anonymously")
+            self.logger.finding("medium", "SMB null session ALLOWED — shares accessible anonymously")
             for share in null_data.get("shares", []):
                 self.loot.add_share(
                     share_path=f"//{target}/{share['name']}",
@@ -216,7 +222,7 @@ class PassiveReconPhase(ADPhaseBase):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _apply_ad_services(self, ad_svc: Dict, results: Dict) -> None:
+    def _apply_ad_services(self, ad_svc: dict, results: dict) -> None:
         """Apply Nmap AD service data to results."""
         for key in ("domain_name", "forest_name", "dc_hostname",
                      "functional_level", "smb_signing"):
@@ -245,7 +251,7 @@ class PassiveReconPhase(ADPhaseBase):
                 ),
             )
 
-    def _record_service_loot(self, ad_svc: Dict, target: str) -> None:
+    def _record_service_loot(self, ad_svc: dict, target: str) -> None:
         """Record discovered services as loot."""
         for svc in ad_svc.get("services", []):
             if svc.get("state") == "open":
@@ -266,11 +272,11 @@ class PassiveReconPhase(ADPhaseBase):
                 },
             )
 
-    def _apply_rootdse(self, rootdse: Dict, results: Dict) -> None:
+    def _apply_rootdse(self, rootdse: dict, results: dict) -> None:
         """Apply RootDSE data to results."""
         results["anonymous_ldap"] = rootdse.get("anonymous", False)
         if results["anonymous_ldap"]:
-            self.logger.finding("Anonymous LDAP bind ALLOWED — extracting domain info")
+            self.logger.finding("medium", "Anonymous LDAP bind ALLOWED — extracting domain info")
             if rootdse.get("base_dn") and not results["base_dn"]:
                 results["base_dn"] = rootdse["base_dn"]
             if rootdse.get("domain_name") and not results["domain"]:
@@ -296,8 +302,8 @@ class PassiveReconPhase(ADPhaseBase):
         else:
             self.logger.info("Anonymous LDAP bind denied (expected in hardened environments)")
 
-    def _generate_workflow(self, target: str, results: Dict,
-                           analysis_data: Dict) -> None:
+    def _generate_workflow(self, target: str, results: dict,
+                           analysis_data: dict) -> None:
         """Generate attack workflow transitions from Phase 1."""
         domain = results.get("domain", "")
         base_dn = results.get("base_dn", "")

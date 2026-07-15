@@ -6,12 +6,11 @@ Collects Kerberos-related data: service detection, AS-REP hashes,
 SPN tickets for Kerberoasting.
 """
 
-from typing import Any, Dict, List
 
 from modules.ad.collectors.base import CollectorBase, CollectorResult
-from modules.ad.tools.nmap import ADNmapTool
-from modules.ad.tools.impacket import ImpacketTool
 from modules.ad.parsers.impacket_parser import ImpacketParser
+from modules.ad.tools.impacket import ImpacketTool
+from modules.ad.tools.nmap import ADNmapTool
 
 
 class KerberosCollector(CollectorBase):
@@ -65,7 +64,7 @@ class KerberosCollector(CollectorBase):
     def collect_asrep_hashes(
         self, target: str, domain: str,
         username: str = "", password: str = "",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Collect AS-REP hashes via GetNPUsers.py."""
         if not domain or not self.impacket.is_available("getnpusers"):
             return []
@@ -89,7 +88,7 @@ class KerberosCollector(CollectorBase):
     def collect_rid_cycling(
         self, target: str, domain: str,
         username: str = "", password: str = "",
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
         """Enumerate users and groups via RID cycling."""
         if not self.impacket.is_available("lookupsid"):
             return {"users": [], "groups": []}

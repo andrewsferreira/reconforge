@@ -7,13 +7,15 @@ import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
 
-from core.adapters.burp.capabilities import SAFE_EXPOSED_TOOLS
 from core.adapters.burp.exceptions import BurpMcpError, BurpNoCapabilitiesError
 from core.adapters.burp.provider import BurpMcpProvider
-
-from mcp_validation.burp.models import SafeExecutionResult, ValidationConfig, ValidationError, ValidationReport
+from mcp_validation.burp.models import (
+    SafeExecutionResult,
+    ValidationConfig,
+    ValidationError,
+    ValidationReport,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,10 +30,10 @@ class BurpMcpValidator:
         self.provider = BurpMcpProvider(config=self.config)
 
     def run(self) -> ValidationReport:
-        errors: List[ValidationError] = []
-        missing: List[str] = []
-        restricted: List[str] = []
-        notes: List[str] = []
+        errors: list[ValidationError] = []
+        missing: list[str] = []
+        restricted: list[str] = []
+        notes: list[str] = []
         safe_execution = SafeExecutionResult()
 
         try:
@@ -123,7 +125,7 @@ class BurpMcpValidator:
             result.latency_ms = round((time.time() - started) * 1000, 2)
         return result
 
-    def _pick_safe_tool(self, enabled_tools: List[str]) -> str:
+    def _pick_safe_tool(self, enabled_tools: list[str]) -> str:
         for candidate in ("get_proxy_http_history", "get_proxy_http_history_regex", "send_http1_request", "send_http2_request"):
             if candidate in enabled_tools:
                 return candidate
@@ -134,7 +136,7 @@ class BurpMcpValidator:
         return ValidationError(stage=stage, error_type=type(exc).__name__, message=str(exc), recoverable=recoverable)
 
     @staticmethod
-    def _recommendation(success: bool, tools: List, safe_execution: SafeExecutionResult, errors: List[ValidationError]) -> str:
+    def _recommendation(success: bool, tools: list, safe_execution: SafeExecutionResult, errors: list[ValidationError]) -> str:
         if success:
             return "READY for ReconForge integration"
         if tools and not safe_execution.success:

@@ -8,7 +8,6 @@ phase (it does reach it via other paths, but this phase silently dropped
 it for its own inline chain).
 """
 
-from types import SimpleNamespace
 
 from core.attack_workflow import AttackWorkflow
 from modules.ad.attack_paths.acl_paths import AclPathBuilder

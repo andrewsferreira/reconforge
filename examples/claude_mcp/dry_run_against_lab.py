@@ -40,19 +40,18 @@ async def main() -> None:
 
     try:
         params = StdioServerParameters(command="reconforge", args=["mcp", "serve"])
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                result = await session.call_tool(
-                    "reconforge_dry_run",
-                    {
-                        "target": f"127.0.0.1:{lab_port}",
-                        "module": "web",
-                        "phases": ["surface"],
-                        "output_base": "outputs",
-                    },
-                )
-                print(json.dumps(result.structuredContent, indent=2))
+        async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(
+                "reconforge_dry_run",
+                {
+                    "target": f"127.0.0.1:{lab_port}",
+                    "module": "web",
+                    "phases": ["surface"],
+                    "output_base": "outputs",
+                },
+            )
+            print(json.dumps(result.structuredContent, indent=2))
     finally:
         lab_server.shutdown()
         lab_server.server_close()

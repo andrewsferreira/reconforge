@@ -6,11 +6,11 @@ Author: Andrews Ferreira
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.logger import ReconLogger
-from core.runner import Runner
 from core.opsec_checks import OpsecChecker
+from core.runner import Runner
 
 
 @dataclass
@@ -26,9 +26,9 @@ class CollectorResult:
     """
     source: str = ""
     success: bool = False
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     raw_output: str = ""
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class CollectorBase(ABC):

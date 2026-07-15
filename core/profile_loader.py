@@ -9,10 +9,9 @@ Author: Andrews Ferreira
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from core.config_loader import ConfigLoader
-
 
 # ── Defaults used when no profile matches ──────────────────────────
 _DEFAULT_TIMING = {
@@ -24,7 +23,7 @@ _DEFAULT_TIMING = {
 _DEFAULT_ALLOWED_NOISE = ["low", "medium"]
 
 # Map simple opsec_mode strings to canonical profile names
-_MODE_TO_PROFILE: Dict[str, str] = {
+_MODE_TO_PROFILE: dict[str, str] = {
     "stealth": "stealth",
     "normal": "normal",
     "aggressive": "aggressive",
@@ -63,12 +62,12 @@ class ProfileLoader:
         self._config = config
         self._opsec_mode = opsec_mode
         self._module = module
-        self._profile: Dict[str, Any] = self._resolve(opsec_mode, module)
+        self._profile: dict[str, Any] = self._resolve(opsec_mode, module)
 
     # ── Public API ──────────────────────────────────────────────────
 
     @property
-    def profile_data(self) -> Dict[str, Any]:
+    def profile_data(self) -> dict[str, Any]:
         """Return the full resolved profile dict."""
         return dict(self._profile)
 
@@ -78,12 +77,12 @@ class ProfileLoader:
         return self._profile.get("opsec_mode", self._opsec_mode)
 
     @property
-    def timing(self) -> Dict[str, Any]:
+    def timing(self) -> dict[str, Any]:
         """Timing configuration (nmap_timing, scan_delay, max_retries)."""
         return {**_DEFAULT_TIMING, **self._profile.get("timing", {})}
 
     @property
-    def allowed_noise(self) -> List[str]:
+    def allowed_noise(self) -> list[str]:
         """Noise levels allowed by the current profile."""
         return self._profile.get("allowed_noise_levels", _DEFAULT_ALLOWED_NOISE)
 
@@ -106,7 +105,7 @@ class ProfileLoader:
 
     # ── Section access ──────────────────────────────────────────────
 
-    def section(self, key: str) -> Dict[str, Any]:
+    def section(self, key: str) -> dict[str, Any]:
         """Return a top-level section of the profile.
 
         Example::
@@ -153,7 +152,7 @@ class ProfileLoader:
 
         return True  # default: allowed
 
-    def enabled_phases(self) -> Optional[List[str]]:
+    def enabled_phases(self) -> list[str] | None:
         """Return the list of phases enabled by the profile, or *None*
         if the profile does not restrict phases (let the module decide)."""
         mod_section = self._profile.get(self._module, {})
@@ -163,7 +162,7 @@ class ProfileLoader:
 
     # ── Resolution logic ────────────────────────────────────────────
 
-    def _resolve(self, opsec_mode: str, module: str) -> Dict[str, Any]:
+    def _resolve(self, opsec_mode: str, module: str) -> dict[str, Any]:
         """Find the best-matching profile in *profiles.yaml*.
 
         Resolution order (most specific → least specific):

@@ -1,11 +1,10 @@
 """Tests for modules.network.parsers.nmap_parser – NmapParser."""
 
 import textwrap
-from pathlib import Path
 
 import pytest
 
-from modules.network.parsers.nmap_parser import NmapParser, NmapHost, NmapPort, NmapResult
+from modules.network.parsers.nmap_parser import NmapHost, NmapParser, NmapPort, NmapResult
 
 
 @pytest.fixture

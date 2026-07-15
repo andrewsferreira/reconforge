@@ -1,12 +1,11 @@
 """Tests for core.loot_manager – LootManager."""
 
+import importlib.util
 import json
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from core.loot_manager import LootManager, LootItem
+from core.loot_manager import LootManager
 
 
 def test_add_and_get_all():
@@ -140,11 +139,7 @@ def test_summary():
 # ── Encryption tests (only if cryptography installed) ─────────────
 
 def _has_crypto():
-    try:
-        from cryptography.fernet import Fernet
-        return True
-    except ImportError:
-        return False
+    return importlib.util.find_spec("cryptography.fernet") is not None
 
 
 @pytest.mark.skipif(not _has_crypto(), reason="cryptography not installed")
@@ -193,6 +188,7 @@ def test_encrypted_save_sets_restrictive_permissions(tmp_path, monkeypatch):
 @pytest.mark.skipif(not _has_crypto(), reason="cryptography not installed")
 def test_env_var_key_used_instead_of_file(tmp_path, monkeypatch):
     from cryptography.fernet import Fernet
+
     import core.loot_manager as lm_mod
 
     key_dir = tmp_path / "keys"

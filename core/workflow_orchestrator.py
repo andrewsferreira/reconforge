@@ -22,30 +22,32 @@ Usage::
 
 import json
 import shlex
-import traceback
-from dataclasses import dataclass, field, asdict
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from core.authorization_gate import ScopeAuthorization
+    from modules.ad.ad_module import ADModule
+    from modules.api.api_module import APIModule
+    from modules.network.network_module import NetworkModule
+    from modules.surface.surface_module import SurfaceModule
+    from modules.web.web_module import WebModule
 
-from core.logger import ReconLogger
+from core.ai_orchestration import AIOrchestrationLayer
+from core.attack_workflow import AttackWorkflow
 from core.credential_vault import CredentialVault
 from core.engagement import EngagementManager
-from core.findings_manager import FindingsManager
-from core.loot_manager import LootManager
-from core.attack_workflow import AttackWorkflow
 from core.exceptions import (
     WorkflowError,
-    WorkflowAbortedError,
-    ModuleError,
 )
-from core.post_exploitation import build_playbooks
 from core.external_integrations import dispatch_workflow_event
-from core.ai_orchestration import AIOrchestrationLayer
-
+from core.findings_manager import FindingsManager
+from core.logger import ReconLogger
+from core.loot_manager import LootManager
+from core.post_exploitation import build_playbooks
 
 # ── Workflow context (data bus between steps) ────────────────────────
 
@@ -57,14 +59,14 @@ class WorkflowContext:
     """
 
     def __init__(self):
-        self.targets: List[str] = []
-        self.live_hosts: List[str] = []
-        self.open_ports: Dict[str, List[int]] = {}  # host → [ports]
-        self.services: Dict[str, Set[str]] = {}     # host → {service_names}
-        self.domains: List[str] = []
-        self.urls: List[str] = []
-        self.module_results: Dict[str, Dict[str, Any]] = {}
-        self.extra: Dict[str, Any] = {}
+        self.targets: list[str] = []
+        self.live_hosts: list[str] = []
+        self.open_ports: dict[str, list[int]] = {}  # host → [ports]
+        self.services: dict[str, set[str]] = {}     # host → {service_names}
+        self.domains: list[str] = []
+        self.urls: list[str] = []
+        self.module_results: dict[str, dict[str, Any]] = {}
+        self.extra: dict[str, Any] = {}
 
     # ── Convenience helpers for conditions ───────────────────────────
 
@@ -78,10 +80,7 @@ class WorkflowContext:
 
     def has_port(self, port: int) -> bool:
         """Check if *any* host has a given port open."""
-        for ports in self.open_ports.values():
-            if port in ports:
-                return True
-        return False
+        return any(port in ports for ports in self.open_ports.values())
 
     def has_domain(self) -> bool:
         return bool(self.domains)
@@ -94,19 +93,19 @@ class WorkflowContext:
 
     # ── Data population ──────────────────────────────────────────────
 
-    def add_hosts(self, hosts: List[str]):
+    def add_hosts(self, hosts: list[str]):
         """Register discovered live hosts."""
         for h in hosts:
             if h and h not in self.live_hosts:
                 self.live_hosts.append(h)
 
-    def add_ports(self, host: str, ports: List[int]):
+    def add_ports(self, host: str, ports: list[int]):
         self.open_ports.setdefault(host, [])
         for p in ports:
             if p not in self.open_ports[host]:
                 self.open_ports[host].append(p)
 
-    def add_services(self, host: str, services: List[str]):
+    def add_services(self, host: str, services: list[str]):
         self.services.setdefault(host, set())
         self.services[host].update(services)
 
@@ -118,10 +117,10 @@ class WorkflowContext:
         if url and url not in self.urls:
             self.urls.append(url)
 
-    def store_result(self, module: str, result: Dict[str, Any]):
+    def store_result(self, module: str, result: dict[str, Any]):
         self.module_results[module] = result
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "targets": self.targets,
             "live_hosts": self.live_hosts,
@@ -153,8 +152,8 @@ def _add_autonomous_step(ctx: WorkflowContext, command: str, reason: str, priori
 class WorkflowStep:
     """Definition of a single step in the workflow pipeline."""
     module_name: str
-    condition: Optional[Callable[[WorkflowContext], bool]] = None
-    config: Dict[str, Any] = field(default_factory=dict)
+    condition: Callable[[WorkflowContext], bool] | None = None
+    config: dict[str, Any] = field(default_factory=dict)
     critical: bool = False   # If True, abort workflow on failure
     description: str = ""
 
@@ -170,12 +169,12 @@ class StepResult:
     end_time: str = ""
     duration_seconds: float = 0.0
     error: str = ""
-    result_data: Dict[str, Any] = field(default_factory=dict)
+    result_data: dict[str, Any] = field(default_factory=dict)
 
 
 # ── Service-to-port / port-to-service maps ───────────────────────────
 
-_PORT_SERVICE_MAP: Dict[int, str] = {
+_PORT_SERVICE_MAP: dict[int, str] = {
     21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns",
     80: "http", 88: "kerberos", 110: "pop3", 111: "rpcbind",
     135: "msrpc", 139: "netbios", 143: "imap", 389: "ldap",
@@ -187,7 +186,7 @@ _PORT_SERVICE_MAP: Dict[int, str] = {
     27017: "mongodb",
 }
 
-_SERVICE_PORT_MAP: Dict[str, List[int]] = {}
+_SERVICE_PORT_MAP: dict[str, list[int]] = {}
 for _p, _s in _PORT_SERVICE_MAP.items():
     _SERVICE_PORT_MAP.setdefault(_s, []).append(_p)
 
@@ -200,7 +199,7 @@ _WEB_SERVICES = {"http", "https", "http-alt", "https-alt"}
 
 # ── Context extractor ────────────────────────────────────────────────
 
-def _extract_context_from_result(module_name: str, result: Dict[str, Any],
+def _extract_context_from_result(module_name: str, result: dict[str, Any],
                                  ctx: WorkflowContext):
     """Parse a module result dict and populate the workflow context."""
     phases = result.get("phases", {})
@@ -252,13 +251,13 @@ def _extract_context_from_result(module_name: str, result: Dict[str, Any],
                         ctx.add_services(host, [svc])
 
 
-def _derive_autonomous_next_steps(module_name: str, result: Dict[str, Any], ctx: WorkflowContext) -> None:
+def _derive_autonomous_next_steps(module_name: str, result: dict[str, Any], ctx: WorkflowContext) -> None:
     """Infer post-recon commands from ports/services/banners/OS hints."""
     if module_name not in {"network", "surface"}:
         return
 
     phases = result.get("phases", {})
-    host_views: Dict[str, Dict[str, Any]] = {}
+    host_views: dict[str, dict[str, Any]] = {}
     if module_name == "network":
         host_views = phases.get("scanning", {}).get("hosts", {})
     elif module_name == "surface":
@@ -376,12 +375,12 @@ def _run_module(module_name: str, target: str, *,
                 dry_run: bool = False,
                 timeout: int = 600,
                 encrypt_loot: bool = False,
-                credential_vault: Optional[CredentialVault] = None,
-                findings_manager: Optional[FindingsManager] = None,
-                extra_config: Optional[Dict[str, Any]] = None,
+                credential_vault: CredentialVault | None = None,
+                findings_manager: FindingsManager | None = None,
+                extra_config: dict[str, Any] | None = None,
                 scope: Optional["ScopeAuthorization"] = None,
-                approval_id: Optional[str] = None,
-                ) -> Dict[str, Any]:
+                approval_id: str | None = None,
+                ) -> dict[str, Any]:
     """Dynamically import and run a ReconForge module.
 
     *scope*/*approval_id* are propagated into the spawned module's Runner
@@ -402,6 +401,13 @@ def _run_module(module_name: str, target: str, *,
     """
     extra = extra_config or {}
 
+    # Quoted deliberately (contra UP037): these names are only ever bound by
+    # local imports further down in this function, one per branch. An
+    # unquoted annotation here is never evaluated at runtime either way
+    # (PEP 526 local annotate-only statements aren't), but ruff's F823
+    # can't tell the two cases apart and flags the unquoted form as a
+    # false "referenced before assignment".
+    mod: "NetworkModule | ADModule | WebModule | APIModule | SurfaceModule"  # noqa: UP037
     if module_name == "network":
         from modules.network.network_module import NetworkModule
         mod = NetworkModule(
@@ -571,7 +577,7 @@ class WorkflowOrchestrator:
 
     def __init__(
         self,
-        targets: Optional[List[str]] = None,
+        targets: list[str] | None = None,
         opsec_mode: str = "normal",
         output_base: str = "outputs",
         verbose: bool = False,
@@ -580,10 +586,10 @@ class WorkflowOrchestrator:
         encrypt_loot: bool = False,
         auto_handoff: bool = False,
         max_handoff_steps: int = 5,
-        credential_vault: Optional[CredentialVault] = None,
-        engagement: Optional[EngagementManager] = None,
+        credential_vault: CredentialVault | None = None,
+        engagement: EngagementManager | None = None,
         scope: Optional["ScopeAuthorization"] = None,
-        approval_id: Optional[str] = None,
+        approval_id: str | None = None,
     ):
         self.targets = targets or []
         self.opsec_mode = opsec_mode
@@ -610,17 +616,17 @@ class WorkflowOrchestrator:
         self.ai_engine = AIOrchestrationLayer()
 
         # Pipeline
-        self._steps: List[WorkflowStep] = []
-        self._results: List[StepResult] = []
-        self._handoff_keys: Set[tuple[str, str]] = set()
+        self._steps: list[WorkflowStep] = []
+        self._results: list[StepResult] = []
+        self._handoff_keys: set[tuple[str, str]] = set()
         self._context = WorkflowContext()
         self._context.targets = list(self.targets)
 
     # ── Step management ──────────────────────────────────────────────
 
     def add_step(self, module_name: str, *,
-                 condition: Optional[Callable[[WorkflowContext], bool]] = None,
-                 config: Optional[Dict[str, Any]] = None,
+                 condition: Callable[[WorkflowContext], bool] | None = None,
+                 config: dict[str, Any] | None = None,
                  critical: bool = False,
                  description: str = "") -> "WorkflowOrchestrator":
         """Add a step to the workflow pipeline.
@@ -662,12 +668,12 @@ class WorkflowOrchestrator:
         return self._context
 
     @property
-    def results(self) -> List[StepResult]:
+    def results(self) -> list[StepResult]:
         return list(self._results)
 
     # ── Execution ────────────────────────────────────────────────────
 
-    def run(self) -> Dict[str, Any]:
+    def run(self) -> dict[str, Any]:
         """Execute the workflow pipeline sequentially.
 
         Returns a summary dict with results from all steps.
@@ -854,9 +860,8 @@ class WorkflowOrchestrator:
         module = step.module_name
 
         # AD: prefer DC IP from context
-        if module == "ad":
-            if self._context.live_hosts:
-                return self._context.live_hosts[0]
+        if module == "ad" and self._context.live_hosts:
+            return self._context.live_hosts[0]
 
         # Web / API: prefer discovered URL
         if module in ("web", "api"):
@@ -875,7 +880,7 @@ class WorkflowOrchestrator:
 
     # ── Summary / report ─────────────────────────────────────────────
 
-    def _build_summary(self, duration: float, aborted: bool) -> Dict[str, Any]:
+    def _build_summary(self, duration: float, aborted: bool) -> dict[str, Any]:
         success = sum(1 for r in self._results if r.status == "success")
         skipped = sum(1 for r in self._results if r.status == "skipped")
         failed = sum(1 for r in self._results if r.status == "failed")
@@ -976,7 +981,7 @@ class WorkflowOrchestrator:
             queued += 1
             self.logger.info(f"Auto-handoff queued: {module_name} -> {target}")
 
-    def _save_workflow_report(self, summary: Dict[str, Any]):
+    def _save_workflow_report(self, summary: dict[str, Any]):
         """Save a JSON workflow report."""
         out_dir = Path(self.output_base) / "workflow"
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -1011,7 +1016,7 @@ class WorkflowOrchestrator:
     # ── Convenience class methods ────────────────────────────────────
 
     @classmethod
-    def full_recon(cls, targets: List[str], **kwargs) -> "WorkflowOrchestrator":
+    def full_recon(cls, targets: list[str], **kwargs) -> "WorkflowOrchestrator":
         """Create a pre-configured full-recon workflow.
 
         Usage::
@@ -1024,7 +1029,7 @@ class WorkflowOrchestrator:
         return wf
 
     @classmethod
-    def targeted(cls, targets: List[str], modules: List[str],
+    def targeted(cls, targets: list[str], modules: list[str],
                  **kwargs) -> "WorkflowOrchestrator":
         """Create a workflow with specific modules (no conditions).
 

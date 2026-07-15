@@ -11,7 +11,6 @@ Extracts:
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
 
 
 @dataclass
@@ -26,11 +25,11 @@ class WafDetection:
 class Wafw00fResult:
     """Complete wafw00f scan result."""
     waf_detected: bool = False
-    detections: List[WafDetection] = field(default_factory=list)
+    detections: list[WafDetection] = field(default_factory=list)
     raw_output: str = ""
 
     @property
-    def waf_names(self) -> List[str]:
+    def waf_names(self) -> list[str]:
         return [d.product for d in self.detections if d.detected]
 
 
@@ -76,9 +75,8 @@ class Wafw00fParser:
                 ))
                 continue
 
-            if self.NO_WAF_RE.search(line):
-                if not result.detections:
-                    result.waf_detected = False
+            if self.NO_WAF_RE.search(line) and not result.detections:
+                result.waf_detected = False
 
         return result
 

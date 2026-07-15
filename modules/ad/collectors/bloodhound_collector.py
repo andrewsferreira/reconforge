@@ -7,16 +7,18 @@ and parses resulting JSON files.
 """
 
 import zipfile
-from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from modules.ad.collectors.base import CollectorBase, CollectorResult
-from modules.ad.tools.bloodhound import BloodhoundTool
-from modules.ad.tools.netexec import NetexecTool
 from modules.ad.parsers.bloodhound_parser import (
-    BloodhoundParser, BloodhoundUser, BloodhoundComputer, BloodhoundGroup,
+    BloodhoundComputer,
+    BloodhoundGroup,
+    BloodhoundParser,
+    BloodhoundUser,
 )
 from modules.ad.parsers.netexec_parser import NetexecParser
+from modules.ad.tools.bloodhound import BloodhoundTool
+from modules.ad.tools.netexec import NetexecTool
 
 
 class BloodhoundCollector(CollectorBase):
@@ -108,7 +110,7 @@ class BloodhoundCollector(CollectorBase):
         )
         return "netexec" if run.success else ""
 
-    def _parse_json_files(self) -> Dict[str, Any]:
+    def _parse_json_files(self) -> dict[str, Any]:
         """Parse bloodhound JSON output files."""
         bh_dir = self.output_dir / "bloodhound"
         if not bh_dir.exists():
@@ -124,9 +126,9 @@ class BloodhoundCollector(CollectorBase):
                     pass
             json_files = list(bh_dir.glob("*.json"))
 
-        users: List[BloodhoundUser] = []
-        groups: List[BloodhoundGroup] = []
-        computers: List[BloodhoundComputer] = []
+        users: list[BloodhoundUser] = []
+        groups: list[BloodhoundGroup] = []
+        computers: list[BloodhoundComputer] = []
         sessions_count = 0
         domains_count = 0
 

@@ -12,9 +12,9 @@ mode arguments are read from ``tools.yaml``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from core.runner import Runner, RunResult, RC_PRECONDITION_FAILED
+from core.runner import RC_PRECONDITION_FAILED, Runner, RunResult
 from core.tool_config import ToolConfig
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ class GobusterTool:
 
     def __init__(self, runner: Runner, logger, output_dir: Path,
                  opsec_mode: str = "normal",
-                 config: Optional["ConfigLoader"] = None):
+                 config: ConfigLoader | None = None):
         self.runner = runner
         self.logger = logger
         self.output_dir = Path(output_dir)
@@ -72,7 +72,7 @@ class GobusterTool:
         threads = self._threads()
         effective_timeout = self.tool_cfg.mode_timeout("dir", timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "gobuster", "dir", "-u", target_url, "-w", wordlist,
             "-t", str(threads), "-q", "-o", str(out_path), "--no-color",
         ]
@@ -98,7 +98,7 @@ class GobusterTool:
         threads = self._threads()
         effective_timeout = self.tool_cfg.mode_timeout("vhost", timeout)
 
-        cmd: List[str] = [
+        cmd: list[str] = [
             "gobuster", "dns", "-d", domain, "-w", wordlist,
             "-t", str(threads), "-q", "-o", str(out_path), "--no-color",
         ]
