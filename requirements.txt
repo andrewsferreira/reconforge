@@ -1,5 +1,5 @@
 # ReconForge Python dependencies
-pyyaml>=6.0
+pyyaml>=6.0.3
 
 # Optional — loot encryption (--encrypt-loot)
 cryptography>=41.0
