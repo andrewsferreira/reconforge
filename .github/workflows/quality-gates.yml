@@ -40,6 +40,9 @@ jobs:
       - name: Documentation link check
         run: python scripts/check_doc_links.py
 
+      - name: Documentation counter check (MCP tool/resource counts)
+        run: python scripts/check_doc_counters.py
+
       - name: Type check (mypy)
         run: mypy --follow-imports=skip --ignore-missing-imports core modules reconforge mcp_validation scripts
 

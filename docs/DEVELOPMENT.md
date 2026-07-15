@@ -10,14 +10,14 @@ reconforge/
 ├── config/
 │   ├── tools.yaml             # Tool configuration (single source of truth)
 │   └── profiles.yaml          # OPSEC profiles (single source of truth)
-├── core/                      # Shared services (17 modules)
+├── core/                      # Shared services (execution, findings, credentials, orchestration)
 ├── modules/
 │   ├── network/               # 5 tools, 4 parsers, 4 phases
 │   ├── web/                   # 9 tools, 7 parsers, 4 phases
 │   ├── api/                   # 4 tools, 4 parsers, 4 phases
 │   ├── surface/               # 2 tools, 1 parser, 6 intelligence components, 4 phases
 │   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 445 tests (pytest)
+└── tests/                     # pytest — see "Testing" in README.md for the current count
 ```
 
 ## Adding a New Tool
@@ -296,35 +296,15 @@ bandit -r core modules reconforge -c pyproject.toml
 # Dependency vulnerability audit
 pip-audit
 
-# Test + coverage gate
-pytest --cov=core --cov=modules --cov-report=term-missing --cov-fail-under=85
+# Test + coverage gate — the enforced floor is codified in
+# pyproject.toml's [tool.coverage.report].fail_under; pass the same
+# value here to reproduce CI's gate locally instead of hardcoding it.
+pytest --cov=core --cov=modules --cov-report=term-missing --cov-fail-under=70
 ```
 
-### Current Test Coverage (375 tests)
+### Current Test Coverage
 
-| Area | Test Files |
-|------|------------|
-| Core: ConfigLoader | `tests/core/test_config_loader.py` |
-| Core: CredentialVault | `tests/core/test_credential_vault.py` |
-| Core: Engagement | `tests/core/test_engagement.py` |
-| Core: Logger | `tests/core/test_logger.py` |
-| Core: LootManager | `tests/core/test_loot_manager.py` |
-| Core: ProfileLoader | `tests/core/test_profile_loader.py` |
-| Core: Runner | `tests/core/test_runner.py` |
-| Core: TargetParser | `tests/core/test_target_parser.py` |
-| Core: Validators | `tests/core/test_validators.py` |
-| Core: WorkflowOrchestrator | `tests/core/test_workflow_orchestrator.py` |
-| API Module | `tests/modules/api/test_api_module.py` |
-| Parsers: Nmap | `tests/parsers/test_nmap_parser.py` |
-| Parsers: Arjun | `tests/parsers/test_arjun_parser.py` |
-| Parsers: Ffuf | `tests/parsers/test_ffuf_parser.py` |
-| Parsers: Nuclei API | `tests/parsers/test_nuclei_api_parser.py` |
-| JWT Analysis | `tests/test_jwt_analysis_p5.py` |
-| OpenAPI Parser | `tests/test_openapi_parser_p5.py` |
-| Authorization/Fuzzing | `tests/test_authorization_fuzzing_p5.py` |
-| Surface Intelligence | `tests/test_surface_intelligence.py` |
-| Profile Activation | `tests/test_profile_activation_p8.py` |
-| ToolConfig | `tests/test_tool_config_p9.py` |
+Test files are organized under `tests/`, mirroring the source tree (`tests/core/`, `tests/modules/<module>/`, `tests/mcp/`, etc.) — one test module per source module, plus cross-cutting suites for parsers and integration scenarios. Run `pytest --collect-only -q` for the current, always-accurate list rather than a hand-maintained table here that will drift as tests are added.
 
 ### Writing Tests
 
@@ -424,4 +404,4 @@ These items are documented in the stabilization report as intentional deferments
 
 ---
 
-*Development guide validated: 2026-03-21 — 375/375 tests passing*
+*Development guide last reviewed: 2026-07-15 — see CHANGELOG.md for the current test count.*

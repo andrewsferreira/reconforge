@@ -4,14 +4,22 @@
 
 ## Overview
 
-ReconForge's CLI/module layer uses two YAML configuration files as the single source of truth for tool/profile settings:
+ReconForge's CLI/module layer uses two YAML configuration files as the base source of truth for tool/profile settings:
 
 | File | Purpose |
 |------|---------|
 | `config/tools.yaml` | Tool binary paths, default arguments, timeouts, scan profiles, safety settings |
 | `config/profiles.yaml` | OPSEC-aware scan profiles with timing, technique toggles, and noise-level gates |
 
-There are no fallback namespaces or hardcoded config overrides for these two files — they are authoritative for tool/profile settings. A third file, `config/mcp.yaml`, configures the separate `reconforge/mcp/` server package (see [mcp.yaml](#mcpyaml) below) — it's loaded through the same `ConfigLoader`, but governs execution policy rather than tool/profile settings, so it's kept distinct from the two above. Several cross-cutting behaviors (secrets backend selection, a kill switch, encryption key overrides, an optional risk-approval gate) are controlled by environment variables instead, since they're either security-sensitive (keys should not have to live in a YAML file) or need to be settable without editing a checked-in config file — see [Environment Variables](#environment-variables) below.
+A third file, `config/mcp.yaml`, configures the separate `reconforge/mcp/` server package (see [mcp.yaml](#mcpyaml) below) — it governs execution policy rather than tool/profile settings, so it's kept distinct from the two above, but it is loaded through the identical mechanism.
+
+Every one of these three files goes through the same `ConfigLoader.load(name)` resolution pipeline, in order:
+
+1. **Base file** — `config/{name}.yaml` is read as-is.
+2. **Environment overlay** — `config/environments/{RECONFORGE_ENV}.yaml` (default `dev`; also `stage`, `prod`) is deep-merged on top, under a top-level key matching `name` (e.g. an overlay's `profiles:` key only ever overrides `profiles.yaml`, never `tools.yaml`). No overlay file, or no matching top-level key inside it, is a no-op — a fresh checkout with no `RECONFORGE_ENV` set behaves identically to `dev`.
+3. **Secret placeholder resolution** — any string value of the form `${secret:KEY}` is resolved via `core/secrets_manager.py::SecretManager`, whose backend (`env` by default, or `file`/`aws_secretsmanager`/`vault`) is selected by `RECONFORGE_SECRET_PROVIDER` — see [Environment Variables](#environment-variables) below.
+
+There are no *additional* fallback namespaces beyond this one pipeline, and no hidden hardcoded overrides — every value either comes from the base file, an explicit environment overlay, or an explicit secret placeholder, all three of which are visible in the checked-out files. Several other cross-cutting behaviors (a kill switch, encryption key overrides, an optional risk-approval gate) are controlled by environment variables entirely outside this pipeline instead, since they're either security-sensitive or need to be settable without editing a checked-in config file — see [Environment Variables](#environment-variables) below.
 
 ## tools.yaml
 
@@ -335,4 +343,4 @@ Not covered above: the Burp MCP integration (`core/adapters/burp/`, `reconforge/
 
 ---
 
-*Configuration system last reviewed: 2026-07-14, 878/878 tests passing — see `docs/ARCHITECTURE_REVIEW.md` for the current, continuously-updated audit trail rather than treating this stamp as authoritative going forward.*
+*Configuration system last reviewed: 2026-07-15 — see `docs/ARCHITECTURE_REVIEW.md` for the continuously-updated audit trail rather than treating this stamp as authoritative going forward.*

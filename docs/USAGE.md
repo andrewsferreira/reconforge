@@ -333,4 +333,4 @@ reconforge api -t https://api.target.com/v2 \
 
 ---
 
-*Usage guide validated: 2026-03-21 — 375/375 tests passing*
+*Usage guide last reviewed: 2026-07-15 — see CHANGELOG.md for the current test count.*

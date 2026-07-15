@@ -2,7 +2,7 @@
 > This scorecard was written by the project author/maintainer (with AI assistance) and has not been
 > reviewed by an external evaluator. Treat the score and claims below as a self-reported snapshot to be
 > verified against the code and tests, not as third-party validation. See
-> [docs/ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) for an audit that cross-checks claims against
+> [docs/ARCHITECTURE_REVIEW.md](../ARCHITECTURE_REVIEW.md) for an audit that cross-checks claims against
 > actual command execution.
 
 # ReconForge Project Scorecard (April 2026)

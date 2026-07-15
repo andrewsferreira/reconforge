@@ -406,4 +406,4 @@ reconforge workflow --target 10.10.10.1 --resume /path/to/engagement.json
 
 ---
 
-*Module documentation validated: 2026-03-21 — 375/375 tests passing*
+*Module documentation last reviewed: 2026-07-15 — see CHANGELOG.md for the current test count.*

@@ -188,7 +188,7 @@ reconforge/
 │       ├── attack_paths/          # acl, asrep, delegation, gpo, kerberoast, privilege_escalation
 │       ├── phases/                # passive_recon, identity_enumeration, configuration_enumeration, delegation_discovery, bloodhound_collection
 │       └── reporting/             # ad_summary, attack_path, attack_surface, high_value_targets, remediation, report_builders
-└── tests/                         # 375 tests (pytest)
+└── tests/                         # pytest — see "Testing" in README.md for the current count
 ```
 
 ## Core Services
@@ -400,9 +400,8 @@ Each phase base defines class attributes: `PHASE_NUMBER`, `PHASE_NAME`, `PHASE_D
 
 ## Testing
 
-- **375 tests, all passing** (pytest, ~3.1s)
-- Coverage spans: config_loader, credential_vault, engagement, logger, loot_manager, profile_loader, runner, target_parser, validators, workflow_orchestrator, tool_config, API module, parsers (nmap, arjun, ffuf, nuclei_api), JWT analysis, OpenAPI parser, authorization/fuzzing, surface intelligence, profile activation
+Unit tests against mocked tool execution, organized to mirror the source tree (`tests/core/`, `tests/modules/<module>/`, `tests/mcp/`, plus cross-cutting parser and integration suites). See [README.md](../README.md#testing--quality-gates) for the current test count and coverage floor.
 
 ---
 
-*Architecture validated: 2026-03-21 — ReconForge v1.1.0 Stabilization Audit (375/375 tests passing)*
+*Architecture last reviewed: 2026-07-15 — see CHANGELOG.md for the current test count.*

@@ -1356,4 +1356,4 @@ See [FINDINGS.md](FINDINGS.md) for the full confidence model.
 
 ---
 
-*Extension guide validated: 2026-03-21 — All patterns verified against codebase (375/375 tests passing)*
+*Extension guide last reviewed: 2026-07-15 — patterns verified against the codebase; see CHANGELOG.md for the current test count.*

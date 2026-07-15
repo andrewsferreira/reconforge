@@ -264,4 +264,4 @@ Example:
 
 ---
 
-*Findings model validated: 2026-03-21 — 375/375 tests passing*
+*Findings model last reviewed: 2026-07-15 — see CHANGELOG.md for the current test count.*

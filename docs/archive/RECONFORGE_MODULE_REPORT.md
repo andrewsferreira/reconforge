@@ -1,7 +1,7 @@
 > **⚠️ HISTORICAL DOCUMENT**
 > This is a historical record of Module Inventory Report completed on 2026-03-17.
 > It reflects the state of the project at that time and is preserved for reference.
-> For current documentation, see [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md).
+> For current documentation, see [DOCUMENTATION_INDEX.md](../DOCUMENTATION_INDEX.md).
 
 # ReconForge Framework — Module Inventory Report
 

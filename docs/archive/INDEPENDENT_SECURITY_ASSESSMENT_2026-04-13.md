@@ -4,7 +4,7 @@
 > autodeclarado, a ser verificado contra o código e os testes reais — não como validação de terceiros.
 > Em particular, a afirmação de "383 testes passando localmente" (item 3, abaixo) não corresponde à
 > contagem real verificada (445 testes, todos passando, em 2026-07-11). Veja
-> [docs/ARCHITECTURE_REVIEW.md](ARCHITECTURE_REVIEW.md) para uma auditoria que cruza as afirmações deste
+> [docs/ARCHITECTURE_REVIEW.md](../ARCHITECTURE_REVIEW.md) para uma auditoria que cruza as afirmações deste
 > documento com a execução real de comandos.
 
 # Avaliação (autodeclarada) — ReconForge (13/04/2026)
