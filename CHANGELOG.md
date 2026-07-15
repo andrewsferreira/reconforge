@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.15.3] — 2026-07-15
+
+Fixes a CI-only flaky test surfaced by the 2.15.2 run, not a regression in application code. PATCH per `docs/VERSIONING.md` — test-only change.
+
+### Fixed
+
+- **`tests/mcp/test_approvals.py::test_consume_if_approved_concurrent_race_exactly_one_winner`**: the 8-thread concurrent-consume test asserted that every losing thread hits `ApprovalStateError` (the `os.open(O_CREAT|O_EXCL)` marker-collision path). CI's scheduler produced a legitimate but different interleaving where a losing thread's status read happened *after* the winner had already written `status="consumed"` under `_RequestLock`, so that thread took the earlier `ApprovalNotApprovedError` branch instead — never reaching the marker race at all. Both outcomes are correct "you lost" results; `consume_if_approved()`'s exactly-once guarantee itself held in both local and CI runs (`results.count("success") == 1` never failed). Loosened the assertion to accept either error for the 7 losing threads, combined into a single count. Verified locally with 15 consecutive runs before shipping.
+
+### Testing
+
+- 1167/1167 tests passing. Ruff, MyPy (`--follow-imports=skip --ignore-missing-imports`), Bandit, pip-audit, and the doc-link checker all pass. Coverage 70.55%, floor 70%.
+
 ## [2.15.2] — 2026-07-15
 
 Priority-2 documentation: a formal whole-system threat model and a README restructure for recruiter/engineer/operator audiences. PATCH per `docs/VERSIONING.md` — documentation only, no code or capability change.

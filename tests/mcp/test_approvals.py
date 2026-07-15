@@ -19,6 +19,7 @@ import pytest
 from reconforge.mcp import approvals
 from reconforge.mcp.errors import (
     ApprovalExpiredError,
+    ApprovalNotApprovedError,
     ApprovalNotFoundError,
     ApprovalStateError,
 )
@@ -338,9 +339,23 @@ def test_consume_if_approved_sequential_replay_after_consumption_is_not_approved
 
 
 def test_consume_if_approved_concurrent_race_exactly_one_winner():
-    """Two callers racing to consume the same approved request at the
-    same instant -- exactly one must succeed; the other must fail with
-    the marker-collision error, not silently succeed too."""
+    """Eight callers racing to consume the same approved request at the
+    same instant -- exactly one must succeed; every other caller must
+    fail, not silently succeed too.
+
+    A losing caller can observe either of two distinct errors depending
+    on exact scheduling, and both are correct:
+      - ApprovalStateError: it lost the os.open(O_CREAT|O_EXCL) marker
+        race (consume_if_approved's actual exclusivity mechanism).
+      - ApprovalNotApprovedError: its status read happened *after* the
+        winner had already flipped status to "consumed" under
+        _RequestLock, so it never even reached the marker race.
+    Which branch a given loser takes is a timing artifact, not part of
+    the exactly-once guarantee -- only "exactly 1 success, 7 losses" is
+    guaranteed. Asserting a fixed split flaked in CI (observed 6/7 state_error
+    with 1 not_approved) because CI's scheduler interleaves the 8 threads
+    differently than local runs.
+    """
     import threading
 
     record = _create()
@@ -354,6 +369,8 @@ def test_consume_if_approved_concurrent_race_exactly_one_winner():
             results.append("success")
         except ApprovalStateError:
             results.append("state_error")
+        except ApprovalNotApprovedError:
+            results.append("not_approved")
         except Exception as exc:  # pragma: no cover - would indicate a real bug
             results.append(f"unexpected:{type(exc).__name__}")
 
@@ -364,4 +381,4 @@ def test_consume_if_approved_concurrent_race_exactly_one_winner():
         t.join()
 
     assert results.count("success") == 1
-    assert results.count("state_error") == 7
+    assert results.count("state_error") + results.count("not_approved") == 7
