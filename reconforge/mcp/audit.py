@@ -1,6 +1,6 @@
 """Structured audit events for MCP tool calls and resource reads.
 
-One JSON line is emitted to stderr for every call to any of the 15 MCP
+One JSON line is emitted to stderr for every call to any of the 18 MCP
 tools, success or failure — wired into the single choke point every
 call already passes through (``reconforge/mcp/tools.py::_call_tool``),
 rather than instrumented per tool. ``reconforge/mcp/resources.py``'s
@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import sys
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -28,6 +29,16 @@ from core.logger import sanitize_log
 # bearer-token-like authorization reference, not a password, but there's
 # no reason to put it in a log stream at all.
 _REDACTED_ARGUMENT_KEYS = frozenset({"approval_id"})
+
+# One id per server process (== one Claude session — see
+# reconforge/mcp/jobs.py's "one server process per Claude session" note),
+# generated once at import time and stamped onto every audit event this
+# process emits. Lets a log reader reconstruct which tool calls belong to
+# the same Claude-directed multi-step scan when stderr from several
+# server processes/sessions is interleaved or aggregated together — the
+# individual events already have a timestamp and tool name, but nothing
+# previously tied a *sequence* of them back to one session.
+SESSION_ID = uuid.uuid4().hex[:12]
 
 
 def _sanitize_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -57,6 +68,7 @@ def emit_tool_call_audit_event(
     """
     event: dict[str, Any] = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": SESSION_ID,
         "event": "mcp_tool_call",
         "tool": tool_name,
         "outcome": outcome,
@@ -82,6 +94,7 @@ def emit_resource_read_audit_event(
     """
     event: dict[str, Any] = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "session_id": SESSION_ID,
         "event": "mcp_resource_read",
         "uri": uri,
         "outcome": outcome,

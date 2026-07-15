@@ -34,9 +34,17 @@ class TrustedResponse(BaseModel):
     findings-bearing responses, not this field — but every response
     carrying it lets a client assert structurally that nothing labeled
     otherwise is a server-authored instruction.
+
+    ``schema_version`` is this response *shape's* contract version, not
+    ReconForge's release version (``reconforge_version`` in
+    GetStatusResponse already covers that) — bumped only when a field is
+    removed or repurposed in a way that would break an existing client's
+    parsing (additive fields don't require a bump). See
+    docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md's MCP Response Contract section.
     """
 
     trust: Literal["server_generated"] = "server_generated"
+    schema_version: str = "1.0"
 
 
 # ── reconforge_get_status ────────────────────────────────────────────
@@ -302,6 +310,53 @@ class SummarizeFindingsResponse(TrustedResponse):
     top_findings: list[TrustedFindingMetadata] = Field(
         description="Metadata only (no evidence text) for the highest severity/confidence "
         "findings — a summary is not the place for untrusted evidence excerpts."
+    )
+
+
+# ── reconforge_recommend_next_steps ─────────────────────────────────────
+
+
+class RecommendedModuleStep(BaseModel):
+    module: ModuleName
+    confidence: float
+    priority: Literal["high", "medium", "low"]
+    reason: str
+    already_run: bool
+
+
+class RecommendedFollowUp(BaseModel):
+    """A specific already-gathered finding worth prioritizing for deeper
+    investigation, ranked by core.ai_orchestration.AIOrchestrationLayer's
+    deterministic risk_score() — not a prediction of exploit success."""
+
+    finding_id: str
+    target: str
+    risk_score: float
+    rationale: str
+    references: list[str]
+
+
+class RecommendNextStepsRequest(BaseModel):
+    output_base: str = "outputs"
+    target: str
+
+
+class RecommendNextStepsResponse(TrustedResponse):
+    target: str
+    modules_run: list[str]
+    recommended_modules: list[RecommendedModuleStep] = Field(
+        description="Modules not yet run for this target, ranked by confidence — a coverage-gap "
+        "heuristic over findings already gathered, raised when those findings include "
+        "critical/high-severity signals. See core/ai_orchestration.py::recommend_modules()."
+    )
+    priority_findings: list[RecommendedFollowUp] = Field(
+        description="Already-gathered findings worth validating or following up on first, "
+        "ranked by risk_score. See core/ai_orchestration.py::top_attack_paths()."
+    )
+    method_note: str = (
+        "Deterministic rule-based ranking over findings already gathered for this target "
+        "(fixed keyword rules, hand-written confidence literals, a linear weighted score) — "
+        "not ML/LLM, not a prediction of what will succeed. See docs/AI_ORCHESTRATION_ARCHITECTURE.md."
     )
 
 

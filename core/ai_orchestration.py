@@ -15,6 +15,9 @@ from typing import Any
 
 _SEVERITY_SCORE = {"critical": 10, "high": 8, "medium": 5, "low": 2, "info": 1}
 _CONFIDENCE_SCORE = {"confirmed": 1.0, "high": 0.9, "medium": 0.7, "low": 0.5, "heuristic": 0.3}
+# Matches reconforge/mcp/schemas.py::MODULE_NAMES / core/workflow_orchestrator.py's
+# add_full_recon() ordering: broad-surface modules before narrower ones.
+_MODULE_ORDER = ("surface", "network", "ad", "web", "api")
 
 # Lightweight mapping for immediate hypotheses without external lookups.
 _BANNER_CVE_HINTS: dict[str, list[str]] = {
@@ -40,6 +43,7 @@ class CorrelatedSignal:
     asset_criticality: float = 0.5
     references: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    finding_id: str = ""
 
     def risk_score(self) -> float:
         sev = _SEVERITY_SCORE.get(self.severity, 1) / 10.0
@@ -169,6 +173,56 @@ class AIOrchestrationLayer:
         self.signals.extend(created)
         return created
 
+    def ingest_findings(self, findings: list[dict[str, Any]]) -> list[CorrelatedSignal]:
+        """Ingest already-persisted Finding records (core/findings_manager.py's
+        on-disk findings.json schema: id/finding_type/severity/confidence/
+        target/module/description/references).
+
+        This is the only ingestion path available to a stateless MCP tool
+        call: unlike core/workflow_orchestrator.py's WorkflowOrchestrator,
+        which holds one AIOrchestrationLayer instance in memory across an
+        entire multi-step run and feeds it each module's raw run() result
+        via ingest_module_result(), an MCP-driven execution
+        (reconforge/mcp/services.py::execute_approved_phase) runs one
+        module/phase per call and never holds that in-memory result past
+        the call — the module's findings.json is the only surviving
+        cross-call artifact. exploit_likelihood/reachability here are
+        fixed, documented defaults derived from severity, not a learned
+        or predicted value (see docs/AI_ORCHESTRATION_ARCHITECTURE.md).
+        """
+        created: list[CorrelatedSignal] = []
+        for raw in findings:
+            target = str(raw.get("target", "")) or "unknown"
+            module = str(raw.get("module", ""))
+            severity = str(raw.get("severity", "info")).lower()
+            if severity not in _SEVERITY_SCORE:
+                severity = "info"
+            confidence = str(raw.get("confidence", "low")).lower()
+            if confidence not in _CONFIDENCE_SCORE:
+                confidence = "low"
+            references = raw.get("references", [])
+
+            self.graph.add_node(target, "finding_target")
+            if module:
+                self.graph.add_node(module, "module")
+                self.graph.add_edge(module, target, "produced_finding", weight=0.6)
+
+            created.append(CorrelatedSignal(
+                source_module=module,
+                signal_type=str(raw.get("finding_type", "information")),
+                target=target,
+                evidence=str(raw.get("description", "")) or str(raw.get("evidence", "")),
+                severity=severity,
+                confidence=confidence,
+                exploit_likelihood=0.6 if severity in {"critical", "high"} else 0.3 if severity == "medium" else 0.15,
+                reachability=0.7,
+                references=[str(r) for r in references] if isinstance(references, list) else [],
+                tags=[t for t in (module, str(raw.get("finding_type", ""))) if t],
+                finding_id=str(raw.get("id", "")),
+            ))
+        self.signals.extend(created)
+        return created
+
     # ---- context builder ----------------------------------------------------
 
     def build_context_snapshot(self) -> dict[str, Any]:
@@ -264,9 +318,50 @@ class AIOrchestrationLayer:
                 "target": sig.target,
                 "narrative": narrative,
                 "references": sig.references,
+                "finding_id": sig.finding_id,
             })
         paths.sort(key=lambda x: x["score"], reverse=True)
         return paths[:limit]
+
+    def recommend_modules(self, already_run: set[str]) -> list[dict[str, Any]]:
+        """Coverage-gap module recommendation from ingested findings alone
+        (see ingest_findings()) — deterministic, not a prediction.
+
+        This is the MCP-facing counterpart to decide_next_actions(): that
+        method needs raw scan data (port/service graph nodes) only the
+        live CLI WorkflowOrchestrator ever holds; this one works from
+        persisted findings.json records, the only signal an MCP tool call
+        has access to. It answers "what hasn't been assessed yet, and
+        does what we've already found raise the value of assessing it" —
+        not "what will succeed."
+        """
+        has_signals = bool(self.signals)
+        has_high_value = any(s.severity in {"critical", "high"} for s in self.signals)
+        recommendations: list[dict[str, Any]] = []
+        for module in _MODULE_ORDER:
+            if module in already_run:
+                continue
+            if has_high_value:
+                priority, confidence = "high", 0.8
+            elif has_signals:
+                priority, confidence = "medium", 0.55
+            else:
+                priority, confidence = "low", 0.35
+            reason = f"'{module}' has not been assessed for this target yet."
+            if has_high_value:
+                reason += (
+                    " Existing findings for already-run modules include critical/high-severity "
+                    "signals, raising the value of expanding coverage before concluding the engagement."
+                )
+            recommendations.append({
+                "module": module,
+                "confidence": confidence,
+                "priority": priority,
+                "reason": reason,
+                "already_run": False,
+            })
+        recommendations.sort(key=lambda r: r["confidence"], reverse=True)
+        return recommendations
 
     def generate_ai_report(self) -> dict[str, Any]:
         top_paths = self.top_attack_paths(limit=5)

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -70,6 +71,16 @@ def test_add_approvals_subparser_parses_deny_with_optional_reason():
 
     args_no_reason = parser.parse_args(["mcp", "approvals", "deny", "abc-123"])
     assert args_no_reason.reason is None
+
+
+def test_add_approvals_subparser_parses_cleanup_with_optional_retention_hours():
+    parser, _ = _build_parser()
+    args = parser.parse_args(["mcp", "approvals", "cleanup", "--retention-hours", "72"])
+    assert args.approvals_command == "cleanup"
+    assert args.retention_hours == 72
+
+    args_default = parser.parse_args(["mcp", "approvals", "cleanup"])
+    assert args_default.retention_hours is None
 
 
 # ── dispatch: list ───────────────────────────────────────────────────
@@ -171,6 +182,53 @@ def test_dispatch_revoke_never_approved_request_exits_nonzero(capsys: pytest.Cap
         approvals_cli.dispatch(args, parser)
     assert exc_info.value.code == 1
     assert "APPROVAL_STATE_ERROR" in capsys.readouterr().err
+
+
+# ── dispatch: cleanup ────────────────────────────────────────────────
+
+
+def _backdate_created_at(record: approvals.ApprovalRequest, *, hours_ago: float) -> None:
+    path = approvals._request_path(record.request_id)
+    data = json.loads(path.read_text())
+    data["created_at"] = (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).isoformat()
+    path.write_text(json.dumps(data))
+
+
+def test_dispatch_cleanup_prints_no_op_message_when_nothing_to_purge(
+    capsys: pytest.CaptureFixture[str],
+):
+    parser, _ = _build_parser()
+    args = parser.parse_args(["mcp", "approvals", "cleanup"])
+    approvals_cli.dispatch(args, parser)
+    out = capsys.readouterr().out
+    assert "No terminal-state requests old enough to purge." in out
+
+
+def test_dispatch_cleanup_purges_old_denied_request_with_explicit_retention(
+    capsys: pytest.CaptureFixture[str],
+):
+    record = _create()
+    approvals.deny(record.request_id)
+    _backdate_created_at(record, hours_ago=48)
+
+    parser, _ = _build_parser()
+    args = parser.parse_args(["mcp", "approvals", "cleanup", "--retention-hours", "24"])
+    approvals_cli.dispatch(args, parser)
+    out = capsys.readouterr().out
+    assert "Purged 1 terminal-state request(s)" in out
+    assert record.request_id in out
+    assert not approvals._request_path(record.request_id).is_file()
+
+
+def test_dispatch_cleanup_leaves_pending_requests_alone(capsys: pytest.CaptureFixture[str]):
+    record = _create()
+    _backdate_created_at(record, hours_ago=999)
+
+    parser, _ = _build_parser()
+    args = parser.parse_args(["mcp", "approvals", "cleanup", "--retention-hours", "24"])
+    approvals_cli.dispatch(args, parser)
+    assert "No terminal-state requests old enough to purge." in capsys.readouterr().out
+    assert approvals.get_request(record.request_id).status == "awaiting_operator_approval"
 
 
 # ── dispatch: no subcommand ────────────────────────────────────────────

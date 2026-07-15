@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import modules
+from core.ai_orchestration import AIOrchestrationLayer
 from core.authorization_gate import ScopeAuthorization
 from core.config_loader import ConfigLoader
 from core.engagement import EngagementManager
@@ -80,6 +81,10 @@ from reconforge.mcp.schemas import (
     PlannedStep,
     PlanWorkflowRequest,
     PlanWorkflowResponse,
+    RecommendedFollowUp,
+    RecommendedModuleStep,
+    RecommendNextStepsRequest,
+    RecommendNextStepsResponse,
     RequestExecutionRequest,
     RequestExecutionResponse,
     SanitizedFinding,
@@ -623,6 +628,60 @@ def summarize_findings(request: SummarizeFindingsRequest) -> SummarizeFindingsRe
         by_module=by_module,
         modules_with_findings=sorted(by_module.keys()),
         top_findings=[_sanitize_finding(f).trusted_metadata for f in top],
+    )
+
+
+# ── reconforge_recommend_next_steps ─────────────────────────────────────
+
+
+def recommend_next_steps(request: RecommendNextStepsRequest) -> RecommendNextStepsResponse:
+    """The Claude-facing entry point into core.ai_orchestration's
+    deterministic decision engine: which modules haven't been assessed
+    for *request.target* yet, and which already-gathered findings are
+    worth prioritizing — so a Claude session can direct a multi-step
+    scan toward the modules/findings most worth pursuing next, instead
+    of exhaustively (and blindly) running every module in a fixed order.
+
+    Reads only already-persisted findings.json records (via
+    _load_findings, the same helper get_findings/summarize_findings
+    use) — this tool never re-runs anything and never has access to a
+    live WorkflowOrchestrator's in-memory AIOrchestrationLayer instance,
+    since each MCP-driven execution runs one module/phase independently
+    (see execute_approved_phase's module.run(phases=[record.phase])).
+    """
+    raw = _load_findings(request.output_base, request.target, module=None)
+    modules_run = sorted({str(f.get("module", "")) for f in raw if f.get("module")})
+
+    engine = AIOrchestrationLayer()
+    engine.ingest_findings(raw)
+
+    recommended_modules = [
+        RecommendedModuleStep(
+            module=row["module"],
+            confidence=row["confidence"],
+            priority=row["priority"],
+            reason=row["reason"],
+            already_run=row["already_run"],
+        )
+        for row in engine.recommend_modules(already_run=set(modules_run))
+    ]
+
+    priority_findings = [
+        RecommendedFollowUp(
+            finding_id=path["finding_id"],
+            target=path["target"],
+            risk_score=path["score"],
+            rationale=path["narrative"][1] if len(path["narrative"]) > 1 else path["name"],
+            references=path["references"],
+        )
+        for path in engine.top_attack_paths(limit=5)
+    ]
+
+    return RecommendNextStepsResponse(
+        target=request.target,
+        modules_run=modules_run,
+        recommended_modules=recommended_modules,
+        priority_findings=priority_findings,
     )
 
 

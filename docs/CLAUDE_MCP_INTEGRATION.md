@@ -63,7 +63,7 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 - **Claude is treated as untrusted.** Every tool argument is independently re-validated
   server-side (target format, module/phase names, scope matching) — nothing from the request is
   taken on faith just because it came from an LLM.
-- **12 of 17 tools are read-only.** They inspect state, plan workflows, or run
+- **13 of 18 tools are read-only.** They inspect state, plan workflows, or run
   `core/runner.py`'s `dry_run=True` code path, which never invokes a real subprocess.
 - **Real execution requires a human operator's approval, given genuinely out-of-band.** No MCP
   request field — not `explicit_confirmation`, not anything else Claude can set — is ever accepted
@@ -112,9 +112,14 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 - **No credentials ever flow through MCP responses.** Secret-redaction patterns from
   `core/logger.py::sanitize_log()` apply to everything read-only tools return.
 - **Every tool call is audited.** A single JSON line goes to stderr for every call to any of the
-  17 tools, success or failure — timestamp, tool name, outcome, sanitized arguments (`approval_id`
-  is always redacted). Claude Desktop/Claude Code capture a server's stderr as logs, so this needs
-  no extra configuration to see.
+  18 tools, success or failure — timestamp, a `session_id` shared by every event from the same
+  server process (so a sequence of Claude-directed calls can be reconstructed from stderr even
+  when several sessions' logs are interleaved), tool name, outcome, sanitized arguments
+  (`approval_id` is always redacted). Claude Desktop/Claude Code capture a server's stderr as logs,
+  so this needs no extra configuration to see.
+- **Every response carries a `schema_version`.** This is the response *shape's* contract version
+  (bumped only on a breaking field removal/repurpose), distinct from `reconforge_version` — lets a
+  client detect a genuinely incompatible response shape rather than assuming the API never changes.
 
 ## Tool reference
 
@@ -131,6 +136,7 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 | `reconforge_get_findings` | List sanitized findings, filterable by target/module/severity/confidence. |
 | `reconforge_get_finding` | Fetch one sanitized finding by id. |
 | `reconforge_summarize_findings` | Deterministic aggregation — counts, top risks, no evidence text. |
+| `reconforge_recommend_next_steps` | Which modules haven't been assessed yet for a target and which already-gathered findings are worth prioritizing — a deterministic, rule-based ranking over findings already on disk (not ML/LLM, not a prediction). Use this to decide where to direct the next `reconforge_request_execution` call. |
 | `reconforge_generate_report` | Render a markdown report (technical or executive) from findings. |
 | `reconforge_request_execution` | Create a pending, out-of-band approval request for one real module phase. Never executes anything and never grants its own approval — see "Security model" above. |
 | `reconforge_get_approval_status` | Poll a request's status: `awaiting_operator_approval`, `approved`, `denied`, `expired`, `consumed`, or `revoked`. No secret material returned. |
@@ -140,7 +146,7 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 
 ## Resource reference
 
-Alongside the 17 tools above, the server exposes 7 read-only MCP *resources* — a separate,
+Alongside the 18 tools above, the server exposes 7 read-only MCP *resources* — a separate,
 argument-free content-exposure primitive addressed by URI (`resources/list` and `resources/read`)
 rather than an invoked call. Useful for a client that wants to load reference material ambiently
 instead of asking a question through a tool call. Every URI comes from a hardcoded allowlist in
@@ -182,7 +188,11 @@ Once connected, a typical read-only session looks like asking Claude:
    `reconforge_dry_run` — nothing runs, just the sanitized command that *would* run
 5. *"What findings do we have for that target so far?"* → `reconforge_get_findings` /
    `reconforge_summarize_findings`
-6. *"Generate an executive report"* → `reconforge_generate_report`
+6. *"Which module should we run next, and what's worth prioritizing?"* →
+   `reconforge_recommend_next_steps` — a coverage-gap recommendation over findings already
+   gathered, so Claude can direct the next step of a multi-module scan instead of a human doing
+   that triage by hand
+7. *"Generate an executive report"* → `reconforge_generate_report`
 
 None of the above can execute anything — they either read existing state or exercise the same
 `dry_run=True` path the CLI's own `--dry-run` flag uses.

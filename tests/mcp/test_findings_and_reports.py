@@ -222,6 +222,76 @@ def test_summarize_findings_never_includes_raw_evidence_text():
     assert not hasattr(schemas.TrustedFindingMetadata, "evidence")
 
 
+# ── reconforge_recommend_next_steps ─────────────────────────────────────
+
+
+def test_recommend_next_steps_recommends_unassessed_modules(tmp_path: Path):
+    _write_findings(tmp_path, "10.10.10.1", "network", [_finding("f1")])
+
+    response = services.recommend_next_steps(
+        schemas.RecommendNextStepsRequest(output_base=str(tmp_path), target="10.10.10.1")
+    )
+    assert response.modules_run == ["network"]
+    recommended = {r.module for r in response.recommended_modules}
+    assert recommended == {"surface", "ad", "web", "api"}
+    assert all(not r.already_run for r in response.recommended_modules)
+
+
+def test_recommend_next_steps_raises_priority_for_high_severity_findings(tmp_path: Path):
+    _write_findings(
+        tmp_path,
+        "10.10.10.1",
+        "network",
+        [_finding("f1", severity="critical", confidence="confirmed")],
+    )
+
+    response = services.recommend_next_steps(
+        schemas.RecommendNextStepsRequest(output_base=str(tmp_path), target="10.10.10.1")
+    )
+    assert all(r.priority == "high" for r in response.recommended_modules)
+
+
+def test_recommend_next_steps_surfaces_priority_findings_ranked_by_risk(tmp_path: Path):
+    _write_findings(
+        tmp_path,
+        "10.10.10.1",
+        "network",
+        [
+            _finding("low-risk", severity="low", confidence="heuristic"),
+            _finding("high-risk", severity="critical", confidence="confirmed"),
+        ],
+    )
+
+    response = services.recommend_next_steps(
+        schemas.RecommendNextStepsRequest(output_base=str(tmp_path), target="10.10.10.1")
+    )
+    assert response.priority_findings
+    assert response.priority_findings[0].finding_id == "high-risk"
+    assert response.priority_findings[0].references == ["CVE-2021-41773"]
+
+
+def test_recommend_next_steps_returns_empty_when_no_findings_yet(tmp_path: Path):
+    response = services.recommend_next_steps(
+        schemas.RecommendNextStepsRequest(output_base=str(tmp_path), target="10.10.10.1")
+    )
+    assert response.modules_run == []
+    assert response.priority_findings == []
+    assert {r.module for r in response.recommended_modules} == {
+        "surface", "network", "ad", "web", "api",
+    }
+    assert all(r.priority == "low" for r in response.recommended_modules)
+
+
+def test_recommend_next_steps_method_note_discloses_deterministic_scope(tmp_path: Path):
+    """No 'ML' or 'prediction' claim leaks past docs/AI_ORCHESTRATION_ARCHITECTURE.md's
+    established honesty bar — see Phase 30's overclaiming fix."""
+    response = services.recommend_next_steps(
+        schemas.RecommendNextStepsRequest(output_base=str(tmp_path), target="10.10.10.1")
+    )
+    assert "not ML/LLM" in response.method_note
+    assert "not a prediction" in response.method_note
+
+
 # ── reconforge_generate_report ─────────────────────────────────────────
 
 

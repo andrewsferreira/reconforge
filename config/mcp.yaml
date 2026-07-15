@@ -40,3 +40,13 @@ mcp:
   # already-approved one (an approval granted just before expiry can
   # still expire before it's ever used).
   approval_ttl_minutes: 30
+
+  # How long a *resolved* request (denied/expired/consumed/revoked) is
+  # kept on disk before `reconforge mcp approvals cleanup` will delete it
+  # -- distinct from approval_ttl_minutes above, which only governs
+  # still-pending requests. A long Claude-directed session issuing many
+  # reconforge_request_execution calls otherwise leaves one file pair per
+  # request on disk indefinitely; this only bounds that growth when the
+  # operator runs the cleanup command themselves -- nothing in the MCP
+  # protocol purges records automatically.
+  approval_retention_hours: 24

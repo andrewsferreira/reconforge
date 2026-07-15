@@ -1,5 +1,5 @@
 """Tests for reconforge/mcp/audit.py and its wiring into
-tools.py::_call_tool — every one of the 17 MCP tools passes through
+tools.py::_call_tool — every one of the 18 MCP tools passes through
 that single choke point, so one JSON audit line to stderr is emitted
 per call, success or failure, without needing per-tool instrumentation.
 Also covers resources.py::_read_resource's analogous audit event.
@@ -14,6 +14,7 @@ import anyio
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
+from reconforge.mcp import audit
 from reconforge.mcp.audit import emit_resource_read_audit_event, emit_tool_call_audit_event
 from reconforge.mcp.server import build_server
 
@@ -42,6 +43,28 @@ def test_successful_tool_call_emits_success_audit_event(capsys: pytest.CaptureFi
     assert event["outcome"] == "success"
     assert "error_code" not in event
     assert "timestamp" in event
+    assert event["session_id"] == audit.SESSION_ID
+
+
+def test_tool_call_events_share_one_session_id_across_a_session(capsys: pytest.CaptureFixture[str]):
+    """A Claude-directed sequence of tool calls (e.g. recommend_next_steps
+    then request_execution) should be reconstructable from stderr as one
+    session — see audit.SESSION_ID's docstring."""
+
+    def _all_json_lines(stderr_text: str) -> list[dict]:
+        return [json.loads(line) for line in stderr_text.splitlines() if line.strip()]
+
+    async def _go() -> None:
+        server = build_server()
+        async with create_connected_server_and_client_session(server) as session:
+            await session.call_tool("reconforge_get_status", {})
+            await session.call_tool("reconforge_list_modules", {})
+
+    _run(_go)
+    events = _all_json_lines(capsys.readouterr().err)
+    assert len(events) == 2
+    session_ids = {e["session_id"] for e in events}
+    assert session_ids == {audit.SESSION_ID}
 
 
 def test_failed_tool_call_emits_error_audit_event_with_code(

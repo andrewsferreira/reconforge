@@ -193,3 +193,96 @@ def test_decision_engine_suggests_web_and_api_for_http_services():
     modules = {r["module"] for r in recs}
     assert "web" in modules
     assert "api" in modules
+
+
+# ── ingest_findings() / recommend_modules() ──────────────────────────
+# The MCP-facing counterparts: reconforge/mcp/services.py::recommend_next_steps
+# only ever has persisted findings.json records to work with (see
+# ingest_findings()'s docstring for why), never the raw module.run()
+# result the CLI's WorkflowOrchestrator holds in memory.
+
+
+def _raw_finding(**overrides) -> dict:
+    base = {
+        "id": "f1",
+        "finding_type": "vulnerability",
+        "severity": "high",
+        "confidence": "confirmed",
+        "target": "10.10.10.1",
+        "module": "network",
+        "description": "Outdated service banner.",
+        "evidence": "",
+        "references": ["CVE-2021-41773"],
+    }
+    base.update(overrides)
+    return base
+
+
+def test_ingest_findings_builds_signals_and_graph_nodes():
+    engine = AIOrchestrationLayer()
+    created = engine.ingest_findings([_raw_finding()])
+
+    assert len(created) == 1
+    sig = created[0]
+    assert sig.source_module == "network"
+    assert sig.signal_type == "vulnerability"
+    assert sig.target == "10.10.10.1"
+    assert sig.finding_id == "f1"
+    assert sig.references == ["CVE-2021-41773"]
+    assert sig.exploit_likelihood == 0.6  # severity="high"
+
+    snapshot = engine.build_context_snapshot()
+    node_types = {n["type"] for n in snapshot["graph"]["nodes"]}
+    assert "finding_target" in node_types
+    assert "module" in node_types
+
+
+def test_ingest_findings_defaults_unknown_severity_and_confidence():
+    engine = AIOrchestrationLayer()
+    created = engine.ingest_findings([_raw_finding(severity="unheard_of", confidence="also_unheard_of")])
+
+    assert created[0].severity == "info"
+    assert created[0].confidence == "low"
+
+
+def test_ingest_findings_threads_finding_id_into_top_attack_paths():
+    engine = AIOrchestrationLayer()
+    engine.ingest_findings([_raw_finding(id="f-critical", severity="critical", confidence="confirmed")])
+
+    paths = engine.top_attack_paths(limit=1)
+    assert paths[0]["finding_id"] == "f-critical"
+
+
+def test_recommend_modules_skips_already_run_modules():
+    engine = AIOrchestrationLayer()
+    engine.ingest_findings([_raw_finding()])
+
+    recs = engine.recommend_modules(already_run={"network", "surface"})
+    modules = {r["module"] for r in recs}
+    assert modules == {"ad", "web", "api"}
+
+
+def test_recommend_modules_raises_priority_when_high_value_findings_exist():
+    engine = AIOrchestrationLayer()
+    engine.ingest_findings([_raw_finding(severity="critical", confidence="confirmed")])
+
+    recs = engine.recommend_modules(already_run={"network"})
+    assert all(r["priority"] == "high" for r in recs)
+    assert all(r["confidence"] == 0.8 for r in recs)
+
+
+def test_recommend_modules_low_priority_when_nothing_ingested_yet():
+    engine = AIOrchestrationLayer()
+
+    recs = engine.recommend_modules(already_run=set())
+    assert all(r["priority"] == "low" for r in recs)
+    assert {r["module"] for r in recs} == {"surface", "network", "ad", "web", "api"}
+
+
+def test_recommend_modules_sorted_by_confidence_descending():
+    engine = AIOrchestrationLayer()
+    engine.ingest_findings([_raw_finding(severity="critical")])
+
+    recs = engine.recommend_modules(already_run=set())
+    confidences = [r["confidence"] for r in recs]
+    assert confidences == sorted(confidences, reverse=True)

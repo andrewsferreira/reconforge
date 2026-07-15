@@ -46,6 +46,18 @@ def add_approvals_subparser(mcp_subparsers: argparse._SubParsersAction) -> None:
     )
     revoke_parser.add_argument("request_id")
 
+    cleanup_parser = approvals_sub.add_parser(
+        "cleanup",
+        help="Delete terminal-state (denied/expired/consumed/revoked) request records "
+        "older than the retention window — pending/approved-unconsumed requests are never touched",
+    )
+    cleanup_parser.add_argument(
+        "--retention-hours",
+        type=int,
+        default=None,
+        help="Override mcp.approval_retention_hours (default: 24) for this run only",
+    )
+
 
 _LIST_COLUMNS = ("request_id", "status", "module", "phase", "target", "tier", "created_at")
 
@@ -63,8 +75,13 @@ def dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
             _cmd_deny(args.request_id, args.reason)
         elif command == "revoke":
             _cmd_revoke(args.request_id)
+        elif command == "cleanup":
+            _cmd_cleanup(args.retention_hours)
         else:
-            parser.error("mcp approvals requires a supported subcommand (list, inspect, approve, deny, revoke)")
+            parser.error(
+                "mcp approvals requires a supported subcommand "
+                "(list, inspect, approve, deny, revoke, cleanup)"
+            )
     except MCPServiceError as exc:
         print(f"Error [{exc.code}]: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -117,3 +134,13 @@ def _cmd_deny(request_id: str, reason: str | None) -> None:
 def _cmd_revoke(request_id: str) -> None:
     record = approvals.revoke(request_id)
     print(f"Revoked {record.request_id}. Status: {record.status}")
+
+
+def _cmd_cleanup(retention_hours: int | None) -> None:
+    purged = approvals.purge_terminal_requests(retention_hours=retention_hours)
+    if not purged:
+        print("No terminal-state requests old enough to purge.")
+        return
+    print(f"Purged {len(purged)} terminal-state request(s):")
+    for request_id in purged:
+        print(f"  {request_id}")

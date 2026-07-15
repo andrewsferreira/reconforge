@@ -6,6 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.16.0] — 2026-07-15
+
+New MCP capability: Claude can now ask ReconForge which module to run next and which findings to prioritize, instead of a human doing that triage between tool calls. MINOR per `docs/VERSIONING.md` — new tool/capability, backward compatible.
+
+### Added
+
+- **`reconforge_recommend_next_steps` MCP tool** (18 tools total, was 17): reads a target's already-persisted `findings.json` records and returns `recommended_modules` (which of surface/network/ad/web/api haven't been assessed yet, raised in priority when existing findings include critical/high severity) and `priority_findings` (already-gathered findings worth validating first, ranked by risk score). Deterministic and evidence-based — the response's `method_note` field states explicitly it is not ML/LLM and not a prediction of what will succeed, matching `docs/AI_ORCHESTRATION_ARCHITECTURE.md`'s existing honesty framing.
+- **`core/ai_orchestration.py::AIOrchestrationLayer.ingest_findings()` / `recommend_modules()`**: a new ingestion path for the existing deterministic decision engine, built for MCP's constraint that each `reconforge_execute_approved_phase`/`reconforge_start_execution` call runs one module/phase independently and never holds a live `AIOrchestrationLayer` instance across calls the way the CLI's `WorkflowOrchestrator` does — `ingest_findings()` normalizes persisted findings.json records into the same signal representation `top_attack_paths()` already ranks.
+- **Versioned MCP response contracts**: every `TrustedResponse` now carries `schema_version: "1.0"` — the response shape's own contract version, bumped only on a breaking change, distinct from `reconforge_version`.
+- **Audit correlation**: `reconforge/mcp/audit.py`'s `SESSION_ID` (one per server process = one Claude session) is now stamped onto every tool-call/resource-read audit event, so a sequence of calls from one Claude-directed session can be reconstructed from stderr even when several sessions' logs are interleaved.
+- **`reconforge mcp approvals cleanup`** CLI subcommand + `reconforge/mcp/approvals.py::purge_terminal_requests()`: deletes denied/expired/consumed/revoked approval-request files older than `config/mcp.yaml`'s new `approval_retention_hours` (default 24). Operator-only, like approve/deny/revoke — nothing in the MCP protocol reaches it. Pending/approved-unconsumed requests are never touched regardless of age. Bounds the on-disk growth a long Claude-directed session issuing many `reconforge_request_execution` calls would otherwise leave behind indefinitely.
+
+### Assessed, no change needed
+
+- Bounding `reconforge/mcp/jobs.py`'s concurrent execution jobs: `services.py::_EXECUTION_LOCK` already limits the server process to one real execution at a time regardless of entry point; the in-memory `_JOBS` registry's unbounded growth is an existing, explicitly-documented deferred decision (resets on process restart, unlike the on-disk approvals directory), not a gap.
+
+### Testing
+
+- 1192/1192 tests passing (25 new: `tests/core/test_ai_orchestration.py`, `tests/mcp/test_findings_and_reports.py`, `tests/mcp/test_findings_reporting_tools_protocol.py`, `tests/mcp/test_server_foundation.py`, `tests/mcp/test_audit_events.py`, `tests/mcp/test_approvals.py`, `tests/mcp/test_approvals_cli.py`). Ruff, MyPy (232-file tree), Bandit, pip-audit, and the doc-link checker all pass. Coverage 70.72%, floor 70%.
+
 ## [2.15.3] — 2026-07-15
 
 Fixes a CI-only flaky test surfaced by the 2.15.2 run, not a regression in application code. PATCH per `docs/VERSIONING.md` — test-only change.

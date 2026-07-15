@@ -382,3 +382,80 @@ def test_consume_if_approved_concurrent_race_exactly_one_winner():
 
     assert results.count("success") == 1
     assert results.count("state_error") + results.count("not_approved") == 7
+
+
+# ── purge_terminal_requests() ────────────────────────────────────────
+# See approvals_cli.py's "cleanup" subcommand, the only caller — nothing
+# in the MCP protocol reaches purge_terminal_requests(), matching
+# approve/deny/revoke's existing operator-only pattern.
+
+
+def _backdate_created_at(record: approvals.ApprovalRequest, *, hours_ago: float) -> None:
+    path = approvals._request_path(record.request_id)
+    data = json.loads(path.read_text())
+    data["created_at"] = (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).isoformat()
+    path.write_text(json.dumps(data))
+
+
+def test_purge_terminal_requests_removes_old_denied_request():
+    record = _create()
+    approvals.deny(record.request_id)
+    _backdate_created_at(record, hours_ago=48)
+
+    purged = approvals.purge_terminal_requests(retention_hours=24)
+    assert purged == [record.request_id]
+    assert not approvals._request_path(record.request_id).is_file()
+
+
+def test_purge_terminal_requests_leaves_recent_terminal_request_alone():
+    record = _create()
+    approvals.deny(record.request_id)
+    # created_at defaults to "now" -- well inside any real retention window.
+
+    purged = approvals.purge_terminal_requests(retention_hours=24)
+    assert purged == []
+    assert approvals._request_path(record.request_id).is_file()
+
+
+def test_purge_terminal_requests_never_touches_pending_requests_regardless_of_age():
+    record = _create()
+    _backdate_created_at(record, hours_ago=999)
+
+    purged = approvals.purge_terminal_requests(retention_hours=24)
+    assert purged == []
+    assert approvals.get_request(record.request_id).status == "awaiting_operator_approval"
+
+
+def test_purge_terminal_requests_never_touches_approved_unconsumed_requests():
+    """An approved-but-not-yet-consumed request is not terminal -- Claude
+    may still call execute_approved_phase against it -- so age alone must
+    never purge it, no matter how old."""
+    record = _create()
+    approvals.approve(record.request_id)
+    _backdate_created_at(record, hours_ago=999)
+
+    purged = approvals.purge_terminal_requests(retention_hours=24)
+    assert purged == []
+    assert approvals.get_request(record.request_id).status == "approved"
+
+
+def test_purge_terminal_requests_also_removes_the_consumed_marker_file():
+    record = _create()
+    approvals.approve(record.request_id)
+    approvals.consume_if_approved(record.request_id, expected_hash=record.request_hash)
+    _backdate_created_at(record, hours_ago=48)
+    marker = approvals._consumed_marker_path(record.request_id)
+    assert marker.is_file()
+
+    approvals.purge_terminal_requests(retention_hours=24)
+    assert not marker.is_file()
+
+
+def test_purge_terminal_requests_defaults_to_configured_retention_hours():
+    record = _create()
+    approvals.deny(record.request_id)
+    _backdate_created_at(record, hours_ago=1)
+
+    # Default is 24h; a request denied 1h ago must survive an unqualified call.
+    purged = approvals.purge_terminal_requests()
+    assert purged == []

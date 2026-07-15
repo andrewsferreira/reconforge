@@ -29,6 +29,22 @@ def test_build_server_reports_reconforge_identity():
     assert server.version == RECONFORGE_VERSION
 
 
+def test_trusted_response_carries_a_contract_schema_version():
+    """schema_version is the response *shape's* contract version
+    (bumped only on a breaking field removal/repurpose), distinct from
+    reconforge_version (the release version, GetStatusResponse only).
+    Every TrustedResponse subclass gets it via the same default — pinned
+    here once rather than duplicated per-tool."""
+    from reconforge.mcp.schemas import GetStatusResponse
+
+    response = GetStatusResponse(
+        reconforge_version="0.0.0", python_version="0.0.0", os="test",
+        modules=[], available_tools=[], missing_tools=[],
+        security_controls=[], supported_output_formats=[],
+    )
+    assert response.schema_version == "1.0"
+
+
 def test_server_advertises_tools_and_resources_but_not_prompts():
     """15 tools (Phase 3/5/6) and 7 resources (Phase 7) are registered;
     prompts are not."""

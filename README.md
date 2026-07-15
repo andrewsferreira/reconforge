@@ -5,9 +5,9 @@
 [![Quality Gates](https://github.com/andrewsferreira/reconforge/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/andrewsferreira/reconforge/actions/workflows/quality-gates.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-1167%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-1192%20passing-brightgreen.svg)](#testing)
 
-> Author: Andrews Ferreira • Version 2.15.3 • 1167/1167 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+> Author: Andrews Ferreira • Version 2.16.0 • 1192/1192 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
@@ -20,7 +20,7 @@ Most portfolio recon tools stop at "it runs nmap and prints results." ReconForge
 - **Findings are never overstated.** Every result carries a confidence level (`confirmed → high → medium → low → heuristic`), and severity is *clamped* by confidence in `core/findings_manager.py` — a heuristic match structurally cannot present as `critical`, no exceptions. This caught and fixed real bugs during development (BloodHound DA-path findings mislabeled `confirmed`, a nuclei severity/confidence inversion, sqlmap negation-unaware false positives) — see `docs/ARCHITECTURE_REVIEW.md`'s Phase 8 entries.
 - **AI-driven execution can't approve itself.** ReconForge ships an MCP server so Claude can plan and inspect recon workflows — but real execution requires a human operator's approval given through a separate CLI process, `reconforge mcp approvals approve <id>`, outside the MCP protocol entirely. No field in Claude's own request — not a boolean, not anything — can substitute for that out-of-band step. See [`CLAUDE_MCP_INTEGRATION.md`'s security model](docs/CLAUDE_MCP_INTEGRATION.md#security-model-summary) and [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
 - **Command execution is structurally injection-resistant, not just "carefully written."** Zero instances of `shell=True` anywhere in the codebase; every subprocess call is a `list[str]` argument vector, with `validate_arg()` rejecting shell metacharacters as a second layer on top.
-- **Quality gates are enforced in CI, not just aspirational.** Ruff (a real ruleset — pyflakes, bugbear, pyupgrade, isort, flake8-simplify — not just syntax-error checks), MyPy across the full 232-file package tree, Bandit, pip-audit, a documentation-link checker, and 1167 tests with an enforced coverage floor all run on every push. See [Quality Gates](#quality-gates).
+- **Quality gates are enforced in CI, not just aspirational.** Ruff (a real ruleset — pyflakes, bugbear, pyupgrade, isort, flake8-simplify — not just syntax-error checks), MyPy across the full 232-file package tree, Bandit, pip-audit, a documentation-link checker, and 1192 tests with an enforced coverage floor all run on every push. See [Quality Gates](#quality-gates).
 - **Limitations are documented, not hidden.** [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) and [`docs/ARCHITECTURE_REVIEW.md`](docs/ARCHITECTURE_REVIEW.md) track exactly what's implemented, what's heuristic, and what's still a known gap — including things like scope matching currently being exact-string-only, and loot encryption being opt-in rather than default. Nothing here claims production-hardened status it hasn't earned.
 - **You can validate all of this without touching a real target.** A first-party, pure-stdlib lab server (`lab/vulnerable_app.py`) and a safe MCP demo script let you see the whole thing work end-to-end on loopback before you ever point it at anything real.
 
@@ -195,10 +195,13 @@ outputs/<target>/<module>/
 ## Claude and MCP Integration
 
 `reconforge mcp serve` runs an MCP (Model Context Protocol) server so Claude Desktop or Claude Code
-can inspect ReconForge's state and plan recon workflows over stdio — 12 read-only tools (status,
+can inspect ReconForge's state and plan recon workflows over stdio — 13 read-only tools (status,
 module/engagement/scope introspection, workflow planning, dry-run command preview, findings,
-reports) plus 5 execution-related tools, all gated behind an active engagement, a validated scope
-file, and a genuinely out-of-band human approval: Claude can request execution, but only a human
+reports, and `reconforge_recommend_next_steps` — a deterministic, evidence-based recommendation
+of which module hasn't been assessed yet and which findings are worth prioritizing, so Claude can
+direct a multi-step scan toward the modules/findings most worth pursuing instead of running every
+module in a fixed order) plus 5 execution-related tools, all gated behind an active engagement, a
+validated scope file, and a genuinely out-of-band human approval: Claude can request execution, but only a human
 operator running `reconforge mcp approvals approve <request_id>` in a separate terminal — outside
 the MCP session entirely — can turn that request into something executable, and (for INTRUSIVE-tier
 phases) an operator-edited server-wide config flag. No MCP request field, and no tool or resource,
@@ -224,7 +227,7 @@ SDK, outside of any Claude client.
 ```bash
 pip install -e ".[dev]"
 python -m pytest
-# 1167 tests, all passing (~19s)
+# 1192 tests, all passing (~23s)
 ```
 
 These are unit tests against mocked tool execution and stored fixtures — they validate parsing, validation, and orchestration logic, not real binaries. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for what has and has not been validated against live tools.
@@ -278,7 +281,7 @@ reconforge/                     # repository root
 │   ├── api/                   # 4 tools, 4 parsers, 4 phases
 │   ├── surface/               # 2 tools, 1 parser, 6 intelligence, 4 phases
 │   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 1167 tests (pytest) — see "Testing" above for current count
+└── tests/                     # 1192 tests (pytest) — see "Testing" above for current count
 ```
 
 ## Limitations

@@ -63,12 +63,13 @@ def test_list_tools_includes_all_read_only_tools_plus_approval_and_execution_too
             result = await session.list_tools()
             names = {t.name for t in result.tools}
             assert names == set(_TOOLS.keys())
-            assert len(names) == 17
+            assert len(names) == 18
             assert "reconforge_request_execution" in names
             assert "reconforge_get_approval_status" in names
             assert "reconforge_execute_approved_phase" in names
             assert "reconforge_start_execution" in names
             assert "reconforge_get_execution_status" in names
+            assert "reconforge_recommend_next_steps" in names
 
     _run(_go)
 
@@ -112,6 +113,25 @@ def test_summarize_findings_tool_call_succeeds(tmp_path: Path):
             )
             assert result.isError is False
             assert result.structuredContent["total"] == 1
+
+    _run(_go)
+
+
+def test_recommend_next_steps_tool_call_succeeds(tmp_path: Path):
+    _write_finding(tmp_path, "10.10.10.1", "network", "f1")
+
+    async def _go() -> None:
+        server = build_server()
+        async with create_connected_server_and_client_session(server) as session:
+            result = await session.call_tool(
+                "reconforge_recommend_next_steps",
+                {"output_base": str(tmp_path), "target": "10.10.10.1"},
+            )
+            assert result.isError is False
+            assert result.structuredContent["modules_run"] == ["network"]
+            recommended = {m["module"] for m in result.structuredContent["recommended_modules"]}
+            assert "ad" in recommended
+            assert "network" not in recommended
 
     _run(_go)
 

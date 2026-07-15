@@ -178,6 +178,16 @@ def _approval_ttl_minutes() -> int:
     return int(ConfigLoader().load("mcp").get("mcp", {}).get("approval_ttl_minutes", 30))
 
 
+def _approval_retention_hours() -> int:
+    """How long a *terminal-state* request record (denied/expired/consumed/
+    revoked) is kept on disk after creation before ``purge_terminal_requests``
+    considers it eligible for deletion. Distinct from ``approval_ttl_minutes``
+    (how long a *pending* request stays awaiting operator approval before
+    the state machine marks it "expired") — this is retention of the
+    resolved record itself, not the approval window."""
+    return int(ConfigLoader().load("mcp").get("mcp", {}).get("approval_retention_hours", 24))
+
+
 def _request_path(request_id: str, directory: Path | None = None) -> Path:
     return (directory or _approvals_dir()) / f"{request_id}.json"
 
@@ -304,6 +314,40 @@ def list_requests() -> list[ApprovalRequest]:
             continue  # skip unreadable/corrupt records, don't fail the whole listing
     requests.sort(key=lambda r: r.created_at)
     return requests
+
+
+def purge_terminal_requests(*, retention_hours: int | None = None) -> list[str]:
+    """Delete request/marker files for requests that reached a terminal
+    state (denied/expired/consumed/revoked) more than *retention_hours*
+    ago (default: ``mcp.approval_retention_hours``, 24).
+
+    Operator-only, like approve/deny/revoke — nothing in the MCP protocol
+    calls this (see ``reconforge/mcp/approvals_cli.py``'s ``cleanup``
+    subcommand, the only caller). A long Claude-directed session that
+    issues many ``reconforge_request_execution`` calls leaves a
+    ``.json``/``.consumed`` file pair on disk per request indefinitely
+    (unlike ``reconforge/mcp/jobs.py``'s in-memory job registry, which
+    resets when the server process exits) — this bounds that growth
+    without ever touching a request still awaiting or holding approval.
+
+    Still-pending or still-approved-but-unconsumed requests are never
+    touched regardless of age; only the four terminal statuses are
+    considered, and only once past the retention window, so an operator
+    reviewing old history has the full retention window to do so.
+    """
+    directory = _approvals_dir()
+    retention = retention_hours if retention_hours is not None else _approval_retention_hours()
+    cutoff = _now() - timedelta(hours=retention)
+    purged: list[str] = []
+    for record in list_requests():
+        if record.status not in _TERMINAL_STATUSES:
+            continue
+        if _parse_iso(record.created_at) >= cutoff:
+            continue
+        _request_path(record.request_id, directory).unlink(missing_ok=True)
+        _consumed_marker_path(record.request_id, directory).unlink(missing_ok=True)
+        purged.append(record.request_id)
+    return purged
 
 
 def _expire_if_due(record: ApprovalRequest, directory: Path) -> ApprovalRequest:

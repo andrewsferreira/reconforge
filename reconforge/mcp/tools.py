@@ -41,6 +41,10 @@ _TOOLS: dict[str, tuple[type[BaseModel], _Handler]] = {
     "reconforge_get_findings": (schemas.GetFindingsRequest, services.get_findings),
     "reconforge_get_finding": (schemas.GetFindingRequest, services.get_finding),
     "reconforge_summarize_findings": (schemas.SummarizeFindingsRequest, services.summarize_findings),
+    "reconforge_recommend_next_steps": (
+        schemas.RecommendNextStepsRequest,
+        services.recommend_next_steps,
+    ),
     "reconforge_generate_report": (schemas.GenerateReportRequest, services.generate_report),
     "reconforge_request_execution": (
         schemas.RequestExecutionRequest,
@@ -108,6 +112,14 @@ _DESCRIPTIONS: dict[str, str] = {
     "reconforge_summarize_findings": (
         "Deterministic aggregation of findings (counts by severity/"
         "confidence/module, top risks) — no evidence text, metadata only."
+    ),
+    "reconforge_recommend_next_steps": (
+        "Which modules haven't been assessed yet for a target, and which "
+        "already-gathered findings are worth prioritizing — a deterministic "
+        "rule-based ranking over findings already on disk (not ML/LLM, not "
+        "a prediction of what will succeed). Use this to decide where to "
+        "direct the next reconforge_request_execution call instead of "
+        "running every module in a fixed order."
     ),
     "reconforge_generate_report": (
         "Render a markdown report (technical or executive) from a "
