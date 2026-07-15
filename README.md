@@ -2,11 +2,27 @@
 
 **An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
 
-> Author: Andrews Ferreira • Version 2.15.1 • 1167/1167 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+[![Quality Gates](https://github.com/andrewsferreira/reconforge/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/andrewsferreira/reconforge/actions/workflows/quality-gates.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-1167%20passing-brightgreen.svg)](#testing)
+
+> Author: Andrews Ferreira • Version 2.15.2 • 1167/1167 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
 
 > **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
 
 ReconForge automates the reconnaissance phase of penetration tests through five specialized modules and a cross-module workflow orchestrator. All commands are executed securely as `list[str]` via `subprocess.run` — **no `shell=True` anywhere in the codebase**. It normalizes raw tool output into findings with an explicit confidence model (§ [FINDINGS.md](docs/FINDINGS.md)); it does not exploit targets and does not claim to be a complete Red Team platform. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) and [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for an honest account of what is implemented, tested, and still in progress.
+
+## Why ReconForge?
+
+Most portfolio recon tools stop at "it runs nmap and prints results." ReconForge is built around the parts that are actually hard to get right in a real engagement, and every claim below is backed by code you can read and tests you can run — not asserted in this README and left unverifiable:
+
+- **Findings are never overstated.** Every result carries a confidence level (`confirmed → high → medium → low → heuristic`), and severity is *clamped* by confidence in `core/findings_manager.py` — a heuristic match structurally cannot present as `critical`, no exceptions. This caught and fixed real bugs during development (BloodHound DA-path findings mislabeled `confirmed`, a nuclei severity/confidence inversion, sqlmap negation-unaware false positives) — see `docs/ARCHITECTURE_REVIEW.md`'s Phase 8 entries.
+- **AI-driven execution can't approve itself.** ReconForge ships an MCP server so Claude can plan and inspect recon workflows — but real execution requires a human operator's approval given through a separate CLI process, `reconforge mcp approvals approve <id>`, outside the MCP protocol entirely. No field in Claude's own request — not a boolean, not anything — can substitute for that out-of-band step. See [`CLAUDE_MCP_INTEGRATION.md`'s security model](docs/CLAUDE_MCP_INTEGRATION.md#security-model-summary) and [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
+- **Command execution is structurally injection-resistant, not just "carefully written."** Zero instances of `shell=True` anywhere in the codebase; every subprocess call is a `list[str]` argument vector, with `validate_arg()` rejecting shell metacharacters as a second layer on top.
+- **Quality gates are enforced in CI, not just aspirational.** Ruff (a real ruleset — pyflakes, bugbear, pyupgrade, isort, flake8-simplify — not just syntax-error checks), MyPy across the full 232-file package tree, Bandit, pip-audit, a documentation-link checker, and 1167 tests with an enforced coverage floor all run on every push. See [Quality Gates](#quality-gates).
+- **Limitations are documented, not hidden.** [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) and [`docs/ARCHITECTURE_REVIEW.md`](docs/ARCHITECTURE_REVIEW.md) track exactly what's implemented, what's heuristic, and what's still a known gap — including things like scope matching currently being exact-string-only, and loot encryption being opt-in rather than default. Nothing here claims production-hardened status it hasn't earned.
+- **You can validate all of this without touching a real target.** A first-party, pure-stdlib lab server (`lab/vulnerable_app.py`) and a safe MCP demo script let you see the whole thing work end-to-end on loopback before you ever point it at anything real.
 
 ## Modules
 
@@ -174,6 +190,7 @@ outputs/<target>/<module>/
 | [OBSERVABILITY_AND_CONTRACTS.md](docs/OBSERVABILITY_AND_CONTRACTS.md) | Execution IDs, structured audit logs, env overlays, and versioned data contracts |
 | [BURP_MCP_INTEGRATION.md](docs/BURP_MCP_INTEGRATION.md) | `reconforge burp` subcommands, the Burp MCP provider, and the standalone [`mcp_validation/`](mcp_validation/README.md) connectivity-check tool |
 | [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md) | Connect Claude Desktop/Claude Code to `reconforge mcp serve` — setup, security model, tool reference, walkthroughs |
+| [THREAT_MODEL.md](docs/THREAT_MODEL.md) | Whole-system threat model: assets, trust boundaries, threats and mitigations, non-goals, known residual risks |
 
 ## Claude and MCP Integration
 
@@ -216,11 +233,11 @@ These are unit tests against mocked tool execution and stored fixtures — they 
 
 Quality gates are codified in CI (`.github/workflows/quality-gates.yml`) and run:
 
-- Ruff (lint)
-- MyPy (type checks — `reconforge/cli.py`, `core/runner.py`, `core/workflow_orchestrator.py`, and all of `reconforge/mcp/*.py`; not yet the full tree)
+- Ruff (lint — `select = ["E9","F","B","UP","I","SIM","C4"]`: pyflakes, bugbear, pyupgrade, isort, flake8-simplify, flake8-comprehensions; `E501` line-length deliberately excluded as pure reformatting with no correctness value)
+- MyPy (type checks across the full package tree — `core`, `modules`, `reconforge`, `mcp_validation`, `scripts`; 232 source files, zero errors)
 - Bandit (SAST)
 - pip-audit (dependency vulnerability audit)
-- Pytest + coverage threshold (currently 50%, codified in `pyproject.toml`'s `[tool.coverage.report]`; measured coverage is ~69% across `core`/`modules`/`reconforge`, well short of the 85% previously asserted in CI but never actually enforced anywhere — see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for the tracked plan to raise it)
+- Pytest + coverage threshold (70%, codified in `pyproject.toml`'s `[tool.coverage.report]`; measured coverage is ~70.5% across `core`/`modules`/`reconforge` — an honest floor, not the 85-90% a security-critical codebase would ideally carry; see `pyproject.toml`'s comment for the current lowest-coverage files and `docs/ARCHITECTURE_REVIEW.md` for the tracked plan to raise it)
 - Packaging smoke test (`pip install -e .` + `reconforge --help`)
 
 ## Project Structure
@@ -261,7 +278,7 @@ reconforge/                     # repository root
 │   ├── api/                   # 4 tools, 4 parsers, 4 phases
 │   ├── surface/               # 2 tools, 1 parser, 6 intelligence, 4 phases
 │   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 499 tests (pytest)
+└── tests/                     # 1167 tests (pytest) — see "Testing" above for current count
 ```
 
 ## Limitations
@@ -270,7 +287,7 @@ ReconForge is a reconnaissance and evidence-normalization framework, not an expl
 
 ## Security
 
-External tools invoked by ReconForge (nmap, nuclei, sqlmap, etc.) retain their own licenses and are not distributed with this project — see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md) for what's expected to be installed separately. For responsible disclosure of a security issue in ReconForge itself, see [SECURITY.md](SECURITY.md).
+External tools invoked by ReconForge (nmap, nuclei, sqlmap, etc.) retain their own licenses and are not distributed with this project — see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md) for what's expected to be installed separately. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the full assets/actors/trust-boundaries model. For responsible disclosure of a security issue in ReconForge itself, see [SECURITY.md](SECURITY.md).
 
 ## License
 

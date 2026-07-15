@@ -6,6 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.15.2] — 2026-07-15
+
+Priority-2 documentation: a formal whole-system threat model and a README restructure for recruiter/engineer/operator audiences. PATCH per `docs/VERSIONING.md` — documentation only, no code or capability change.
+
+### Added
+
+- **`docs/THREAT_MODEL.md`**: a whole-system threat model covering assets, actors/trust levels, a trust-boundary diagram, threats-and-mitigations sections (unauthorized-target execution, subprocess/command injection, credential handling, network egress outside subprocess tools, the MCP server's Claude-as-client boundary, findings/evidence integrity), explicit non-goals, and known residual risks (exact-string-only scope matching, opt-in-not-default loot encryption, free-form MCP path parameters, non-streaming output truncation, ~70% coverage). Cross-references rather than duplicates the MCP-specific trust-boundary/threat-model sections already in `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md` §2/§4. Every claim is traceable to a specific file, function, or test.
+
+### Changed (README)
+
+- Added CI status, license, Python version, and test-count badges.
+- Added a "Why ReconForge?" section aimed at readers evaluating this as a security-engineering portfolio piece — every claim in it (severity clamping, the out-of-band MCP approval architecture, zero `shell=True`, CI-enforced quality gates, documented limitations, the local validation lab) points at code or a doc already established elsewhere in the repo, not new assertions.
+- Fixed two stale claims left over from the Priority-1 quality-gate hardening pass: the "Quality Gates" section still described MyPy as covering only 4 hand-picked files (now the full 232-file tree) and the coverage floor as 50%/~69% (now 70%/~70.5%). Fixed the "Project Structure" section's stale "499 tests" count.
+- Linked the new `THREAT_MODEL.md` from the Documentation table and the Security section.
+
+### Testing
+
+- 1167/1167 tests passing (no code changed this pass).
+- Ruff, MyPy, Bandit, pip-audit, and the doc-link checker all pass.
+
 ## [2.15.1] — 2026-07-15
 
 Quality-gate hardening: widened Ruff and MyPy scope from a narrow syntax-error/4-file subset to real repo-wide checks, fixed every real issue they surfaced, and raised the coverage gate from an unenforced 50% to an honest, currently-true 70%. PATCH per `docs/VERSIONING.md` — bug fixes and CI/tooling hardening, no new capabilities.
