@@ -6,12 +6,15 @@ scan of a large range, a nuclei run against many endpoints), which can
 exceed how long an MCP client is willing to block on a single tool-call
 response. ``reconforge_start_execution`` runs the exact same
 authorization path as the synchronous ``reconforge_execute_approved_phase``
-tool (``services.py::_authorize_execution`` — see that function's
+tool (``services.py::_consume_and_authorize`` — see that function's
 docstring) before returning, so a bad or unauthorized request fails
 immediately, not after a job was already created; only the actual
 module execution moves to a background thread. Both tools share
 ``services.py::_EXECUTION_LOCK``, so "one execution at a time on this
-server process" holds regardless of which tool started it.
+server process" holds regardless of which tool started it. Both also
+consume the same out-of-band-approved request exactly once
+(``reconforge/mcp/approvals.py::consume_if_approved``) — there is no
+weaker path into execution via the job model.
 
 No cancellation: ``core/runner.py``'s subprocess execution has no
 cooperative-cancellation hook, so a running job cannot actually be
@@ -40,7 +43,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from reconforge.mcp.errors import ExecutionConflictError, JobNotFoundError, MCPServiceError
-from reconforge.mcp.schemas import ExecuteApprovedPhaseRequest, ExecuteApprovedPhaseResponse
+from reconforge.mcp.schemas import ExecuteApprovedPhaseResponse
 
 JobStatus = Literal["pending", "running", "completed", "failed"]
 
@@ -69,25 +72,33 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def start_execution(request: ExecuteApprovedPhaseRequest) -> ExecutionJob:
-    """Authorize synchronously, acquire the execution lock synchronously
-    (so a busy server rejects the call immediately, before any job is
-    created — identical failure mode to ``execute_approved_phase``),
-    then run the module in a background thread and return right away.
+def start_execution(request_id: str) -> ExecutionJob:
+    """Acquire the execution lock synchronously first (so a busy server
+    rejects the call immediately, before the referenced approval is ever
+    touched — a lock conflict must never burn a genuinely valid,
+    operator-approved request; see ``services.py::execute_approved_phase``'s
+    identical ordering and its comment for why), then authorize —
+    including atomically consuming the approval
+    (``services.py::_consume_and_authorize``) — before creating any job.
+    A second call with the same ``request_id`` always fails once the
+    approval is consumed, whether or not the lock was ever the reason.
     """
     from reconforge.mcp import services
 
-    module_cls, tier, scope = services._authorize_execution(request)
-
     if not services._EXECUTION_LOCK.acquire(blocking=False):
         raise ExecutionConflictError("Another execution is already in progress on this server process.")
+    try:
+        record, module_cls, tier, scope = services._consume_and_authorize(request_id)
+    except Exception:
+        services._EXECUTION_LOCK.release()
+        raise
 
     job = ExecutionJob(
         job_id=str(uuid.uuid4()),
         status="pending",
-        module=request.module,
-        phase=request.phase,
-        target=request.target,
+        module=record.module,
+        phase=record.phase,
+        target=record.target,
         created_at=_now(),
     )
     with _JOBS_REGISTRY_LOCK:
@@ -98,7 +109,7 @@ def start_execution(request: ExecuteApprovedPhaseRequest) -> ExecutionJob:
             job.status = "running"
             job.started_at = _now()
         try:
-            result = services._execute_module_phase_locked(request, module_cls, tier, scope)
+            result = services._execute_module_phase_locked(record, module_cls, tier, scope)
         except MCPServiceError as exc:
             with job._lock:
                 job.status = "failed"

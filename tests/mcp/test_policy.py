@@ -1,11 +1,13 @@
 """Tests for reconforge/mcp/policy.py — the SAFE_READ_ONLY -> PROHIBITED
 execution-tier classification and requirement evaluation.
 
-No execution tool exists yet; this only tests the policy layer those
-tools will be built on. The most important test in this file is
-test_evaluate_never_self_approves, which pins down the one invariant
-that makes controlled execution safe to build on top of later: this
-module never manufactures approval on its own.
+The most important test in this file is test_evaluate_never_self_approves,
+which pins down the one invariant that makes controlled execution safe:
+this module never manufactures approval on its own. has_operator_approval
+can only become True by consuming a genuinely operator-approved
+reconforge.mcp.approvals.ApprovalRequest (see
+tests/mcp/test_approvals.py and tests/mcp/test_out_of_band_approval_security.py
+for the end-to-end proof of that) — nothing here fabricates it.
 """
 
 from __future__ import annotations
@@ -84,23 +86,20 @@ def test_safe_read_only_requires_nothing():
     reqs = requirements_for(ExecutionTier.SAFE_READ_ONLY)
     assert reqs.requires_engagement is False
     assert reqs.requires_scope is False
-    assert reqs.requires_explicit_confirmation is False
-    assert reqs.requires_approval_id is False
+    assert reqs.requires_operator_approval is False
 
 
-def test_active_recon_requires_engagement_scope_and_confirmation_but_not_approval_id():
+def test_active_recon_requires_engagement_scope_and_operator_approval():
     reqs = requirements_for(ExecutionTier.ACTIVE_RECON)
     assert reqs.requires_engagement is True
     assert reqs.requires_scope is True
-    assert reqs.requires_explicit_confirmation is True
-    assert reqs.requires_approval_id is False
+    assert reqs.requires_operator_approval is True
 
 
 @pytest.mark.parametrize("tier", [ExecutionTier.INTRUSIVE, ExecutionTier.CREDENTIAL_USE])
-def test_intrusive_and_credential_use_require_approval_id_too(tier):
+def test_intrusive_and_credential_use_require_operator_approval_too(tier):
     reqs = requirements_for(tier)
-    assert reqs.requires_approval_id is True
-    assert reqs.requires_explicit_confirmation is True
+    assert reqs.requires_operator_approval is True
 
 
 def test_prohibited_is_not_allowed_by_default():
@@ -120,7 +119,7 @@ def test_evaluate_active_recon_denied_when_nothing_supplied():
     decision = evaluate(ExecutionTier.ACTIVE_RECON)
     assert decision.allowed is False
     assert "engagement_id" in decision.missing_requirements
-    assert "explicit_confirmation=true" in decision.missing_requirements
+    assert any("operator approval" in m for m in decision.missing_requirements)
 
 
 def test_evaluate_active_recon_allowed_when_all_requirements_met():
@@ -128,35 +127,33 @@ def test_evaluate_active_recon_allowed_when_all_requirements_met():
         ExecutionTier.ACTIVE_RECON,
         has_engagement=True,
         has_validated_scope=True,
-        explicit_confirmation=True,
+        has_operator_approval=True,
     )
     assert decision.allowed is True
     assert decision.missing_requirements == ()
 
 
-def test_evaluate_active_recon_denied_without_confirmation_even_with_everything_else_true():
+def test_evaluate_active_recon_denied_without_operator_approval_even_with_everything_else_true():
     decision = evaluate(
         ExecutionTier.ACTIVE_RECON,
         has_engagement=True,
         has_validated_scope=True,
-        explicit_confirmation=False,
-        approval_id="whatever-not-required-here",
+        has_operator_approval=False,
     )
     assert decision.allowed is False
-    assert decision.missing_requirements == ("explicit_confirmation=true",)
+    assert any("operator approval" in m for m in decision.missing_requirements)
 
 
 @pytest.mark.parametrize("tier", [ExecutionTier.INTRUSIVE, ExecutionTier.CREDENTIAL_USE])
-def test_evaluate_intrusive_and_credential_use_denied_without_approval_id(tier):
+def test_evaluate_intrusive_and_credential_use_denied_without_operator_approval(tier):
     decision = evaluate(
         tier,
         has_engagement=True,
         has_validated_scope=True,
-        explicit_confirmation=True,
-        approval_id=None,
+        has_operator_approval=False,
     )
     assert decision.allowed is False
-    assert "approval_id" in decision.missing_requirements
+    assert any("operator approval" in m for m in decision.missing_requirements)
 
 
 def test_evaluate_credential_use_allowed_with_full_approval():
@@ -164,8 +161,7 @@ def test_evaluate_credential_use_allowed_with_full_approval():
         ExecutionTier.CREDENTIAL_USE,
         has_engagement=True,
         has_validated_scope=True,
-        explicit_confirmation=True,
-        approval_id="APPROVAL-123",
+        has_operator_approval=True,
     )
     assert decision.allowed is True
 
@@ -179,8 +175,7 @@ def test_evaluate_intrusive_denied_without_config_gate_even_with_full_approval()
         ExecutionTier.INTRUSIVE,
         has_engagement=True,
         has_validated_scope=True,
-        explicit_confirmation=True,
-        approval_id="APPROVAL-123",
+        has_operator_approval=True,
     )
     assert decision.allowed is False
     assert any("allow_intrusive_execution" in m for m in decision.missing_requirements)
@@ -191,23 +186,10 @@ def test_evaluate_intrusive_allowed_with_full_approval_and_config_gate_enabled()
         ExecutionTier.INTRUSIVE,
         has_engagement=True,
         has_validated_scope=True,
-        explicit_confirmation=True,
-        approval_id="APPROVAL-123",
+        has_operator_approval=True,
         intrusive_execution_allowed=True,
     )
     assert decision.allowed is True
-
-
-def test_evaluate_empty_string_approval_id_counts_as_missing():
-    decision = evaluate(
-        ExecutionTier.INTRUSIVE,
-        has_engagement=True,
-        has_validated_scope=True,
-        explicit_confirmation=True,
-        approval_id="",
-    )
-    assert decision.allowed is False
-    assert "approval_id" in decision.missing_requirements
 
 
 def test_evaluate_prohibited_is_never_allowed_regardless_of_inputs():
@@ -218,8 +200,7 @@ def test_evaluate_prohibited_is_never_allowed_regardless_of_inputs():
         ExecutionTier.PROHIBITED,
         has_engagement=True,
         has_validated_scope=True,
-        explicit_confirmation=True,
-        approval_id="APPROVAL-123",
+        has_operator_approval=True,
     )
     assert decision.allowed is False
 

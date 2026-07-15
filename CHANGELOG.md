@@ -6,6 +6,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (see [docs/VERSIONING.md](docs/VERSIONING.md)).
 
 
+## [2.15.0] — 2026-07-15
+
+Out-of-band human approval architecture for MCP execution — closes the trust-boundary gap flagged as "next" in 2.14.4's release note. MINOR per `docs/VERSIONING.md`: two new tools, and a breaking change to the execution-tool request schema (broader than 2.14.4's single-field break) is scoped to the optional MCP interface, not the core CLI/config surface `VERSIONING.md`'s MAJOR criteria target.
+
+### Changed (security, breaking for MCP clients)
+
+- **Real execution now requires operator approval given genuinely out-of-band — `explicit_confirmation: true` is removed.** That field was, by construction, a value inside the request Claude itself constructs; nothing distinguished "the operator typed this" from "the model decided to include this." It is replaced with a two-stage flow implemented in the new `reconforge/mcp/approvals.py`:
+  - `reconforge_request_execution` (new tool) is now the *only* MCP-reachable way to propose real execution. It independently re-validates engagement, scope, and tier exactly as the old authorization function did, then creates a disk-backed `ApprovalRequest` in `awaiting_operator_approval` status and returns a `request_id`. It can never execute anything and never grants its own approval.
+  - The **only** code path that can move a request out of `awaiting_operator_approval` is the new `reconforge mcp approvals {list,inspect,approve,deny,revoke} <request_id>` CLI (`reconforge/mcp/approvals_cli.py`) — a separate process invocation with no MCP tool or resource equivalent, so an MCP client has no path to it, direct or indirect.
+  - `reconforge_execute_approved_phase` and `reconforge_start_execution` now take **only** `request_id` — every other field was dropped from `ExecuteApprovedPhaseRequest`, since the already-approved request fixes every parameter of the operation, leaving nothing for a client to supply and therefore nothing to tamper with at execution time.
+  - Each request is bound to a `canonical_request_hash()` (SHA-256 over a deterministic encoding of `engagement_id`/`normalized_target`/`module`/`phase`/`opsec_profile`/`tier`/`scope_reference`), recomputed fresh at consumption time from the record's own stored fields and compared against the hash stored at creation — on-disk tampering after approval is rejected rather than silently executed.
+  - Consumption (`approvals.consume_if_approved()`) is atomic and exactly-once — `os.open(path, O_CREAT|O_EXCL|O_WRONLY)`, dependency-free, genuinely atomic across separate OS processes (not just threads within one process). A replayed, expired, tampered, or never-approved `request_id` always fails closed.
+  - Approvals expire after `mcp.approval_ttl_minutes` (new config key, default 30) whether or not they're acted on.
+- **`reconforge_get_approval_status`** (new tool): read-only poll of a request's status (`awaiting_operator_approval`/`approved`/`denied`/`expired`/`consumed`/`revoked`). No secret material is ever returned.
+- **`config/mcp.yaml`** gains `mcp.approvals_dir` (default `.reconforge/mcp_approvals`) and `mcp.approval_ttl_minutes` (default `30`).
+
+### Fixed
+
+- Two real bugs caught during implementation, before they shipped:
+  - An early draft consumed the approval *before* acquiring the process-wide execution lock — a transient "server busy" conflict would have irreversibly burned a valid, human-approved request. Fixed by acquiring the lock first in both `services.py::execute_approved_phase` and `jobs.py::start_execution`.
+  - An early draft of `request_execution()` hardcoded unconditional engagement+scope checks, silently making `SAFE_READ_ONLY` phases stricter than `policy.py::requirements_for()` already declares them to be. Fixed by consulting the tier's actual requirements before enforcing either check.
+
+### Testing
+
+- `test_approvals.py` (28 tests): direct state-machine unit tests — canonical hashing, expiry, deny/revoke transitions, corrupt/missing records, lock timeout, and a genuine 8-thread concurrent-consumption race asserting exactly one winner.
+- `test_approvals_cli.py` (13 tests, 100% coverage of `approvals_cli.py`).
+- `test_out_of_band_approval_security.py` (13 tests): the consolidated adversarial suite — self-authorization attempts, replay, tamper-after-approval via direct on-disk mutation, expired/denied/revoked approvals, concurrent consumption over a real MCP session.
+- Every pre-existing execution-path test file (`test_execute_approved_phase.py`, `test_execution_jobs.py`, `test_policy.py`, `test_structured_errors.py`, `test_audit_events.py`, `test_stdio_transport_integrity.py`, `test_findings_reporting_tools_protocol.py`) was adapted to the new request/approve/consume flow, including a real cross-process subprocess test where the MCP server and the "operator" (this test process) independently resolve the same `approvals_dir` the way the real CLI and server processes would.
+- `reconforge/mcp/approvals.py` reaches 98% coverage; `approvals_cli.py` 100%.
+- 1165/1165 tests passing; ruff, mypy (`reconforge/cli.py core/runner.py core/workflow_orchestrator.py reconforge/mcp/*.py`), bandit, pip-audit, and the doc-link checker all pass.
+
+### Known limitations (unchanged scope, restated for clarity)
+
+- `scope_file`/`output_base` remain free-form path strings rather than server-controlled logical references with a traversal-safe resolver — a known, deliberately deferred gap, not addressed in this release.
+- CREDENTIAL_USE-tier phases (AD `delegation`/`bloodhound`, brute-force) remain unreachable through MCP entirely.
+- Ruff/MyPy scope, coverage-percentage targets beyond what's stated above, a live-tool CI matrix, a Python version compatibility matrix, supply-chain tooling (SBOM/CodeQL/Dependabot beyond what already exists), and a formal release-process document were out of scope for this release.
+
 ## [2.14.4] — 2026-07-14
 
 Security hardening — first step of a broader MCP trust-boundary review. PATCH per `docs/VERSIONING.md` — security fix, breaking change to one response field.

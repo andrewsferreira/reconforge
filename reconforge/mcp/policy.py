@@ -1,24 +1,25 @@
 """Execution-tier policy classification for controlled MCP execution.
 
-docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md §6 committed to this
-``SAFE_READ_ONLY → PROHIBITED`` taxonomy before any execution tool
-existed. Nothing in this module executes anything — it only classifies
-a ``(module, phase)`` pair into a tier and evaluates whether the
-information a caller supplies satisfies that tier's requirements.
-
-No tool that calls into this module exists yet (that is a later,
-separate piece of work — the actual ``reconforge_execute_approved_phase``
-tool, its 17-point verification, and the execution job model). This
-module is the policy foundation those will be built on, not a
-stand-in for them.
+Three MCP tools call into this module: ``reconforge_request_execution``
+(creates a pending, out-of-band approval request — see
+``reconforge/mcp/approvals.py``), and ``reconforge_execute_approved_phase``/
+``reconforge_start_execution`` (which only ever run an operation whose
+approval request has already been consumed). Nothing in this module
+executes anything itself — it only classifies a ``(module, phase)``
+pair into a tier and evaluates whether the information a caller
+supplies satisfies that tier's requirements.
 
 The critical invariant enforced by :func:`evaluate`: it never grants
-approval on its own. ``explicit_confirmation`` and ``approval_id`` are
-required *inputs* the caller must have obtained from the operator
+approval on its own. ``has_operator_approval`` is a required *input*
+the caller must have obtained by consuming a genuinely
+operator-approved :class:`reconforge.mcp.approvals.ApprovalRequest`
 (never derived, defaulted, or inferred by this function) — the model
 cannot talk its way past this by choosing what arguments to pass,
-because :func:`evaluate` treats an absent/empty value as exactly that:
-absent. See :func:`evaluate`'s docstring and
+because :func:`evaluate` treats an absent value as exactly that:
+absent, and nothing in the MCP tool surface lets a client set
+``approvals.ApprovalRequest.status`` to ``"approved"`` — only a human
+running ``reconforge mcp approvals approve`` in a separate process can.
+See :func:`evaluate`'s docstring and
 ``tests/mcp/test_policy.py::test_evaluate_never_self_approves``.
 """
 
@@ -109,22 +110,21 @@ class TierRequirements:
     allowed_by_default: bool
     requires_engagement: bool
     requires_scope: bool
-    requires_explicit_confirmation: bool
-    requires_approval_id: bool
+    requires_operator_approval: bool
 
 
 _TIER_REQUIREMENTS: dict[ExecutionTier, TierRequirements] = {
-    ExecutionTier.SAFE_READ_ONLY: TierRequirements(True, False, False, False, False),
-    ExecutionTier.LOW_IMPACT: TierRequirements(True, True, True, False, False),
-    ExecutionTier.ACTIVE_RECON: TierRequirements(True, True, True, True, False),
+    ExecutionTier.SAFE_READ_ONLY: TierRequirements(True, False, False, False),
+    ExecutionTier.LOW_IMPACT: TierRequirements(True, True, True, False),
+    ExecutionTier.ACTIVE_RECON: TierRequirements(True, True, True, True),
     # allowed_by_default=True here means "reachable if every requirement is
     # met" — evaluate()'s intrusive_execution_allowed parameter adds a
     # further, server-wide off switch on top of these per-request
     # requirements (config/mcp.yaml's mcp.allow_intrusive_execution, off
     # by default — see services.py::_intrusive_execution_allowed()).
-    ExecutionTier.INTRUSIVE: TierRequirements(True, True, True, True, True),
-    ExecutionTier.CREDENTIAL_USE: TierRequirements(True, True, True, True, True),
-    ExecutionTier.PROHIBITED: TierRequirements(False, True, True, True, True),
+    ExecutionTier.INTRUSIVE: TierRequirements(True, True, True, True),
+    ExecutionTier.CREDENTIAL_USE: TierRequirements(True, True, True, True),
+    ExecutionTier.PROHIBITED: TierRequirements(False, True, True, True),
 }
 
 
@@ -145,21 +145,20 @@ def evaluate(
     *,
     has_engagement: bool = False,
     has_validated_scope: bool = False,
-    explicit_confirmation: bool = False,
-    approval_id: str | None = None,
+    has_operator_approval: bool = False,
     intrusive_execution_allowed: bool = False,
 ) -> PolicyDecision:
     """Decide whether *tier*'s requirements are satisfied by the given facts.
 
     Every keyword argument defaults to the *denying* value
-    (``False``/``None``) — a caller that forgets to pass one gets a
-    rejection, not an accidental approval. This function never sets
-    ``explicit_confirmation`` or ``approval_id`` itself; both must
-    originate from the actual MCP request the operator supplied, verified
-    by the caller of this function (a future ``reconforge_execute_approved_phase``
-    tool) against ``core/authorization_gate.py::ScopeAuthorization``, not
-    fabricated here. ``intrusive_execution_allowed`` is likewise never
-    derived from the request — it comes only from
+    (``False``) — a caller that forgets to pass one gets a rejection,
+    not an accidental approval. This function never sets
+    ``has_operator_approval`` itself; it must originate from a
+    successful ``reconforge/mcp/approvals.py::consume_if_approved()``
+    call — proof a human ran ``reconforge mcp approvals approve`` in a
+    process outside the MCP protocol entirely, not merely that an MCP
+    request included a particular field. ``intrusive_execution_allowed``
+    is likewise never derived from the request — it comes only from
     ``config/mcp.yaml``'s ``mcp.allow_intrusive_execution`` (a
     server-wide, operator-controlled setting a single MCP request cannot
     influence), read by the caller before invoking this function.
@@ -179,10 +178,8 @@ def evaluate(
         missing.append("engagement_id")
     if reqs.requires_scope and not has_validated_scope:
         missing.append("validated scope (scope_file + target in allowed_targets)")
-    if reqs.requires_explicit_confirmation and not explicit_confirmation:
-        missing.append("explicit_confirmation=true")
-    if reqs.requires_approval_id and not approval_id:
-        missing.append("approval_id")
+    if reqs.requires_operator_approval and not has_operator_approval:
+        missing.append("operator approval (see 'reconforge mcp approvals approve')")
     if tier is ExecutionTier.INTRUSIVE and not intrusive_execution_allowed:
         missing.append("mcp.allow_intrusive_execution=true in config/mcp.yaml (server-wide, operator-controlled)")
 

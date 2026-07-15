@@ -22,3 +22,21 @@ mcp:
   #
   # Off by default.
   allow_intrusive_execution: false
+
+  # Where out-of-band approval requests (reconforge/mcp/approvals.py) are
+  # persisted as JSON files. reconforge_request_execution (MCP) only ever
+  # creates a request here in "awaiting_operator_approval" state; moving
+  # it to "approved" requires a human running
+  # `reconforge mcp approvals approve <request_id>` in a separate,
+  # out-of-band CLI invocation -- there is no MCP tool that can write to
+  # this directory. Relative paths resolve against the process's current
+  # working directory, matching --output-base's existing behavior
+  # elsewhere in this project.
+  approvals_dir: ".reconforge/mcp_approvals"
+
+  # How long a pending request waits for operator action before it's
+  # treated as expired -- checked both when an operator tries to approve
+  # it and, independently, when the MCP layer tries to consume an
+  # already-approved one (an approval granted just before expiry can
+  # still expire before it's ever used).
+  approval_ttl_minutes: 30

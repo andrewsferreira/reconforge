@@ -343,7 +343,18 @@ class GenerateReportResponse(TrustedResponse):
 # mechanism exists yet, and PROHIBITED has no execution path by design.
 
 
-class ExecuteApprovedPhaseRequest(BaseModel):
+# ── reconforge_request_execution ──────────────────────────────────────
+#
+# The only MCP-reachable way to create an out-of-band approval request
+# (reconforge/mcp/approvals.py). This never executes anything and never
+# grants its own approval — it only ever creates a request in
+# "awaiting_operator_approval" state. Every field needed to actually run
+# the operation is captured here and locked into the resulting
+# ApprovalRequest; reconforge_execute_approved_phase/
+# reconforge_start_execution later take *only* the returned request_id.
+
+
+class RequestExecutionRequest(BaseModel):
     engagement_id: str = Field(
         description="Must reference an active engagement saved under "
         "<output_base>/workflow/engagement_*.json (see reconforge_list_engagements)."
@@ -356,12 +367,52 @@ class ExecuteApprovedPhaseRequest(BaseModel):
     domain: str = Field(default="", description="AD domain — only used when module='ad'.")
     scope_file: str | None = None
     approval_id: str | None = None
-    explicit_confirmation: bool = Field(
-        default=False,
-        description="Must be true, supplied by the operator — this field is only ever "
-        "read, never set, by the policy layer. Required for every tier above SAFE_READ_ONLY.",
-    )
     timeout: int = 600
+
+
+class RequestExecutionResponse(TrustedResponse):
+    request_id: str
+    status: str
+    tier: str
+    expires_at: str
+
+
+class GetApprovalStatusRequest(BaseModel):
+    request_id: str
+
+
+class GetApprovalStatusResponse(TrustedResponse):
+    request_id: str
+    status: str
+    engagement_id: str
+    target: str
+    module: str
+    phase: str
+    tier: str
+    created_at: str
+    expires_at: str
+    approved_at: str | None = None
+    denial_reason: str | None = None
+
+
+# ── reconforge_execute_approved_phase / reconforge_start_execution ──
+#
+# Both tools take *only* a request_id referencing an ApprovalRequest a
+# human already approved out-of-band via `reconforge mcp approvals
+# approve` — a separate CLI invocation this MCP session cannot reach.
+# There is no field here for a client to self-supply confirmation of
+# any kind; every parameter of the actual operation (target, module,
+# phase, output_base, ...) was already fixed when the request was
+# created and cannot be changed now.
+
+
+class ExecuteApprovedPhaseRequest(BaseModel):
+    request_id: str = Field(
+        description="An approval request id returned by reconforge_request_execution, "
+        "already approved by the operator via 'reconforge mcp approvals approve <request_id>' "
+        "outside the MCP protocol. No other field is accepted or needed — the approved "
+        "request already fixes every parameter of the operation."
+    )
 
 
 class ExecuteApprovedPhaseResponse(TrustedResponse):
@@ -380,7 +431,7 @@ class ExecuteApprovedPhaseResponse(TrustedResponse):
 # (reconforge/mcp/jobs.py), for phases whose real execution time could
 # exceed how long an MCP client waits for one tool-call response.
 # start_execution runs the identical authorization path
-# (services.py::_authorize_execution) as the synchronous tool before
+# (services.py::_consume_and_authorize) as the synchronous tool before
 # returning — a bad request fails immediately, not after a job was
 # already created — then hands the actual module execution to a
 # background thread and returns right away. Both share

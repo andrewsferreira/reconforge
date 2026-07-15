@@ -61,28 +61,50 @@ confirm ReconForge shows up and is reachable.
 Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 
 - **Claude is treated as untrusted.** Every tool argument is independently re-validated
-  server-side (target format, module/phase names, scope/approval matching) — nothing from the
-  request is taken on faith just because it came from an LLM.
-- **12 of 15 tools are read-only.** They inspect state, plan workflows, or run
+  server-side (target format, module/phase names, scope matching) — nothing from the request is
+  taken on faith just because it came from an LLM.
+- **12 of 17 tools are read-only.** They inspect state, plan workflows, or run
   `core/runner.py`'s `dry_run=True` code path, which never invokes a real subprocess.
-- **None of the three execution tools ever self-approve.** `reconforge_execute_approved_phase`,
-  `reconforge_start_execution`, and `reconforge_get_execution_status` all require the same checks,
-  independently re-checked in `services.py`, not merely echoed back from the request —
-  `reconforge_start_execution` runs the identical authorization function
-  (`services.py::_authorize_execution()`) as the blocking tool before it ever creates a job, so the
-  job model is not a separate, weaker path around the same policy engine:
-  - An **active engagement** (created beforehand via `reconforge workflow`, see below).
-  - A **scope authorization file** and matching **approval ID** (the same mechanism the CLI's
-    `--enforce-scope`/`--scope-file`/`--approval-id` flags already use).
-  - `explicit_confirmation: true` in the request itself.
+- **Real execution requires a human operator's approval, given genuinely out-of-band.** No MCP
+  request field — not `explicit_confirmation`, not anything else Claude can set — is ever accepted
+  as proof a human reviewed anything, because Claude can generate that value itself. Instead:
+  1. `reconforge_request_execution` creates a pending request. This is the *only* thing it can
+     do — it never executes anything and never grants its own approval. The request captures every
+     parameter of the operation (target, module, phase, OPSEC profile, scope) and sits in
+     `awaiting_operator_approval` status, tied to a stable `request_id`.
+  2. A human operator reviews and approves it by running `reconforge mcp approvals approve
+     <request_id>` **in a separate terminal, outside the MCP session and outside Claude's reach
+     entirely.** Nothing in `reconforge/mcp/` — no tool, no resource — can move a request out of
+     `awaiting_operator_approval`. That command is the only code path that can.
+  3. Only then can `reconforge_execute_approved_phase` or `reconforge_start_execution` — which
+     take **only** a `request_id`, nothing else — consume the approval and run. Consumption is
+     atomic and single-use: a `request_id` that has already run, or that was never approved, or
+     that has expired, always fails, and a second attempt to consume the same approval can never
+     succeed even under a race (verified with real concurrent threads and a real separate OS
+     process in `tests/mcp/test_approvals.py` and `tests/mcp/test_stdio_transport_integrity.py`).
+  4. Every approval is bound to a canonical hash of the exact operation it was created for
+     (engagement, normalized target, module, phase, OPSEC profile, tier, scope reference). If any
+     of those fields were altered on disk after approval, the hash recomputed at execution time
+     won't match and the request is rejected — approval cannot be silently retargeted.
+  5. Approvals expire (`config/mcp.yaml`'s `mcp.approval_ttl_minutes`, default 30 minutes) whether
+     or not anyone acts on them, and an operator can `reconforge mcp approvals deny`/`revoke` a
+     request at any point before it's consumed.
   - The requested phase must not classify as `CREDENTIAL_USE` or `PROHIBITED` — AD's
-    `delegation`/`bloodhound` phases and any credential-brute-force path are rejected outright,
-    with no way to supply credentials through MCP at all.
+    `delegation`/`bloodhound` phases and any credential-brute-force path are rejected outright at
+    request-creation time, with no way to supply credentials through MCP at all.
   - **INTRUSIVE-tier phases** (`web`'s `exploit`, `api`'s `authorization`) additionally require
     `config/mcp.yaml`'s `mcp.allow_intrusive_execution: true` — off by default, and not settable
     via the MCP request itself. Meeting every requirement above still isn't enough for these two
     phases unless an operator has explicitly opted the whole server in by editing that file. See
     [CONFIGURATION.md](CONFIGURATION.md#mcpyaml).
+  - Engagement and scope validity are checked twice: once when the request is created, and again,
+    fresh, at the moment of consumption — time passes between approval and execution, and either
+    could have changed in between. A request whose preconditions no longer hold is still consumed
+    (fail-closed): a burned approval forcing a fresh request is safer than executing against a
+    stale precondition or leaving a spent approval reusable.
+- **No MCP-reachable path can read, create, or forge an approval secret.** There is no tool or
+  resource that returns an approval's request hash, and no argument to any execution tool other
+  than the opaque `request_id` a client already received from `reconforge_request_execution`.
 - **Findings and report content separate server-generated structure from target-derived text.**
   Every response carries `trusted_metadata`/`untrusted_evidence` fields (or a flat
   `trust: "server_generated"` marker) so a scanned target can never plant instructions that look
@@ -90,7 +112,7 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 - **No credentials ever flow through MCP responses.** Secret-redaction patterns from
   `core/logger.py::sanitize_log()` apply to everything read-only tools return.
 - **Every tool call is audited.** A single JSON line goes to stderr for every call to any of the
-  15 tools, success or failure — timestamp, tool name, outcome, sanitized arguments (`approval_id`
+  17 tools, success or failure — timestamp, tool name, outcome, sanitized arguments (`approval_id`
   is always redacted). Claude Desktop/Claude Code capture a server's stderr as logs, so this needs
   no extra configuration to see.
 
@@ -110,13 +132,15 @@ Full detail lives in `CLAUDE_MCP_IMPLEMENTATION_PLAN.md`; the short version:
 | `reconforge_get_finding` | Fetch one sanitized finding by id. |
 | `reconforge_summarize_findings` | Deterministic aggregation — counts, top risks, no evidence text. |
 | `reconforge_generate_report` | Render a markdown report (technical or executive) from findings. |
-| `reconforge_execute_approved_phase` | Run one real module phase and block until it finishes; see "Security model" above. |
-| `reconforge_start_execution` | Same authorization requirements as above, but returns a `job_id` immediately instead of blocking — for phases that might take longer than you want to wait on one call. |
+| `reconforge_request_execution` | Create a pending, out-of-band approval request for one real module phase. Never executes anything and never grants its own approval — see "Security model" above. |
+| `reconforge_get_approval_status` | Poll a request's status: `awaiting_operator_approval`, `approved`, `denied`, `expired`, `consumed`, or `revoked`. No secret material returned. |
+| `reconforge_execute_approved_phase` | Run one real module phase and block until it finishes. Takes only an already-approved `request_id`; see "Security model" above. |
+| `reconforge_start_execution` | Same `request_id`-only interface and approval requirement as above, but returns a `job_id` immediately instead of blocking — for phases that might take longer than you want to wait on one call. |
 | `reconforge_get_execution_status` | Poll a job started by `reconforge_start_execution` — status, and the result once completed. |
 
 ## Resource reference
 
-Alongside the 15 tools above, the server exposes 7 read-only MCP *resources* — a separate,
+Alongside the 17 tools above, the server exposes 7 read-only MCP *resources* — a separate,
 argument-free content-exposure primitive addressed by URI (`resources/list` and `resources/read`)
 rather than an invoked call. Useful for a client that wants to load reference material ambiently
 instead of asking a question through a tool call. Every URI comes from a hardcoded allowlist in
@@ -165,9 +189,9 @@ None of the above can execute anything — they either read existing state or ex
 
 ## Walkthrough: authorizing real execution
 
-`reconforge_execute_approved_phase` deliberately cannot be satisfied by anything Claude supplies on
-its own — the operator has to create the preconditions out-of-band, the same way `--enforce-scope`
-already requires for CLI-driven runs:
+Real execution is a two-stage flow: Claude can *ask*, but only a human operator sitting at a
+separate terminal can turn that ask into an approval. Nothing Claude supplies in the MCP request
+itself — no field, no flag — can substitute for that human step.
 
 1. **Create a scope authorization file** (YAML), naming exactly what's authorized:
 
@@ -187,19 +211,36 @@ already requires for CLI-driven runs:
 
    This writes `outputs/workflow/<engagement_id>.json` with `status: "active"`.
 
-3. **Ask Claude to run a specific phase**, supplying the same `scope_file`, `approval_id`, and the
-   `engagement_id` from step 2, plus `explicit_confirmation: true`. Only then does
-   `reconforge_execute_approved_phase` proceed — and only for phases classified below
-   `CREDENTIAL_USE`/`PROHIBITED` in `reconforge/mcp/policy.py`.
+3. **Ask Claude to request execution of a specific phase**, supplying `scope_file`, `approval_id`,
+   and the `engagement_id` from step 2. `reconforge_request_execution` validates all of this
+   immediately — wrong approval ID, target outside `allowed_targets`, an inactive/nonexistent
+   engagement, or a `CREDENTIAL_USE`/`PROHIBITED`-tier phase all fail right here with a
+   `PolicyBlockedError`. If it succeeds, Claude gets back a `request_id` and the request sits in
+   `awaiting_operator_approval` — nothing has run, and nothing can run yet.
 
-Any one of these missing or mismatched — wrong approval ID, target outside the scope file's
-`allowed_targets`, an inactive/nonexistent engagement, `explicit_confirmation` omitted — and the
-tool returns a `PolicyBlockedError`, not a partial or best-effort execution.
+4. **You, the operator, review and approve it yourself**, in a separate terminal:
+
+   ```bash
+   reconforge mcp approvals inspect <request_id>   # see exactly what was requested
+   reconforge mcp approvals approve <request_id>   # or `deny <request_id> --reason "..."`
+   ```
+
+   This is the only step in the entire flow Claude cannot perform or influence — it doesn't run
+   inside the MCP session, and no MCP tool can call it.
+
+5. **Ask Claude to run the approved request**, supplying only the `request_id` from step 3.
+   `reconforge_execute_approved_phase` re-verifies the approval is genuine, unexpired, unconsumed,
+   and hash-matches exactly what was requested, then runs it — consuming the approval in the same
+   atomic step, so the same `request_id` can never be used twice.
 
 For a phase that might run long, use `reconforge_start_execution` instead of
-`reconforge_execute_approved_phase` in step 3 — identical fields and identical authorization
-requirements, but it returns a `job_id` immediately; poll `reconforge_get_execution_status` with
-that id until `status` is `completed` or `failed`.
+`reconforge_execute_approved_phase` in step 5 — identical `request_id`-only interface, but it
+returns a `job_id` immediately; poll `reconforge_get_execution_status` with that id until `status`
+is `completed` or `failed`.
+
+Approvals expire after `mcp.approval_ttl_minutes` (default 30) if step 5 never happens — check
+`reconforge_get_approval_status`/`reconforge mcp approvals list` if a request seems to have gone
+stale.
 
 ## Known limitations
 
@@ -208,6 +249,10 @@ users right now:
 
 - **No credentialed execution.** AD's `delegation`/`bloodhound` phases and any brute-force path are
   not reachable through MCP at all — run those via the CLI directly with your own `-u`/`-p` flags.
+- **Free-form `scope_file`/`output_base` path parameters.** These are still plain strings supplied
+  in the MCP request rather than server-controlled logical references — replacing them with an
+  opaque, server-validated `scope_id`/`workspace_id` plus a path resolver that rejects traversal and
+  symlink escapes is a known, deliberately deferred gap, not yet built.
 - **One execution at a time, per server process.** A process-wide lock serializes every execution
   tool call — `reconforge_execute_approved_phase`, and `reconforge_start_execution`'s background
   job. A second call while one is in flight is rejected with `ExecutionConflictError` immediately,

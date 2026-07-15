@@ -87,3 +87,57 @@ class JobNotFoundError(MCPServiceError):
     was restarted since this job_id was issued.\""""
 
     code = "JOB_NOT_FOUND"
+
+
+class ApprovalNotFoundError(MCPServiceError):
+    """No approval request matches the requested request_id
+    (reconforge/mcp/approvals.py). Approval requests are disk-persisted
+    under ``mcp.approvals_dir``, so unlike ``JobNotFoundError`` this is
+    not explained by a server restart — the id is simply wrong, or the
+    request expired and was pruned."""
+
+    code = "APPROVAL_NOT_FOUND"
+
+
+class ApprovalNotApprovedError(MCPServiceError):
+    """The referenced approval request exists but is not in the
+    ``approved`` state (still ``awaiting_operator_approval``, or
+    terminally ``denied``/``expired``/``consumed``/``revoked``) —
+    execution cannot proceed. ``status`` carries the request's actual
+    state so a client can distinguish "not yet" from "never will."""
+
+    code = "APPROVAL_NOT_APPROVED"
+
+    def __init__(self, message: str, *, status: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+class ApprovalExpiredError(MCPServiceError):
+    """The approval request's TTL (``mcp.approval_ttl_minutes``) elapsed
+    before it was consumed — including the case where it was approved
+    but execution didn't happen before expiry. A new request must be
+    created; an expired approval can never be revived."""
+
+    code = "APPROVAL_EXPIRED"
+
+
+class ApprovalRequestMismatchError(MCPServiceError):
+    """The approval request's stored canonical hash does not match the
+    hash recomputed from its own stored fields at consumption time —
+    on-disk tampering or corruption between approval and execution.
+    Execution is refused; this should never happen under normal
+    operation, since the fields an approval binds are never mutated
+    after creation."""
+
+    code = "APPROVAL_REQUEST_MISMATCH"
+
+
+class ApprovalStateError(MCPServiceError):
+    """A requested state transition on an approval request is invalid
+    for its current state — e.g. approving an already-denied request,
+    revoking a request that was never approved, or two callers racing
+    to consume the same approved request (exactly one wins; the other
+    gets this error, not a second execution)."""
+
+    code = "APPROVAL_STATE_ERROR"

@@ -201,15 +201,21 @@ Configuration for `reconforge/mcp/`, the package that lets Claude Desktop/Claude
 ```yaml
 mcp:
   allow_intrusive_execution: false
+  approvals_dir: ".reconforge/mcp_approvals"
+  approval_ttl_minutes: 30
 ```
 
 ### Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|--------------|
-| `mcp.allow_intrusive_execution` | bool | `false` | Server-wide off switch for INTRUSIVE-tier phases (`web`'s `exploit`, `api`'s `authorization` — see `reconforge/mcp/policy.py`'s tier taxonomy). An *additional* gate on top of every per-request requirement the `reconforge_execute_approved_phase` MCP tool already checks (active engagement, validated scope, `explicit_confirmation`, `approval_id`) — meeting all of those still isn't enough for an INTRUSIVE-tier phase unless this is also `true`. Not settable via the MCP request itself; only editing this file changes it, by design — a single fully-authorized request is a per-target decision an operator can make in the moment, but enabling INTRUSIVE execution at all is a standing posture change that should require deliberately editing a file, not something any one request should be able to talk its way into. |
+| `mcp.allow_intrusive_execution` | bool | `false` | Server-wide off switch for INTRUSIVE-tier phases (`web`'s `exploit`, `api`'s `authorization` — see `reconforge/mcp/policy.py`'s tier taxonomy). An *additional* gate on top of every per-request requirement `reconforge_request_execution` already checks (active engagement, validated scope, out-of-band operator approval — see below) — meeting all of those still isn't enough for an INTRUSIVE-tier phase unless this is also `true`. Not settable via the MCP request itself; only editing this file changes it, by design — a single fully-authorized request is a per-target decision an operator can make in the moment, but enabling INTRUSIVE execution at all is a standing posture change that should require deliberately editing a file, not something any one request should be able to talk its way into. |
+| `mcp.approvals_dir` | str | `.reconforge/mcp_approvals` | Directory where pending/approved/denied execution-approval requests are persisted as one JSON file per `request_id`. Must be readable/writable both by the `reconforge mcp serve` process and by the separate `reconforge mcp approvals ...` CLI invocations an operator runs to approve or deny them — the two processes agree on this path by sharing the same working directory and config, not by any communication over MCP itself. |
+| `mcp.approval_ttl_minutes` | int | `30` | How long a request stays approvable/consumable after creation. Checked both when an operator tries to approve/deny/revoke a request and again when a client tries to consume an approved one — an expired request is rejected either way, regardless of whether it was ever approved. |
 
-CREDENTIAL_USE-tier phases (`ad`'s `delegation`/`bloodhound`) are unaffected by this setting — they're rejected outright by `reconforge_execute_approved_phase` regardless, since no credential-reference mechanism exists yet (see `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`'s Known Limitations).
+Real execution through MCP requires a human operator's approval, given genuinely out-of-band via `reconforge mcp approvals approve <request_id>` — no MCP request field can substitute for this. See [CLAUDE_MCP_INTEGRATION.md](CLAUDE_MCP_INTEGRATION.md#security-model-summary) for the full flow.
+
+CREDENTIAL_USE-tier phases (`ad`'s `delegation`/`bloodhound`) are unaffected by the intrusive-execution setting — they're rejected outright by `reconforge_request_execution` regardless, since no credential-reference mechanism exists yet (see `docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md`'s Known Limitations).
 
 ---
 

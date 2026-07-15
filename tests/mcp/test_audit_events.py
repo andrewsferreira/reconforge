@@ -1,5 +1,5 @@
 """Tests for reconforge/mcp/audit.py and its wiring into
-tools.py::_call_tool — every one of the 15 MCP tools passes through
+tools.py::_call_tool — every one of the 17 MCP tools passes through
 that single choke point, so one JSON audit line to stderr is emitted
 per call, success or failure, without needing per-tool instrumentation.
 Also covers resources.py::_read_resource's analogous audit event.
@@ -84,7 +84,7 @@ def test_approval_id_is_redacted_in_audit_event(
         server = build_server()
         async with create_connected_server_and_client_session(server) as session:
             await session.call_tool(
-                "reconforge_execute_approved_phase",
+                "reconforge_request_execution",
                 {
                     "engagement_id": "does_not_exist",
                     "target": "10.10.10.1",

@@ -47,8 +47,8 @@ from reconforge.mcp.errors import (
     ScopeFileError,
     UnknownPhaseError,
 )
-from reconforge.mcp import jobs
-from reconforge.mcp.policy import ExecutionTier, classify_phase, evaluate
+from reconforge.mcp import approvals, jobs
+from reconforge.mcp.policy import ExecutionTier, classify_phase, evaluate, requirements_for
 from reconforge.mcp.sanitization import sanitize_untrusted_text
 from reconforge.mcp.schemas import (
     MODULE_NAMES,
@@ -59,6 +59,8 @@ from reconforge.mcp.schemas import (
     ExecuteApprovedPhaseResponse,
     GenerateReportRequest,
     GenerateReportResponse,
+    GetApprovalStatusRequest,
+    GetApprovalStatusResponse,
     GetEngagementRequest,
     GetEngagementResponse,
     GetExecutionStatusRequest,
@@ -81,6 +83,8 @@ from reconforge.mcp.schemas import (
     PlannedStep,
     PlanWorkflowRequest,
     PlanWorkflowResponse,
+    RequestExecutionRequest,
+    RequestExecutionResponse,
     SanitizedFinding,
     ScopeDecision,
     StartExecutionRequest,
@@ -122,10 +126,15 @@ _MODULE_TARGET_TYPES = {
 _URL_TARGET_MODULES = frozenset({"web", "api"})
 
 
-def _validate_target_for_module(target: str, module: str) -> None:
+def _validate_target_for_module(target: str, module: str) -> str:
     """Validate *target* using the same rules the named module's own
-    constructor would apply, so dry_run/_authorize_execution never
-    reject a target the module would actually accept (or vice versa).
+    constructor would apply, so dry_run/request_execution never reject
+    a target the module would actually accept (or vice versa). Returns
+    the normalized form used for canonical hashing
+    (reconforge/mcp/approvals.py::canonical_request_hash) — for web/api
+    this is the scheme-qualified URL a bare host normalizes to; for
+    every other module the target grammar has no equivalent
+    normalization step, so the stripped input is returned unchanged.
 
     validate_url() alone only checks scheme/netloc/no-userinfo — unlike
     parse_target(), it does not reject shell metacharacters, so a
@@ -149,11 +158,12 @@ def _validate_target_for_module(target: str, module: str) -> None:
         # the narrower one before it's ever reached.
         except ValidationError as exc:
             raise InvalidMCPRequestError(str(exc)) from exc
-        return
+        return candidate
     try:
         parse_target(target)
     except TargetValidationError as exc:
         raise InvalidMCPRequestError(str(exc)) from exc
+    return target.strip()
 
 # Grounded in the actual opt_in-gated capabilities found in each module's
 # run() signature (network's brute_force flag, web's exploit phase, api's
@@ -733,18 +743,54 @@ def _intrusive_execution_allowed() -> bool:
     return bool(ConfigLoader().load("mcp").get("mcp", {}).get("allow_intrusive_execution", False))
 
 
-def _authorize_execution(
-    request: ExecuteApprovedPhaseRequest,
-) -> tuple[type[Any], ExecutionTier, ScopeAuthorization | None]:
-    """Validate and authorize an execution request — no lock, no
-    execution. Raises the same typed errors ``execute_approved_phase``
-    always has; returns what the caller needs to actually run the
-    phase. Shared by the synchronous ``reconforge_execute_approved_phase``
-    tool and ``reconforge_start_execution``'s job model
-    (``reconforge/mcp/jobs.py``) so both enforce identical policy — the
-    job model is not a separate, weaker path around this check.
+def _check_engagement_and_scope(
+    *,
+    engagement_id: str,
+    output_base: str,
+    target: str,
+    scope_file: str | None,
+    approval_id: str | None,
+) -> tuple[bool, ScopeAuthorization | None]:
+    """Shared by ``request_execution`` (creation time) and
+    ``_consume_and_authorize`` (execution time, re-checked fresh since
+    time has passed and the engagement/scope may no longer be valid).
     """
-    _validate_target_for_module(request.target, request.module)
+    has_engagement = False
+    if engagement_id:
+        engagement_path = _engagement_dir(output_base) / f"{engagement_id}.json"
+        if engagement_path.is_file():
+            try:
+                _summary, mgr = _load_engagement_summary(engagement_path)
+                has_engagement = mgr.status == "active"
+            except EngagementNotFoundError:
+                has_engagement = False
+
+    scope = None
+    if scope_file and approval_id:
+        try:
+            candidate_scope = ScopeAuthorization.from_file(scope_file)
+            candidate_scope.assert_authorized(target=target, provided_approval_id=approval_id)
+            scope = candidate_scope
+        except ValueError:
+            scope = None
+
+    return has_engagement, scope
+
+
+def request_execution(request: RequestExecutionRequest) -> RequestExecutionResponse:
+    """The only MCP-reachable way to create an out-of-band approval
+    request (``reconforge/mcp/approvals.py``). Never executes anything
+    and never grants its own approval — the created request sits in
+    ``awaiting_operator_approval`` until a human runs
+    ``reconforge mcp approvals approve <request_id>`` in a process this
+    MCP session has no path to. Every field needed to actually run the
+    operation is captured into the resulting ``ApprovalRequest`` now,
+    so ``reconforge_execute_approved_phase``/``reconforge_start_execution``
+    need nothing but the returned ``request_id`` — there is nothing
+    left for a client to supply, and therefore nothing left to tamper
+    with, once this call returns.
+    """
+    normalized_target = _validate_target_for_module(request.target, request.module)
 
     module_cls = _module_class(request.module)
     valid_phases = list(module_cls.VALID_PHASES)
@@ -764,45 +810,140 @@ def _authorize_execution(
     if tier is ExecutionTier.PROHIBITED:
         raise PolicyBlockedError(f"'{request.module}/{request.phase}' is a PROHIBITED-tier action.")
 
-    has_engagement = False
-    if request.engagement_id:
-        engagement_path = _engagement_dir(request.output_base) / f"{request.engagement_id}.json"
-        if engagement_path.is_file():
-            try:
-                _summary, mgr = _load_engagement_summary(engagement_path)
-                has_engagement = mgr.status == "active"
-            except EngagementNotFoundError:
-                has_engagement = False
+    # Requirements are graduated by tier (policy.py::requirements_for) —
+    # SAFE_READ_ONLY needs neither an engagement nor a scope; every
+    # tier that actually touches a target does. Checking these
+    # unconditionally here, regardless of tier, would silently make
+    # SAFE_READ_ONLY phases stricter than policy.py declares them to be.
+    reqs = requirements_for(tier)
+    has_engagement, scope = _check_engagement_and_scope(
+        engagement_id=request.engagement_id,
+        output_base=request.output_base,
+        target=request.target,
+        scope_file=request.scope_file,
+        approval_id=request.approval_id,
+    )
+    if reqs.requires_engagement and not has_engagement:
+        raise PolicyBlockedError(
+            f"No active engagement found for engagement_id='{request.engagement_id}'. Create "
+            "one first (see reconforge_list_engagements / 'reconforge workflow --engagement').",
+            missing_requirements=("engagement_id",),
+        )
+    if reqs.requires_scope and scope is None:
+        raise PolicyBlockedError(
+            "Target is not authorized by a valid scope file — supply scope_file and a matching "
+            "approval_id (see reconforge_get_scope).",
+            missing_requirements=("validated scope (scope_file + target in allowed_targets)",),
+        )
+    if tier is ExecutionTier.INTRUSIVE and not _intrusive_execution_allowed():
+        raise PolicyBlockedError(
+            f"'{request.module}/{request.phase}' is INTRUSIVE-tier and mcp.allow_intrusive_execution "
+            "is not enabled in config/mcp.yaml.",
+            missing_requirements=(
+                "mcp.allow_intrusive_execution=true in config/mcp.yaml (server-wide, operator-controlled)",
+            ),
+        )
 
-    has_validated_scope = False
-    scope = None
-    if request.scope_file and request.approval_id:
-        try:
-            scope = ScopeAuthorization.from_file(request.scope_file)
-            scope.assert_authorized(target=request.target, provided_approval_id=request.approval_id)
-            has_validated_scope = True
-        except ValueError:
-            has_validated_scope = False
+    record = approvals.create_request(
+        engagement_id=request.engagement_id,
+        target=request.target,
+        normalized_target=normalized_target,
+        module=request.module,
+        phase=request.phase,
+        opsec_profile=request.opsec_profile,
+        tier=tier.value,
+        scope_reference=request.scope_file or "",
+        output_base=request.output_base,
+        domain=request.domain,
+        scope_file=request.scope_file,
+        approval_id=request.approval_id,
+        timeout=request.timeout,
+    )
+    return RequestExecutionResponse(
+        request_id=record.request_id,
+        status=record.status,
+        tier=tier.value,
+        expires_at=record.expires_at,
+    )
+
+
+def get_approval_status(request: GetApprovalStatusRequest) -> GetApprovalStatusResponse:
+    """Read-only poll of an approval request's current state. Never
+    reveals anything a client couldn't already infer from having
+    created the request — no scope/approval secrets, no hash."""
+    record = approvals.get_request(request.request_id)
+    return GetApprovalStatusResponse(
+        request_id=record.request_id,
+        status=record.status,
+        engagement_id=record.engagement_id,
+        target=record.target,
+        module=record.module,
+        phase=record.phase,
+        tier=record.tier,
+        created_at=record.created_at,
+        expires_at=record.expires_at,
+        approved_at=record.approved_at,
+        denial_reason=record.denial_reason,
+    )
+
+
+def _consume_and_authorize(
+    request_id: str,
+) -> tuple[approvals.ApprovalRequest, type[Any], ExecutionTier, ScopeAuthorization | None]:
+    """The only path by which MCP-triggered execution may proceed.
+
+    Atomically consumes the referenced approval (raising if it isn't
+    genuinely ``approved``, is expired, or was already consumed —
+    see ``approvals.consume_if_approved``), then re-verifies engagement
+    and scope *fresh* — time has passed since the request was approved,
+    and either could have changed. If that fresh check fails, the
+    approval has still been consumed: burning a stale approval and
+    requiring a new one (and therefore a new human review) is the safer
+    failure mode than either executing against outdated preconditions
+    or leaving a spent approval reusable.
+    """
+    record = approvals.get_request(request_id)
+    tier = ExecutionTier(record.tier)
+
+    expected_hash = approvals.canonical_request_hash(
+        engagement_id=record.engagement_id,
+        normalized_target=record.normalized_target,
+        module=record.module,
+        phase=record.phase,
+        opsec_profile=record.opsec_profile,
+        tier=record.tier,
+        scope_reference=record.scope_reference,
+    )
+    record = approvals.consume_if_approved(request_id, expected_hash=expected_hash)
+
+    module_cls = _module_class(record.module)
+    has_engagement, scope = _check_engagement_and_scope(
+        engagement_id=record.engagement_id,
+        output_base=record.output_base,
+        target=record.target,
+        scope_file=record.scope_file,
+        approval_id=record.approval_id,
+    )
 
     decision = evaluate(
         tier,
         has_engagement=has_engagement,
-        has_validated_scope=has_validated_scope,
-        explicit_confirmation=request.explicit_confirmation,
-        approval_id=request.approval_id,
+        has_validated_scope=scope is not None,
+        has_operator_approval=True,
         intrusive_execution_allowed=_intrusive_execution_allowed(),
     )
     if not decision.allowed:
         raise PolicyBlockedError(
-            f"Execution denied for '{request.module}/{request.phase}' (tier={tier.value}): {decision.reason}",
+            f"Execution denied for '{record.module}/{record.phase}' (tier={tier.value}) despite a "
+            f"consumed approval — state changed since approval: {decision.reason}",
             missing_requirements=decision.missing_requirements,
         )
 
-    return module_cls, tier, scope
+    return record, module_cls, tier, scope
 
 
 def _execute_module_phase_locked(
-    request: ExecuteApprovedPhaseRequest,
+    record: approvals.ApprovalRequest,
     module_cls: type[Any],
     tier: ExecutionTier,
     scope: ScopeAuthorization | None,
@@ -817,28 +958,28 @@ def _execute_module_phase_locked(
     """
     warnings: list[str] = []
     kwargs: dict[str, Any] = {
-        "target": request.target,
-        "output_base": request.output_base,
-        "opsec_mode": request.opsec_profile,
+        "target": record.target,
+        "output_base": record.output_base,
+        "opsec_mode": record.opsec_profile,
         "verbose": False,
         "dry_run": False,
-        "timeout": request.timeout,
+        "timeout": record.timeout,
         "scope": scope,
-        "approval_id": request.approval_id,
+        "approval_id": record.approval_id,
     }
-    if request.module == "ad":
-        kwargs["domain"] = request.domain
+    if record.module == "ad":
+        kwargs["domain"] = record.domain
 
     module = module_cls(**kwargs)
     try:
-        module.run(phases=[request.phase])
+        module.run(phases=[record.phase])
     except ReconForgeError as exc:
         warnings.append(f"Module raised during execution: {exc}")
 
     return ExecuteApprovedPhaseResponse(
-        module=request.module,
-        phase=request.phase,
-        target=request.target,
+        module=record.module,
+        phase=record.phase,
+        target=record.target,
         tier=tier.value,
         findings_count=len(module.findings_mgr.get_all()),
         artifacts_written=[str(module.output.module_dir(module_cls.MODULE_NAME))],
@@ -847,12 +988,18 @@ def _execute_module_phase_locked(
 
 
 def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteApprovedPhaseResponse:
-    module_cls, tier, scope = _authorize_execution(request)
-
+    # Lock first, consume second: a busy server process must reject the
+    # call without ever touching the approval record. Consuming first
+    # would burn a genuinely valid, operator-approved request on a
+    # transient concurrency conflict that has nothing to do with whether
+    # the approval itself was good — forcing a fresh operator review for
+    # no real reason. With the lock acquired first, a conflict here
+    # leaves the approval untouched and still consumable on retry.
     if not _EXECUTION_LOCK.acquire(blocking=False):
         raise ExecutionConflictError("Another execution is already in progress on this server process.")
     try:
-        return _execute_module_phase_locked(request, module_cls, tier, scope)
+        record, module_cls, tier, scope = _consume_and_authorize(request.request_id)
+        return _execute_module_phase_locked(record, module_cls, tier, scope)
     finally:
         _EXECUTION_LOCK.release()
 
@@ -861,7 +1008,7 @@ def execute_approved_phase(request: ExecuteApprovedPhaseRequest) -> ExecuteAppro
 
 
 def start_execution(request: StartExecutionRequest) -> StartExecutionResponse:
-    job = jobs.start_execution(request)
+    job = jobs.start_execution(request.request_id)
     return StartExecutionResponse(job_id=job.job_id, status=job.status)
 
 

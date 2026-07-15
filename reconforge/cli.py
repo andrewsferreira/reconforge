@@ -2,7 +2,7 @@
 """ReconForge - Modular Pentest Reconnaissance Framework.
 
 Author: Andrews Ferreira
-Version: 2.14.4
+Version: 2.15.0
 
 Usage (after `pip install -e .` or `pipx install .`):
     reconforge network --target <target> [options]
@@ -124,12 +124,16 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_parser = subparsers.add_parser(
         "mcp",
         help="Claude Model Context Protocol (MCP) server",
-        description="Start ReconForge's MCP server so Claude Desktop/Claude Code can connect to it "
-                     "(stdio transport only; foundation phase — no tools registered yet, see "
-                     "docs/CLAUDE_MCP_IMPLEMENTATION_PLAN.md)",
+        description="Start ReconForge's MCP server so Claude Desktop/Claude Code can connect to "
+                     "it (stdio transport only), or review/approve pending execution requests it "
+                     "has created (see docs/CLAUDE_MCP_INTEGRATION.md).",
     )
     mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command", help="MCP subcommand")
     mcp_subparsers.add_parser("serve", help="Start the MCP server over stdio")
+
+    from reconforge.mcp.approvals_cli import add_approvals_subparser
+
+    add_approvals_subparser(mcp_subparsers)
 
     # Network module
     net_parser = subparsers.add_parser("network", help="Network reconnaissance")
@@ -720,8 +724,12 @@ def _dispatch(args, parser, scope: "ScopeAuthorization | None" = None) -> None:
             from reconforge.mcp.server import run_stdio_server
 
             run_stdio_server()
+        elif args.mcp_command == "approvals":
+            from reconforge.mcp.approvals_cli import dispatch as dispatch_approvals
+
+            dispatch_approvals(args, parser)
         else:
-            parser.error("mcp requires a supported subcommand (serve)")
+            parser.error("mcp requires a supported subcommand (serve, approvals)")
 
     else:
         print(f"Unknown module: {args.module}")
