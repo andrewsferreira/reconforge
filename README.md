@@ -1,28 +1,47 @@
 # ReconForge
 
-**An evidence-driven reconnaissance framework for authorized penetration testing and Red Team laboratories.**
-
 [![Quality Gates](https://github.com/andrewsferreira/reconforge/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/andrewsferreira/reconforge/actions/workflows/quality-gates.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Coverage](https://img.shields.io/badge/coverage-70%25%20floor-yellow.svg)](#testing--quality-gates)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-1192%20passing-brightgreen.svg)](#testing)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-> Author: Andrews Ferreira • Version 2.16.0 • 1192/1192 tests passing (unit tests, mocked tool execution — see [LIMITATIONS.md](docs/LIMITATIONS.md))
+**A modular reconnaissance framework for authorized penetration testing, with a human-gated MCP server for LLM-directed workflows.**
 
-> **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems and networks you own or have explicit written authorization to test. See [Safety and Scope](#safety-and-scope) below.
+ReconForge treats reconnaissance output as evidence, not conclusions — every finding carries a confidence level, and severity never exceeds what's actually been verified. When an LLM client drives the workflow, execution still requires a human operator's approval, given entirely outside the LLM's own request. This is a framework, not a wrapper around a single scanner.
 
-ReconForge automates the reconnaissance phase of penetration tests through five specialized modules and a cross-module workflow orchestrator. All commands are executed securely as `list[str]` via `subprocess.run` — **no `shell=True` anywhere in the codebase**. It normalizes raw tool output into findings with an explicit confidence model (§ [FINDINGS.md](docs/FINDINGS.md)); it does not exploit targets and does not claim to be a complete Red Team platform. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) and [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for an honest account of what is implemented, tested, and still in progress.
+> **Authorization required.** ReconForge executes real reconnaissance tooling against real targets. Only run it against systems you own or are explicitly authorized to test. See [Execution Model](#execution-model).
 
-## Why ReconForge?
+## Highlights
 
-Most portfolio recon tools stop at "it runs nmap and prints results." ReconForge is built around the parts that are actually hard to get right in a real engagement, and every claim below is backed by code you can read and tests you can run — not asserted in this README and left unverifiable:
+- **Evidence-driven findings** — severity structurally clamped to confidence; a heuristic match cannot present as `critical`
+- **Human-in-the-loop execution** — an LLM can request a run, never approve one
+- **Secure-by-construction execution** — zero `shell=True`; every subprocess call is a validated `list[str]`
+- **Modular architecture** — five independent recon modules, one orchestrator, one confidence model
+- **Native MCP integration** — 18 schema-driven tools, an execution-tier policy engine, out-of-band approval
+- **CI-enforced quality gates** — Ruff, MyPy (232 files), Bandit, pip-audit, 1192 tests, every push
 
-- **Findings are never overstated.** Every result carries a confidence level (`confirmed → high → medium → low → heuristic`), and severity is *clamped* by confidence in `core/findings_manager.py` — a heuristic match structurally cannot present as `critical`, no exceptions. This caught and fixed real bugs during development (BloodHound DA-path findings mislabeled `confirmed`, a nuclei severity/confidence inversion, sqlmap negation-unaware false positives) — see `docs/ARCHITECTURE_REVIEW.md`'s Phase 8 entries.
-- **AI-driven execution can't approve itself.** ReconForge ships an MCP server so Claude can plan and inspect recon workflows — but real execution requires a human operator's approval given through a separate CLI process, `reconforge mcp approvals approve <id>`, outside the MCP protocol entirely. No field in Claude's own request — not a boolean, not anything — can substitute for that out-of-band step. See [`CLAUDE_MCP_INTEGRATION.md`'s security model](docs/CLAUDE_MCP_INTEGRATION.md#security-model-summary) and [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
-- **Command execution is structurally injection-resistant, not just "carefully written."** Zero instances of `shell=True` anywhere in the codebase; every subprocess call is a `list[str]` argument vector, with `validate_arg()` rejecting shell metacharacters as a second layer on top.
-- **Quality gates are enforced in CI, not just aspirational.** Ruff (a real ruleset — pyflakes, bugbear, pyupgrade, isort, flake8-simplify — not just syntax-error checks), MyPy across the full 232-file package tree, Bandit, pip-audit, a documentation-link checker, and 1192 tests with an enforced coverage floor all run on every push. See [Quality Gates](#quality-gates).
-- **Limitations are documented, not hidden.** [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) and [`docs/ARCHITECTURE_REVIEW.md`](docs/ARCHITECTURE_REVIEW.md) track exactly what's implemented, what's heuristic, and what's still a known gap — including things like scope matching currently being exact-string-only, and loot encryption being opt-in rather than default. Nothing here claims production-hardened status it hasn't earned.
-- **You can validate all of this without touching a real target.** A first-party, pure-stdlib lab server (`lab/vulnerable_app.py`) and a safe MCP demo script let you see the whole thing work end-to-end on loopback before you ever point it at anything real.
+## Architecture
+
+```
+Target + Scope
+      ↓
+Authorization Gate
+      ↓
+Recon Module   (tools → parsers → phases)
+      ↓
+Evidence       (confidence-clamped findings)
+      ↓
+Reports
+```
+
+Every module shares one core:
+
+- `runner.py` — secure subprocess execution
+- `findings_manager.py` — confidence model, severity clamping
+- `ai_orchestration.py` — deterministic cross-module correlation engine
+- `workflow_orchestrator.py` — conditional multi-module pipeline
+- `credential_vault.py` / `loot_manager.py` — centralized, deduplicated, optionally encrypted
+- `engagement.py` — full lifecycle: planning → active → paused → completed
 
 ## Modules
 
@@ -35,143 +54,117 @@ Most portfolio recon tools stop at "it runs nmap and prints results." ReconForge
 | **AD** | Domain controllers | nmap, enum4linux-ng, Impacket, ldapsearch, smbclient, BloodHound, NetExec | passive_recon, identity_enumeration, configuration_enumeration, delegation_discovery, bloodhound_collection |
 | **Workflow** | Any target | All modules | Conditional multi-module pipeline |
 
-**None of the tools listed above ship with ReconForge.** ReconForge orchestrates, parses, and correlates the output of external security tools you install yourself (`nmap`, `ffuf`, `nuclei`, `impacket`, etc.) — it does not bundle, vendor, or auto-download them. Only `nmap` is required for every module that touches network/AD targets; everything else is optional and gracefully skipped if missing (a skipped tool narrows coverage, it never crashes a run). See [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md) for the full per-module tool list with install commands, supported OS/Python versions, and known-unsupported environments.
+None of the tools above ship with ReconForge. Only `nmap` is required for network/AD targets — everything else is optional and gracefully skipped if missing. See [SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md).
 
-## What is heuristic vs. confirmed
+## Evidence Model
 
-Every finding carries a confidence level (`confirmed → high → medium → low → heuristic`), and severity is capped by confidence — a heuristic match can never present as a `critical` finding regardless of what the underlying issue would be if real. Two ends of the same scale, from an actual web-module rule:
+Confidence scale: `confirmed → high → medium → low → heuristic`. Severity is capped by confidence — a heuristic match can never present as `critical`.
 
-- **Heuristic**: a mutated request to an endpoint with a numeric ID returns HTTP 200 with a body that differs from the baseline. This is logged as an `IDOR_candidate` at low/medium confidence — it is evidence worth checking, not a claim that authorization is actually broken. A parameter that just happens to accept a wider ID range would look identical.
-- **Confirmed**: the same finding after a human or a dedicated validation step reproduces unauthorized access to another user's specific, identifiable data. Only then does it carry `confirmed` confidence and can it be reported as a real finding rather than a hypothesis.
+- **Heuristic**: a mutated request to a numeric-ID endpoint returns HTTP 200 with a body that differs from baseline. Logged as `IDOR_candidate`, low/medium confidence — evidence worth checking, not proof.
+- **Confirmed**: a human or a dedicated validation step reproduces unauthorized access to another user's identifiable data.
 
-ReconForge does not perform that confirmation step automatically for anything beyond a handful of opt-in, explicitly-flagged checks — see [docs/FINDINGS.md](docs/FINDINGS.md) for the full rule set and severity-clamping table.
+Full rule set and severity-clamping table: [FINDINGS.md](docs/FINDINGS.md).
 
-## Architecture
+## Execution Model
 
-```
-tools/ → parsers/ → phases/ → module.py → core/
-```
+- Every active run requires an explicit acknowledgement: `--authorized-target`, `--lab-mode`, or `--enforce-scope` with a `--scope-file`. Omit all three and ReconForge refuses to run.
+- `--enforce-scope` checks an explicit allowlist on every command, not just at startup, and propagates to targets discovered mid-run. Matching is exact-string only today — see [ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for that and other tracked gaps.
+- `--dry-run` prints the exact commands ReconForge would run without executing them.
+- Intrusive phases (exploit candidates, brute force) require explicit opt-in flags; never run by default.
 
-All modules share a common core providing:
-
-- **OPSEC-aware profiles** — stealth / normal / aggressive with noise-level gating
-- **Secure execution** — `list[str]` commands, `validate_arg()`, credential sanitization in logs
-- **5-level confidence model** — confirmed → high → medium → low → heuristic, with severity clamping
-- **Structured output** — findings (JSON/Markdown), loot vault (optional Fernet encryption), session notes
-- **Credential vault** — centralized, deduplicated storage shared across modules
-- **Engagement tracking** — full lifecycle (planning → active → paused → completed) with pause/resume
-- **Workflow orchestration** — conditional multi-module pipelines with automatic data passing
-- **Configuration system** — `tools.yaml` + `profiles.yaml` as single source of truth, typed `ToolConfig` accessor
-
-## Safety and Scope
-
-- Only run ReconForge against systems and networks you own or are explicitly authorized to test (signed engagement, CTF/lab you control, etc.).
-- **Every active run requires an explicit authorization acknowledgement.** Pass one of `--authorized-target` (you are authorized to test this target), `--lab-mode` (this is a lab/CTF environment you control), or `--enforce-scope` with a valid `--scope-file`/`--approval-id`. Omitting all three causes ReconForge to refuse to run. `--dry-run` is exempt since it never executes anything.
-- `--enforce-scope` gates execution against an explicit allowlist. It is opt-in, but once enabled it is checked at every command execution (not just once at startup) and propagated to targets discovered mid-run (e.g. workflow auto-handoff) — not only the initial `--target`. Matching is still exact-string only (no CIDR/domain-suffix matching yet); see [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for that and other tracked gaps.
-- `--dry-run` prints the exact commands ReconForge would execute without running them — use it to review behavior before pointing the tool at anything.
-- Intrusive phases (exploit candidates, brute force) require explicit opt-in flags; they are never run by default.
+| OPSEC Mode | Noise | Behavior |
+|---|---|---|
+| `stealth` | low | Passive techniques, limited ports |
+| `normal` | low, medium | Standard engagements |
+| `aggressive` | low – very_high | CTF / lab environments |
 
 ## Quick Start
 
 ```bash
-# Install (editable, with dev tooling)
 pip install -e ".[dev]"
 
-# Optional: pull in a module's pip-installable external tools too
-# (impacket, bloodhound-python, enum4linux-ng, netexec for AD;
-# wafw00f for web; arjun for API — see docs/SUPPORT_MATRIX.md for the
-# full external-tool list, most of which are apt/go/gem installs and
-# not pip packages at all, so these extras don't cover every tool)
-pip install -e ".[ad]"
-pip install -e ".[web]"
-pip install -e ".[api]"
-
-# Or, without installing, from a repo checkout:
-# python -m reconforge <module> --target ...
-
-# Every active run requires --authorized-target, --lab-mode, or --enforce-scope
-# (see "Safety and Scope" above). Examples below use --authorized-target as a
-# stand-in for "you have confirmed authorization to test this target."
-
-# Network recon
-reconforge network --target 10.10.10.1 --authorized-target
-
-# AD recon
-reconforge ad --target 10.10.10.1 --domain corp.local --authorized-target
-
-# Web recon
-reconforge web --target https://example.com --authorized-target
-
-# API recon with authentication
-reconforge api --target https://api.example.com --auth-token "Bearer eyJ..." --authorized-target
-
-# Attack surface mapping
-reconforge surface --target 10.10.10.1 --authorized-target
-
-# Full workflow (conditional: surface → network → ad → web → api)
-reconforge workflow --target 10.10.10.1 --authorized-target
-
-# Targeted workflow with engagement tracking
-reconforge workflow --target 10.10.10.1 --modules network,ad \
-    --engagement "Q1 Pentest" --client "Acme Corp" --encrypt-loot --authorized-target
-
-# Workflow with guardrailed auto-handoff (follow-on module steps inferred from recon)
-reconforge workflow --target 10.10.10.1 --auto-handoff --max-handoff-steps 5 --authorized-target
-
-# Stealth mode
-reconforge network --target 10.10.10.1 --opsec stealth --authorized-target
-
-# Dry run (show commands without executing — no authorization flag needed)
-reconforge network --target 10.10.10.1 --dry-run -v
-
-# Alternative install for operators (isolated CLI, no venv activation needed)
-pipx install .
-reconforge network --target 10.10.10.1 --authorized-target
+reconforge network --target 10.10.10.1 --dry-run -v          # no auth flag needed
+reconforge network --target 10.10.10.1 --authorized-target   # live run
+reconforge workflow --target 10.10.10.1 --auto-handoff --authorized-target
 ```
 
-## Local Validation Lab (Safe Testing)
+`ad`, `web`, `api`, `surface` follow the same shape. Full CLI reference: [USAGE.md](docs/USAGE.md).
 
-For repeatable testing in isolated environments, ReconForge ships a first-party, pure-stdlib lab target at [`lab/vulnerable_app.py`](lab/vulnerable_app.py) — no third-party dependencies, no external downloads, and it refuses to bind to anything but loopback. Start it, then run ReconForge against it:
+## Local Validation Lab
+
+A first-party, pure-stdlib target at [`lab/vulnerable_app.py`](lab/vulnerable_app.py) — no third-party dependencies, loopback-only, deterministic:
 
 ```bash
 python3 lab/vulnerable_app.py
-# listening on http://127.0.0.1:8008 — in another terminal:
 reconforge web --target http://127.0.0.1:8008 --phases surface,content -v --lab-mode
 ```
 
-The lab target intentionally serves a few weaknesses for the `web`/`api` modules to detect: `/` omits all security headers, `/search?q=` reflects the query parameter unescaped, `/admin` and `/robots.txt` provide predictable/enumerable paths, and `/api/status` returns a small JSON fingerprint.
+Serves known weaknesses (missing security headers, a reflected query parameter, enumerable admin paths) for the `web`/`api` modules to detect.
 
-Expected artifacts:
+## Screenshots
 
-- `outputs/<target>/web/findings.json`
-- `outputs/<target>/web/session.md`
-- `outputs/<target>/web/commands.log`
-- `outputs/<target>/web/audit.json`
-- `outputs/<target>/web/results.contract.json`
+*Not yet captured.*
 
-> Note: deep classes such as SQLi/XSS/SSRF depend on optional tools (for example `sqlmap`, `nuclei`, and `ffuf`) being installed and enabled in your OPSEC profile. The bundled lab target does not implement these deeper vulnerability classes.
+| Placeholder | Shows |
+|---|---|
+| `docs/media/terminal-execution.png` | `--dry-run` command construction |
+| `docs/media/report-output.png` | Rendered executive report |
+| `docs/media/workflow-run.png` | `--auto-handoff` end-to-end run |
+| `docs/media/architecture.png` | Module → core → MCP data flow |
 
-## OPSEC Modes
+## MCP Integration
 
-| Mode | Allowed Noise | Behavior |
-|------|--------------|----------|
-| `stealth` | low | Minimal noise, passive techniques, limited ports |
-| `normal` | low, medium | Balanced for standard engagements |
-| `aggressive` | low, medium, high, very_high | Full coverage for CTF/lab environments |
+`reconforge mcp serve` exposes 13 read-only tools and 5 execution tools to an MCP client (Claude Desktop, Claude Code) over stdio — including `reconforge_recommend_next_steps`, a deterministic recommendation of which module hasn't been assessed yet and which findings to prioritize.
 
-## Output Structure
+Execution never happens on the LLM's say-so:
+
+```
+Claude requests execution
+      ↓
+Policy Engine       (SAFE_READ_ONLY → PROHIBITED tier classification)
+      ↓
+Pending approval     (awaiting_operator_approval, disk-backed)
+      ↓
+Human operator approves   (separate CLI process, out-of-band)
+      ↓
+Execution            (single-use, hash-verified against the approved request)
+```
+
+No field in the LLM's own request substitutes for that step. Full model: [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md#security-model-summary), [THREAT_MODEL.md](docs/THREAT_MODEL.md).
+
+```bash
+pip install -e ".[mcp]"
+reconforge mcp serve
+```
+
+## Reporting
 
 ```
 outputs/<target>/<module>/
-├── raw/                  # Raw tool output
-├── parsed/               # Parsed results
-├── findings.json         # Findings (JSON)
-├── findings.md           # Findings (Markdown)
-├── loot.json             # Discovered loot
-├── session.md            # Session notes
-├── commands.log          # Command log
-├── attack_paths.md       # Attack paths
-└── quick_report.md       # Quick report
+├── findings.json / findings.md
+├── loot.json
+├── session.md
+├── commands.log
+├── attack_paths.md
+└── quick_report.md
+```
+
+## Testing & Quality Gates
+
+```bash
+python -m pytest   # 1192 tests, ~23s
+```
+
+CI (`.github/workflows/quality-gates.yml`) runs on every push: Ruff, MyPy (232 files, zero errors), Bandit, pip-audit, pytest with a 70% coverage floor, and a packaging smoke test. Tests run against mocked tool execution and stored fixtures, not real binaries — see [LIMITATIONS.md](docs/LIMITATIONS.md) for what has and has not been validated against live tools.
+
+## Project Structure
+
+```
+reconforge/
+├── reconforge/mcp/       # MCP server: 18 tools, schema-driven, approval state machine
+├── core/                 # shared services: execution, findings, credentials, orchestration
+├── modules/{network,web,api,surface,ad}/
+└── tests/                # 1192 tests
 ```
 
 ## Documentation
@@ -179,119 +172,24 @@ outputs/<target>/<module>/
 | Document | Description |
 |----------|-------------|
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data flow, core services, security model |
-| [CONFIGURATION.md](docs/CONFIGURATION.md) | tools.yaml, profiles.yaml, ToolConfig, ProfileLoader |
-| [MODULES.md](docs/MODULES.md) | All 5 modules: tools, parsers, phases, architecture |
-| [FINDINGS.md](docs/FINDINGS.md) | 5-level confidence model, severity clamping, classification |
-| [USAGE.md](docs/USAGE.md) | CLI reference, examples, OPSEC modes, output interpretation |
-| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Adding tools/parsers/phases, testing guidelines, code standards |
-| [API_REFERENCE.md](docs/API_REFERENCE.md) | Core classes, module classes, data structures |
-| [FINAL_STABILIZATION_REPORT.md](docs/FINAL_STABILIZATION_REPORT.md) | Validation results, technical debt, 10-point checklist |
-| [ARTIFACT_POLICY.md](docs/ARTIFACT_POLICY.md) | Artifact retention, storage separation, and sensitive-data handling |
-| [OBSERVABILITY_AND_CONTRACTS.md](docs/OBSERVABILITY_AND_CONTRACTS.md) | Execution IDs, structured audit logs, env overlays, and versioned data contracts |
-| [BURP_MCP_INTEGRATION.md](docs/BURP_MCP_INTEGRATION.md) | `reconforge burp` subcommands, the Burp MCP provider, and the standalone [`mcp_validation/`](mcp_validation/README.md) connectivity-check tool |
-| [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md) | Connect Claude Desktop/Claude Code to `reconforge mcp serve` — setup, security model, tool reference, walkthroughs |
-| [THREAT_MODEL.md](docs/THREAT_MODEL.md) | Whole-system threat model: assets, trust boundaries, threats and mitigations, non-goals, known residual risks |
+| [MODULES.md](docs/MODULES.md) | All 5 modules: tools, parsers, phases |
+| [FINDINGS.md](docs/FINDINGS.md) | Confidence model, severity clamping |
+| [USAGE.md](docs/USAGE.md) | CLI reference, OPSEC modes |
+| [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md) | MCP setup, security model, tool reference |
+| [THREAT_MODEL.md](docs/THREAT_MODEL.md) | Assets, trust boundaries, mitigations |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | Adding tools/parsers/phases, code standards |
+| [LIMITATIONS.md](docs/LIMITATIONS.md) | Current gaps, tracked honestly |
 
-## Claude and MCP Integration
+Full index: [docs/DOCUMENTATION_INDEX.md](docs/DOCUMENTATION_INDEX.md).
 
-`reconforge mcp serve` runs an MCP (Model Context Protocol) server so Claude Desktop or Claude Code
-can inspect ReconForge's state and plan recon workflows over stdio — 13 read-only tools (status,
-module/engagement/scope introspection, workflow planning, dry-run command preview, findings,
-reports, and `reconforge_recommend_next_steps` — a deterministic, evidence-based recommendation
-of which module hasn't been assessed yet and which findings are worth prioritizing, so Claude can
-direct a multi-step scan toward the modules/findings most worth pursuing instead of running every
-module in a fixed order) plus 5 execution-related tools, all gated behind an active engagement, a
-validated scope file, and a genuinely out-of-band human approval: Claude can request execution, but only a human
-operator running `reconforge mcp approvals approve <request_id>` in a separate terminal — outside
-the MCP session entirely — can turn that request into something executable, and (for INTRUSIVE-tier
-phases) an operator-edited server-wide config flag. No MCP request field, and no tool or resource,
-can substitute for that step — Claude never grants itself permission to run anything. It also
-exposes 7 read-only resources under a `reconforge://` URI allowlist (6 curated documentation pages
-plus a live module catalog) for clients that prefer to load reference material as MCP resources
-rather than tool calls.
+## Security Model
 
-```bash
-pip install -e ".[mcp]"
-reconforge mcp serve   # blocks, waiting for an MCP client over stdio
-```
-
-See [CLAUDE_MCP_INTEGRATION.md](docs/CLAUDE_MCP_INTEGRATION.md) for the Claude Desktop/Code setup
-steps, the full security model, and the tool reference. [`examples/claude_mcp/`](examples/claude_mcp/)
-has three runnable scripts (`query_status.py`, `plan_workflow.py`, and `dry_run_against_lab.py` — a
-fully self-contained, safe end-to-end demo that spins up `lab/vulnerable_app.py` on loopback and
-dry-runs a real scan against it) showing how to talk to the server directly with the `mcp` Python
-SDK, outside of any Claude client.
-
-## Testing
-
-```bash
-pip install -e ".[dev]"
-python -m pytest
-# 1192 tests, all passing (~23s)
-```
-
-These are unit tests against mocked tool execution and stored fixtures — they validate parsing, validation, and orchestration logic, not real binaries. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for what has and has not been validated against live tools.
-
-## Quality Gates
-
-Quality gates are codified in CI (`.github/workflows/quality-gates.yml`) and run:
-
-- Ruff (lint — `select = ["E9","F","B","UP","I","SIM","C4"]`: pyflakes, bugbear, pyupgrade, isort, flake8-simplify, flake8-comprehensions; `E501` line-length deliberately excluded as pure reformatting with no correctness value)
-- MyPy (type checks across the full package tree — `core`, `modules`, `reconforge`, `mcp_validation`, `scripts`; 232 source files, zero errors)
-- Bandit (SAST)
-- pip-audit (dependency vulnerability audit)
-- Pytest + coverage threshold (70%, codified in `pyproject.toml`'s `[tool.coverage.report]`; measured coverage is ~70.5% across `core`/`modules`/`reconforge` — an honest floor, not the 85-90% a security-critical codebase would ideally carry; see `pyproject.toml`'s comment for the current lowest-coverage files and `docs/ARCHITECTURE_REVIEW.md` for the tracked plan to raise it)
-- Packaging smoke test (`pip install -e .` + `reconforge --help`)
-
-## Project Structure
-
-```
-reconforge/                     # repository root
-├── reconforge/                 # installable CLI package
-│   ├── cli.py                  # argparse dispatcher (entry point: `reconforge` / `python -m reconforge`)
-│   ├── __main__.py
-│   ├── burp/                   # Burp Suite MCP validation subcommands
-│   └── entrypoints/
-├── config/
-│   ├── tools.yaml             # Tool configuration
-│   └── profiles.yaml          # OPSEC profiles
-├── core/                      # 18 shared services
-│   ├── runner.py              # Secure subprocess execution
-│   ├── config_loader.py       # YAML config with caching
-│   ├── tool_config.py         # Typed config accessor
-│   ├── profile_loader.py      # OPSEC profile resolution
-│   ├── findings_manager.py    # 5-level confidence + severity clamping
-│   ├── loot_manager.py        # Loot tracking + Fernet encryption
-│   ├── credential_vault.py    # Centralized credential store
-│   ├── engagement.py          # Engagement lifecycle
-│   ├── workflow_orchestrator.py  # Cross-module pipeline
-│   ├── attack_workflow.py     # Kill-chain tracking
-│   ├── notes_manager.py       # Session notes
-│   ├── output_manager.py      # Structured output + reports
-│   ├── validators.py          # Input validation
-│   ├── opsec_checks.py        # Technique gating
-│   ├── detection_map.py       # Noise-level mapping
-│   ├── exceptions.py          # Exception hierarchy
-│   ├── logger.py              # Logging + credential sanitization
-│   ├── target_parser.py       # Target parsing
-│   └── utils.py               # Utility helpers
-├── modules/
-│   ├── network/               # 5 tools, 4 parsers, 4 phases
-│   ├── web/                   # 9 tools, 7 parsers, 4 phases
-│   ├── api/                   # 4 tools, 4 parsers, 4 phases
-│   ├── surface/               # 2 tools, 1 parser, 6 intelligence, 4 phases
-│   └── ad/                    # 8 tools, 8 parsers, 6 collectors, 5 analyzers, 6 attack paths, 5 phases, 6 reporters
-└── tests/                     # 1192 tests (pytest) — see "Testing" above for current count
-```
+External tools ReconForge shells out to (nmap, nuclei, sqlmap, etc.) retain their own licenses and are not distributed with this project. Full threat model: [THREAT_MODEL.md](docs/THREAT_MODEL.md). Responsible disclosure: [SECURITY.md](SECURITY.md).
 
 ## Limitations
 
-ReconForge is a reconnaissance and evidence-normalization framework, not an exploitation platform, not a fully autonomous pentest, and not a stealth tool by default — noise profiles document *expected* telemetry, they do not guarantee it goes undetected. See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for the full, current list of gaps, and [docs/ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md) for the prioritized remediation plan being worked through before wider release.
-
-## Security
-
-External tools invoked by ReconForge (nmap, nuclei, sqlmap, etc.) retain their own licenses and are not distributed with this project — see [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md) for what's expected to be installed separately. See [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the full assets/actors/trust-boundaries model. For responsible disclosure of a security issue in ReconForge itself, see [SECURITY.md](SECURITY.md).
+Reconnaissance and evidence-normalization, not an exploitation platform, not a fully autonomous pentest, and not a stealth tool by default. Full list: [LIMITATIONS.md](docs/LIMITATIONS.md). Prioritized remediation plan: [ARCHITECTURE_REVIEW.md](docs/ARCHITECTURE_REVIEW.md).
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE). Third-party tools ReconForge shells out to are governed by their own licenses.
+[Apache License 2.0](LICENSE). Third-party tools ReconForge shells out to are governed by their own licenses.
