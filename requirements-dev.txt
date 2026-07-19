@@ -20,4 +20,4 @@ setuptools>=83.0.0
 # in CI), this one IS a dev/test dependency: CI needs it to import and test
 # the MCP server package. End users only need it via `pip install
 # reconforge[mcp]` if they want to run `reconforge mcp serve`.
-mcp>=1.2.0
+mcp>=1.28.1
