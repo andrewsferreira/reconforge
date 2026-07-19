@@ -54,7 +54,7 @@ api = [
 # First-party server code, not a wrapped external recon tool — unlike the
 # extras above, this one only enables `reconforge mcp serve`.
 mcp = [
-  "mcp>=1.2.0",
+  "mcp>=1.28.1",
 ]
 
 [project.scripts]
